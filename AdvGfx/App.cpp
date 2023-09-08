@@ -1,16 +1,29 @@
 #include "App.h"
 #include <GLFW/glfw3.h>
+#include <cmath>
 
 namespace App
 {
     GLFWwindow* window { nullptr };
+    AppDesc app_desc;
+
+    uint32_t* render_buffer { nullptr };
 
     int init(AppDesc& desc)
     {
+        app_desc = desc;
+        delete[] render_buffer;
+        render_buffer = new uint32_t[app_desc.width * app_desc.height];
+        memset(render_buffer, 0, app_desc.width * app_desc.height * sizeof(uint32_t));
+
         if (!glfwInit())
+        {
             return -1;
+        }
         else
+        {
             LOGMSG(Log::MessageType::Default, "Initialized GLFW.");
+        }
 
         window = glfwCreateWindow(desc.width, desc.height, desc.title.c_str(), NULL, NULL);
         if (!window)
@@ -23,10 +36,8 @@ namespace App
             LOGMSG(Log::MessageType::Default, "Created Window.");
         }
 
-        /* Make the window's context current */
         glfwMakeContextCurrent(window);
 
-        /* Loop until the user closes the window */
         while (!glfwWindowShouldClose(window))
         {
             App::update();
@@ -38,13 +49,12 @@ namespace App
 
     void update()
     {
-        /* Render here */
         glClear(GL_COLOR_BUFFER_BIT);
 
-        /* Swap front and back buffers */
-        glfwSwapBuffers(window);
+        render_buffer[0] = 0xffffffff;
 
-        /* Poll for and process events */
+        glDrawPixels(app_desc.width, app_desc.height, GL_RGBA, GL_UNSIGNED_BYTE, render_buffer);
+        glfwSwapBuffers(window);
         glfwPollEvents();
     }
 }
