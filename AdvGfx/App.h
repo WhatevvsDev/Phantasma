@@ -5,7 +5,7 @@ struct AppDesc
 {
 	int			width	{ 1200 };
 	int			height	{ 800 };
-	std::string title	{ "Window"};
+	std::string title	{ "AdvGfx"};
 };
 
 namespace App

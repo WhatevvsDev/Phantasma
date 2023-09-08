@@ -36,10 +36,6 @@ namespace Log
 
 	inline void print(MessageType aType, const char* aFile, int aLineNumber, const std::string& aMessage, bool aAssertion = true)
 	{
-		// If assertion passed, ignore this message
-		if(aAssertion && aType == MessageType::Error)
-			return;
-
 		// If assertion didn't pass, throw an exception
 		if(!aAssertion)
 			throw std::exception(aMessage.c_str());
@@ -61,4 +57,3 @@ namespace Log
 }
 
 #define LOGMSG(type, message) Log::print(type, __FILE__, __LINE__, message, true);
-#define LOGASSERT(message, assertion) Log::print(Log::Error, __FILE__, __LINE__, message, assertion);
