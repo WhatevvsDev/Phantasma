@@ -1,4 +1,7 @@
 #include "App.h"
+
+#include "Timer.h"
+
 #include <GLFW/glfw3.h>
 #include <cmath>
 #include <format>
@@ -9,6 +12,9 @@ namespace App
     AppDesc app_desc;
 
     uint32_t* render_buffer { nullptr };
+
+    Timer fps_timer;
+    float last_time { 1.0f };
 
     #define FROM_RGBA(r, g, b, a) ((0x01000000 * a) | (0x00010000 * b) | (0x00000100 * g) | (0x00000001 * r))
 
@@ -28,6 +34,7 @@ namespace App
             LOGMSG(Log::MessageType::Default, "Initialized GLFW.");
         }
 
+        glfwWindowHint(GLFW_RESIZABLE, false);
         window = glfwCreateWindow(desc.width, desc.height, desc.title.c_str(), NULL, NULL);
         if (!window)
         {
@@ -54,6 +61,8 @@ namespace App
         ImGui_ImplGlfw_InitForOpenGL(window, true);
         ImGui_ImplOpenGL3_Init("#version 130");
 
+        fps_timer.start();
+
         while (!glfwWindowShouldClose(window))
         {
             App::update();
@@ -67,7 +76,7 @@ namespace App
     {
         glClear(GL_COLOR_BUFFER_BIT);
 
-        std::string title = std::format("{} Window | FPS: {}", app_desc.title, 0);
+        std::string title = std::format("{} Window | {} ms ({} FPS)", app_desc.title, (int)last_time, (int)(1000.0f / last_time));
 
         glfwSetWindowTitle(window, title.c_str());
         
@@ -89,15 +98,19 @@ namespace App
 
     void render()
     {
+        fps_timer.lap_delta();
+
         for(int y = 0; y < app_desc.height; y++)
         {
             for(int x = 0; x < app_desc.width; x++)
             {
-                int x_t = ((float)x / (float)app_desc.width) * 255.0f;
-                int y_t = ((float)y / (float)app_desc.height) * 255.0f;
+                int x_t = (int)(((float)x / (float)app_desc.width) * 255.0f);
+                int y_t = (int)(((float)y / (float)app_desc.height) * 255.0f);
 
                 render_buffer[x + y * app_desc.width] = (uint32_t)((0x00000100 * x_t) | (0x00000001 * y_t));
             }
         }
+
+        last_time = fps_timer.lap_delta();
     }
 }
