@@ -172,6 +172,7 @@
     <ClCompile Include="imgui_tables.cpp" />
     <ClCompile Include="imgui_widgets.cpp" />
     <ClCompile Include="Math.cpp" />
+    <ClCompile Include="Raytracer.cpp" />
     <ClCompile Include="Source.cpp" />
     <ClCompile Include="Timer.cpp" />
   </ItemGroup>
@@ -180,6 +181,7 @@
     <ClInclude Include="Common.h" />
     <ClInclude Include="LogHelper.h" />
     <ClInclude Include="Math.h" />
+    <ClInclude Include="Raytracer.h" />
     <ClInclude Include="Timer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -1,7 +1,7 @@
 #include "App.h"
+#include "Raytracer.h"
 
 #include "Timer.h"
-#include "Math.h"
 
 #include <GLFW/glfw3.h>
 #include <cmath>
@@ -15,9 +15,8 @@ namespace App
     uint32_t* render_buffer { nullptr };
 
     Timer fps_timer;
-    float last_time { 1.0f };
-
-    #define FROM_RGBA(r, g, b, a) ((0x01000000 * a) | (0x00010000 * b) | (0x00000100 * g) | (0x00000001 * r))
+    float render_time { 1.0f };
+    float update_time { 1.0f };
 
     int init(AppDesc& desc)
     {
@@ -64,6 +63,8 @@ namespace App
 
         fps_timer.start();
 
+        Raytracer::init();
+
         while (!glfwWindowShouldClose(window))
         {
             App::update();
@@ -77,7 +78,11 @@ namespace App
     {
         glClear(GL_COLOR_BUFFER_BIT);
 
-        std::string title = std::format("{} Window | {} ms ({} FPS)", app_desc.title, (int)last_time, (int)(1000.0f / last_time));
+        // Limit to min 1.0f
+        render_time = max(render_time, 1.0f);
+        update_time = max(update_time, 1.0f);
+
+        std::string title = std::format("{} Window | {} ms ({} FPS) | {}ms update", app_desc.title, (int)render_time, (int)(1000.0f / render_time),  (int)update_time);
 
         glfwSetWindowTitle(window, title.c_str());
         
@@ -86,7 +91,11 @@ namespace App
         ImGui::NewFrame();
 
         ImGui::ShowDemoWindow();
-        render();
+
+        // Only get the render time
+        update_time =  fps_timer.lap_delta();
+        Raytracer::raytrace(app_desc.width, app_desc.height, render_buffer);
+        render_time = fps_timer.lap_delta();
 
         glDrawPixels(app_desc.width, app_desc.height, GL_RGBA, GL_UNSIGNED_BYTE, render_buffer);
 
@@ -95,23 +104,5 @@ namespace App
 
         glfwSwapBuffers(window);
         glfwPollEvents();
-    }
-
-    void render()
-    {
-        fps_timer.lap_delta();
-
-        for(int y = 0; y < app_desc.height; y++)
-        {
-            for(int x = 0; x < app_desc.width; x++)
-            {
-                int x_t = (int)(((float)x / (float)app_desc.width) * 255.0f);
-                int y_t = (int)(((float)y / (float)app_desc.height) * 255.0f);
-
-                render_buffer[x + y * app_desc.width] = (uint32_t)((0x00000100 * x_t) | (0x00000001 * y_t));
-            }
-        }
-
-        last_time = fps_timer.lap_delta();
     }
 }

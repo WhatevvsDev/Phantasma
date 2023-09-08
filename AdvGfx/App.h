@@ -12,5 +12,4 @@ namespace App
 {
 	int  init(AppDesc& desc);
 	void update();
-	void render();
 }
