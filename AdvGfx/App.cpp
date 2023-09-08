@@ -9,6 +9,8 @@ namespace App
 
     uint32_t* render_buffer { nullptr };
 
+    #define FROM_RGBA(r, g, b, a) ((0x01000000 * a) | (0x00010000 * b) | (0x00000100 * g) | (0x00000001 * r))
+
     int init(AppDesc& desc)
     {
         app_desc = desc;
@@ -51,10 +53,24 @@ namespace App
     {
         glClear(GL_COLOR_BUFFER_BIT);
 
-        render_buffer[0] = 0xffffffff;
+        render();
 
         glDrawPixels(app_desc.width, app_desc.height, GL_RGBA, GL_UNSIGNED_BYTE, render_buffer);
         glfwSwapBuffers(window);
         glfwPollEvents();
+    }
+
+    void render()
+    {
+        for(int y = 0; y < app_desc.height; y++)
+        {
+            for(int x = 0; x < app_desc.width; x++)
+            {
+                int x_t = ((float)x / (float)app_desc.width) * 255.0f;
+                int y_t = ((float)y / (float)app_desc.height) * 255.0f;
+
+                render_buffer[x + y * app_desc.width] = (uint32_t)((0x00000100 * x_t) | (0x00000001 * y_t));
+            }
+        }
     }
 }
