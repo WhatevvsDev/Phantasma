@@ -1,6 +1,7 @@
 #include "App.h"
 
 #include "Timer.h"
+#include "Math.h"
 
 #include <GLFW/glfw3.h>
 #include <cmath>
