@@ -2,6 +2,7 @@
 #include "Math.h"
 #include "Common.h"
 #include "LogUtility.h"
+#include "IOUtility.h"
 #include "Compute.h"
 
 #include <utility>
@@ -188,7 +189,7 @@ namespace Raytracer
         }
 
         BuildBVH();
-		Compute::create_kernel("C:/Users/Matt/Desktop/AdvGfx/AdvGfx/compute/raytrace_tri.cl", "raytrace");
+		Compute::create_kernel(get_current_directory_path() + "/raytrace_tri.cl", "raytrace");
 	}
 
 	void raytrace(int width, int height, uint32_t* buffer)

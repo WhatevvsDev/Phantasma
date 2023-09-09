@@ -189,6 +189,11 @@
     <ClInclude Include="strippedwindows.h" />
     <ClInclude Include="Timer.h" />
   </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="compute\raytrace_tri.cl">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

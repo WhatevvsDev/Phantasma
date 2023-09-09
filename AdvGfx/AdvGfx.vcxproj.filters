@@ -93,4 +93,7 @@
       <Filter>Utils</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="compute\raytrace_tri.cl" />
+  </ItemGroup>
 </Project>
