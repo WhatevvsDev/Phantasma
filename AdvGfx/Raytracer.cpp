@@ -5,6 +5,8 @@
 #include "IOUtility.h"
 #include "Compute.h"
 
+#include <GLFW/glfw3.h>
+
 #include <utility>
 
 struct Tri 
@@ -172,7 +174,56 @@ struct SceneData
 {
 	uint resolution[2];
 	uint tri_count;
+	uint dummy;
+	glm::vec3 cam_pos{ 0.0f };
 } sceneData;
+
+// Temporary scuffed input
+static bool move_w = false;
+static bool move_a = false;
+static bool move_s = false;
+static bool move_d = false;
+static bool move_space = false;
+static bool move_lctrl = false;
+
+void Raytracer::key_input(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+	if(action != GLFW_PRESS && action != GLFW_RELEASE)
+		return;
+
+	bool is_pressed = (action == GLFW_PRESS);
+
+	switch(key)
+	{
+		case GLFW_KEY_W:
+		move_w = is_pressed;
+		break;
+		case GLFW_KEY_A:
+		move_a = is_pressed;
+		break;
+		case GLFW_KEY_S:
+		move_s = is_pressed;
+		break;
+		case GLFW_KEY_D:
+		move_d = is_pressed;
+		break;
+		case GLFW_KEY_SPACE:
+		move_space = is_pressed;
+		break;
+		case GLFW_KEY_LEFT_CONTROL:
+		move_lctrl = is_pressed;
+		break;
+	}
+}
+
+void Raytracer::mouse_button_input(GLFWwindow* window, int button, int action, int mods)
+{
+
+}
+void Raytracer::cursor_input(GLFWwindow* window, double xpos, double ypos)
+{
+
+}
 
 namespace Raytracer
 {
@@ -200,6 +251,15 @@ namespace Raytracer
 
 	void raytrace(int width, int height, uint32_t* buffer)
 	{
+		int moveHor = (move_d) - (move_a);
+		int moveVer = (move_space) - (move_lctrl);
+		int moveWard = (move_w) - (move_s);
+
+		glm::vec3 dir = {moveHor, moveVer, moveWard};
+		glm::normalize(dir);
+
+		sceneData.cam_pos += dir;
+
 		sceneData.resolution[0] = width;
 		sceneData.resolution[1] = height;
 		sceneData.tri_count = N;
