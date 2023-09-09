@@ -2,6 +2,7 @@
 #include "Math.h"
 #include "Common.h"
 #include "LogUtility.h"
+#include "Compute.h"
 
 #include <utility>
 
@@ -172,6 +173,8 @@ namespace Raytracer
     glm::vec3 p0( -1, 1, -15 ), p1( 1, 1, -15 ), p2( -1, -1, -15 );
     Ray ray;
 
+	ComputeOperation* perform_raytracing;
+
 	void init()
 	{
 		for (int i = 0; i < N; i++)
@@ -185,10 +188,15 @@ namespace Raytracer
         }
 
         BuildBVH();
+
+		Compute::create_kernel("");
+		perform_raytracing = new ComputeOperation();
 	}
 
 	void raytrace(int width, int height, uint32_t* buffer)
 	{
+
+
         for (int y = 0; y < height; y++) 
         {
             for (int x = 0; x < width; x++)
