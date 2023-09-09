@@ -82,7 +82,7 @@ namespace App
         render_time = max(render_time, 1.0f);
         update_time = max(update_time, 1.0f);
 
-        std::string title = std::format("{} Window | {} ms ({} FPS) | {}ms update", app_desc.title, (int)render_time, (int)(1000.0f / render_time),  (int)update_time);
+        std::string title = std::format("{} Window {}x{} | {} ms ({} FPS) | {}ms update", app_desc.title, app_desc.width, app_desc.height, (int)render_time, (int)(1000.0f / render_time),  (int)update_time);
 
         glfwSetWindowTitle(window, title.c_str());
         
