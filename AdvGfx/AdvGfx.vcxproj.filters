@@ -96,4 +96,7 @@
   <ItemGroup>
     <CopyFileToFolders Include="compute\raytrace_tri.cl" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="compute\example.cl" />
+  </ItemGroup>
 </Project>
