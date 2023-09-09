@@ -189,14 +189,12 @@ namespace Raytracer
 
         BuildBVH();
 
-		Compute::create_kernel("");
-		perform_raytracing = new ComputeOperation();
+		//Compute::create_kernel("");
+		//perform_raytracing = new ComputeOperation();
 	}
 
 	void raytrace(int width, int height, uint32_t* buffer)
 	{
-
-
         for (int y = 0; y < height; y++) 
         {
             for (int x = 0; x < width; x++)
