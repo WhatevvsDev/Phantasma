@@ -1,6 +1,7 @@
 #include "Raytracer.h"
 #include "Math.h"
 #include "Common.h"
+#include "LogUtility.h"
 
 #include <utility>
 
@@ -28,7 +29,7 @@ struct BVHNode
     bool isLeaf() { return tri_count > 0; }
 };
 
- #define N 512
+ #define N 2048
 
 // TODO: Swap triangle to bouding box centroid, instead of vertex centroid :)
 

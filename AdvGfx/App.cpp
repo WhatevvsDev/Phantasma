@@ -2,6 +2,7 @@
 #include "Raytracer.h"
 
 #include "Timer.h"
+#include "LogUtility.h"
 
 #include <GLFW/glfw3.h>
 #include <cmath>
