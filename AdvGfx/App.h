@@ -3,8 +3,8 @@
 
 struct AppDesc
 {
-	int			width	{ 640 };
-	int			height	{ 640 };
+	int			width	{ 1200 };
+	int			height	{ 800 };
 	std::string title	{ "Phantasma" };
 };
 
