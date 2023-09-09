@@ -1,5 +1,6 @@
 #include "App.h"
 #include "Raytracer.h"
+#include "Compute.h"
 
 #include "Timer.h"
 #include "LogUtility.h"
@@ -64,6 +65,7 @@ namespace App
 
         fps_timer.start();
 
+        Compute::init();
         Raytracer::init();
 
         while (!glfwWindowShouldClose(window))

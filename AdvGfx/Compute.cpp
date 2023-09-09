@@ -1,9 +1,10 @@
 #include "Compute.h"
 #include "LogUtility.h"
 
-#include <CL/cl2.hpp>
+#define CL_HPP_TARGET_OPENCL_VERSION 300
+#include <CL/opencl.hpp>
 #include <vector>
-#include <iostream>
+#include <format>
 
 void Compute::init()
 {
@@ -11,22 +12,21 @@ void Compute::init()
     std::vector<cl::Platform> all_platforms;
     cl::Platform::get(&all_platforms);
     if(all_platforms.size()==0){
-        std::cout<<" No platforms found. Check OpenCL installation!\n";
+        LOGMSG(Log::MessageType::Error, "No platforms found. Check OpenCL installation!");
         exit(1);
     }
     cl::Platform default_platform=all_platforms[0];
-    std::cout << "Using platform: "<<default_platform.getInfo<CL_PLATFORM_NAME>()<<"\n";
+    LOGMSG(Log::MessageType::Debug, std::format("Using platform: {}", default_platform.getInfo<CL_PLATFORM_NAME>()));
      
     //get default device of the default platform
     std::vector<cl::Device> all_devices;
     default_platform.getDevices(CL_DEVICE_TYPE_ALL, &all_devices);
     if(all_devices.size()==0){
-        std::cout<<" No devices found. Check OpenCL installation!\n";
+        LOGMSG(Log::MessageType::Error, "No devices found. Check OpenCL installation!");
         exit(1);
     }
     cl::Device default_device=all_devices[0];
-    std::cout<< "Using device: "<<default_device.getInfo<CL_DEVICE_NAME>()<<"\n";
-     
+    LOGMSG(Log::MessageType::Debug, std::format("Using device: {}", default_device.getInfo<CL_DEVICE_NAME>()));
      
     cl::Context context({default_device});
      
@@ -41,7 +41,7 @@ void Compute::init()
      
     cl::Program program(context,sources);
     if(program.build({default_device})!=CL_SUCCESS){
-        std::cout<<" Error building: "<<program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(default_device)<<"\n";
+        LOGMSG(Log::MessageType::Error, std::format("Error building: {}", program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(default_device)));
         exit(1);
     }
      
@@ -63,10 +63,6 @@ void Compute::init()
      
      
     //run the kernel
-    //cl::KernelFunctor simple_add(cl::Kernel(program,"simple_add"),queue,cl::NullRange,cl::NDRange(10),cl::NullRange);
-    //simple_add(buffer_A,buffer_B,buffer_C);
-     
-    //alternative way to run the kernel
     cl::Kernel kernel_add=cl::Kernel(program,"simple_add");
     kernel_add.setArg(0,buffer_A);
     kernel_add.setArg(1,buffer_B);
@@ -77,9 +73,4 @@ void Compute::init()
     int C[10];
     //read result C from the device to array C
     queue.enqueueReadBuffer(buffer_C,CL_TRUE,0,sizeof(int)*10,C);
-     
-    std::cout<<" result: \n";
-    for(int i=0;i<10;i++){
-        std::cout<<C[i]<<" ";
-    }
 }
