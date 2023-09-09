@@ -34,4 +34,4 @@ namespace Log
 	void print(Log::MessageType type, const char* file, int line_number, const std::string& message);
 }
 
-#define LOGMSG(type, message) Log::print(type, __FILE__, __LINE__, message, true);
+#define LOGMSG(type, message) Log::print(type, __FILE__, __LINE__, message);

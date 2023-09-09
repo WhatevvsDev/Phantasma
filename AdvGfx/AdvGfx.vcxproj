@@ -176,11 +176,13 @@
     <ClCompile Include="Raytracer.cpp" />
     <ClCompile Include="Source.cpp" />
     <ClCompile Include="Timer.cpp" />
+    <ClCompile Include="Utilities.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="App.h" />
     <ClInclude Include="Common.h" />
     <ClInclude Include="Compute.h" />
+    <ClInclude Include="IOUtility.h" />
     <ClInclude Include="LogUtility.h" />
     <ClInclude Include="Math.h" />
     <ClInclude Include="Raytracer.h" />

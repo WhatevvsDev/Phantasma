@@ -57,6 +57,9 @@
     <ClCompile Include="Compute.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Utilities.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="App.h">
@@ -82,6 +85,9 @@
     </ClInclude>
     <ClInclude Include="strippedwindows.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="IOUtility.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
