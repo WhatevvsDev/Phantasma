@@ -16,6 +16,9 @@
     <Filter Include="External Source">
       <UniqueIdentifier>{25ac6cbc-450c-43ed-8bcf-6c8d5c911369}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Utils">
+      <UniqueIdentifier>{c132f7c6-d7f5-4d45-a46b-ad1cd4f68354}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source.cpp">
@@ -58,17 +61,11 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Utilities.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Utils</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="App.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Common.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="LogUtility.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="Timer.h">
@@ -84,10 +81,16 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="strippedwindows.h">
-      <Filter>Header Files</Filter>
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="LogUtility.h">
+      <Filter>Utils</Filter>
     </ClInclude>
     <ClInclude Include="IOUtility.h">
-      <Filter>Source Files</Filter>
+      <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Common.h">
+      <Filter>Utils</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
