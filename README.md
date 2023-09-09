@@ -1,3 +1,3 @@
-# AdvGfx
+# Phantasma Pathtracer
 
-My repository for the Advanced Graphics Masterclass at Breda University of Applied Sciences given by Jacco Bikker.
+My repository for my Phantasma Pathtracer built along with the Advanced Graphics Masterclass at BUas, given by Jacco Bikker.
