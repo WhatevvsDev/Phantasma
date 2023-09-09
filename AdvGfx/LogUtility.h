@@ -31,26 +31,7 @@ namespace Log
 		}
 	}
 
-	inline void print(MessageType aType, const char* aFile, int aLineNumber, const std::string& aMessage, bool aAssertion = true)
-	{
-		// If assertion didn't pass, throw an exception
-		if(!aAssertion)
-			throw std::exception(aMessage.c_str());
-
-		HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
-
-		// Modify color of text
-		WORD attribute = type_to_color(aType);
-		SetConsoleTextAttribute(handle, attribute);
-
-		// Get only file name
-		std::string fileName { aFile };
-		fileName = fileName.substr(fileName.find_last_of("/\\") + 1).c_str();
-
-		// Print and reset color
-		printf("[%s: %i] - %s\n", fileName.c_str(), aLineNumber, aMessage.c_str());
-		SetConsoleTextAttribute(handle, 15);
-	}
+	void print(Log::MessageType type, const char* file, int line_number, const std::string& message);
 }
 
 #define LOGMSG(type, message) Log::print(type, __FILE__, __LINE__, message, true);
