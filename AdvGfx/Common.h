@@ -6,7 +6,7 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
-#include "LogHelper.h"
+#include "LogUtility.h"
 
 // windows.h: disable as much as possible to speed up compilation.
 #ifndef WIN32_LEAN_AND_MEAN

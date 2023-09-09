@@ -1,5 +1,5 @@
 #include "Timer.h"
-#include "LogHelper.h"
+#include "LogUtility.h"
 
 // Starts timing
 void Timer::start()

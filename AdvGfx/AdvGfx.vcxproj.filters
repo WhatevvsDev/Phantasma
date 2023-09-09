@@ -62,7 +62,7 @@
     <ClInclude Include="Common.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="LogHelper.h">
+    <ClInclude Include="LogUtility.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="Timer.h">

@@ -179,7 +179,7 @@
   <ItemGroup>
     <ClInclude Include="App.h" />
     <ClInclude Include="Common.h" />
-    <ClInclude Include="LogHelper.h" />
+    <ClInclude Include="LogUtility.h" />
     <ClInclude Include="Math.h" />
     <ClInclude Include="Raytracer.h" />
     <ClInclude Include="Timer.h" />
