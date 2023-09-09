@@ -2,9 +2,6 @@
 #include "LogUtility.h"
 #include "IOUtility.h"
 
-#define CL_HPP_TARGET_OPENCL_VERSION 300
-#include <CL/opencl.hpp>
-
 #include <GLM/glm.hpp>
 
 #include <vector>
@@ -104,16 +101,11 @@ ComputeOperation::ComputeOperation(const std::string& kernel_name)
 
 }
 
-template<typename T>
-ComputeOperation& ComputeOperation::write(const std::vector<T>& data)
+ComputeOperation& ComputeOperation::write(const ComputeDataHandle& data)
 {
-    size_t data_size = sizeof(T);
-    size_t data_count = data.size();
-    size_t data_byte_count =  data_size * data_count;
-
-    cl::Buffer new_write_buffer(compute.context, CL_MEM_READ_WRITE, data_byte_count);
+    cl::Buffer new_write_buffer(compute.context, CL_MEM_READ_WRITE, data.data_byte_size);
    
-    compute.queue.enqueueWriteBuffer(new_write_buffer, CL_TRUE, 0, data_byte_count, data.data());
+    compute.queue.enqueueWriteBuffer(new_write_buffer, CL_TRUE, 0, data.data_byte_size, data.data_ptr);
  
     write_buffers.push_back(std::move(new_write_buffer));
     
@@ -123,17 +115,12 @@ ComputeOperation& ComputeOperation::write(const std::vector<T>& data)
     return *this;
 }
 
-template<typename T>
-ComputeOperation& ComputeOperation::read(const std::vector<T>& data)
+ComputeOperation& ComputeOperation::read(const ComputeDataHandle& data)
 {
-    size_t data_size = sizeof(T);
-    size_t data_count = data.size();
-    size_t data_byte_count =  data_size * data_count;
-
     // Create and push new buffer
-    cl::Buffer new_read_buffer = cl::Buffer(compute.context, CL_MEM_READ_WRITE, data_byte_count);
+    cl::Buffer new_read_buffer = cl::Buffer(compute.context, CL_MEM_READ_WRITE, data.data_byte_size);
 
-    read_buffers.push_back({(void*)data.data(), data_byte_count,std::move(new_read_buffer)});
+    read_buffers.push_back({data.data_ptr, data.data_byte_size,std::move(new_read_buffer)});
 
     kernel.setArg(arg_count, read_buffers.back().buffer);
 
@@ -245,6 +232,8 @@ void Compute::init()
     select_device();
     get_context_and_command_queue();
   
+    // Example
+    /*
     create_kernel("C:/Users/Matt/Desktop/AdvGfx/AdvGfx/compute/kernel.cl", "simple_add");
 
     std::vector<int> A = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
@@ -263,4 +252,5 @@ void Compute::init()
     {
         printf("got: %i \n", C[i]);
     }
+    */
 }
