@@ -5,6 +5,8 @@
 #define CL_HPP_TARGET_OPENCL_VERSION 300
 #include <CL/opencl.hpp>
 
+#include <GLM/glm.hpp>
+
 #include <vector>
 #include <format>
 
@@ -108,11 +110,29 @@ struct ComputeOperation
     template<typename T>
     ComputeOperation& read(const std::vector<T>& data);
 
+    ComputeOperation& local_dispatch(glm::ivec3 size);
+
+    ComputeOperation& global_dispatch(glm::ivec3 size);
+
+    void execute();
+    
 private:
-    cl::Kernel& kernel;
+    struct read_destination
+    {
+        void* data_destination;
+        size_t data_byte_count;
+        cl::Buffer buffer;
+    };
+
     int arg_count { 0 };
+
+    glm::ivec3 local_dispatch_size{1, 1, 1};
+    glm::ivec3 global_dispatch_size{1, 1, 1};
+
+    cl::Kernel& kernel;
+
     std::vector<cl::Buffer> write_buffers;
-    cl::Buffer read_buffer;
+    std::vector<read_destination> read_buffers;
 };
 
 ComputeOperation::ComputeOperation(const std::string& kernel_name)
@@ -148,19 +168,42 @@ ComputeOperation& ComputeOperation::read(const std::vector<T>& data)
     size_t data_byte_count =  data_size * data_count;
 
     // Create and push new buffer
-    read_buffer = cl::Buffer(compute.context, CL_MEM_READ_WRITE, data_byte_count);
-    kernel.setArg(arg_count, read_buffer);
-    
-    // This should be dispach size!
-    compute.queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(10), cl::NullRange);
-    compute.queue.finish();
+    cl::Buffer new_read_buffer = cl::Buffer(compute.context, CL_MEM_READ_WRITE, data_byte_count);
 
-    compute.queue.enqueueReadBuffer(read_buffer, CL_TRUE, 0, data_byte_count, (void*)data.data());
+    read_buffers.push_back({(void*)data.data(), data_byte_count,std::move(new_read_buffer)});
+
+    kernel.setArg(arg_count, read_buffers.back().buffer);
 
     arg_count++;
     return *this;
 }
 
+ComputeOperation& ComputeOperation::local_dispatch(glm::ivec3 size)
+{
+    local_dispatch_size = size;
+    return *this;
+}
+
+ComputeOperation& ComputeOperation::global_dispatch(glm::ivec3 size)
+{
+    global_dispatch_size = size;
+    return *this;
+}
+
+void ComputeOperation::execute()
+{
+    // This should be dispach size!
+    compute.queue.enqueueNDRangeKernel(kernel, cl::NullRange, 
+        cl::NDRange(global_dispatch_size.x, global_dispatch_size.y, global_dispatch_size.z), 
+        cl::NDRange(local_dispatch_size.x, local_dispatch_size.y, local_dispatch_size.z));
+
+    compute.queue.finish(); ;
+
+    for(auto& buffer : read_buffers)
+    {
+        compute.queue.enqueueReadBuffer(buffer.buffer, CL_TRUE, 0, buffer.data_byte_count, buffer.data_destination);
+    }
+}
 
 void Compute::create_kernel(const std::string& path, const std::string& entry_point)
 {
@@ -246,11 +289,12 @@ void Compute::init()
     std::vector<int> C;
     C.resize(10);
 
-    ComputeOperation simple_add_op("kernel.cl");
-    simple_add_op
+    ComputeOperation("kernel.cl")
         .write(A)
         .write(B)
-        .read(C);
+        .read(C)
+        .global_dispatch({10, 1, 1})
+        .execute();
 
     for(int i=0; i<10; i++)
     {
