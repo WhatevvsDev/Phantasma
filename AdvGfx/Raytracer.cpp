@@ -17,7 +17,8 @@ struct Ray
 
 Tri tris[N];
 
-void IntersectTri( Ray& ray, const Tri& tri )
+
+void intersect_tri( Ray& ray, const Tri& tri )
 {
     const glm::vec3 edge1 = tri.vertex1 - tri.vertex0;
     const glm::vec3 edge2 = tri.vertex2 - tri.vertex0;
@@ -51,6 +52,9 @@ namespace Raytracer
             tris[i].vertex0 = r0 * 9.0f - glm::vec3( 5 );
             tris[i].vertex1 = tris[i].vertex0 + r1;
             tris[i].vertex2 = tris[i].vertex0 + r2;
+
+            tris[i].centroid = tris[i].vertex0 + tris[i].vertex1 + tris[i].vertex2;
+            tris[i].centroid *= 1.0f / 3.0f;
         }
 	}
 
@@ -65,7 +69,7 @@ namespace Raytracer
                 ray.D = normalize( pixelPos - ray.O );
                 ray.t = 1e30f;
 
-                for( int i = 0; i < N; i++ ) IntersectTri( ray, tris[i] );
+                for( int i = 0; i < N; i++ ) intersect_tri( ray, tris[i] );
 
                 bool hit_anything = ray.t != 1e30f;
 
