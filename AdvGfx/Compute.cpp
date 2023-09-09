@@ -143,11 +143,19 @@ ComputeOperation& ComputeOperation::global_dispatch(glm::ivec3 size)
 void ComputeOperation::execute()
 {
     // This should be dispach size!
-    compute.queue.enqueueNDRangeKernel(kernel, cl::NullRange, 
-        cl::NDRange(global_dispatch_size.x, global_dispatch_size.y, global_dispatch_size.z), 
-        cl::NDRange(local_dispatch_size.x, local_dispatch_size.y, local_dispatch_size.z));
+    cl_int error;
 
-    compute.queue.finish(); ;
+    error = compute.queue.enqueueNDRangeKernel(kernel, cl::NullRange, 
+        cl::NDRange(global_dispatch_size.x, global_dispatch_size.y, global_dispatch_size.z), 
+        cl::NullRange);
+
+    if(error != CL_SUCCESS)
+        LOGMSG(Log::MessageType::Error, std::format("Could not enqueue work! {}", get_cl_error_string(error)));
+
+    error = compute.queue.finish();
+
+    if(error != CL_SUCCESS)
+        LOGMSG(Log::MessageType::Error, std::format("Could not finish work! {}", get_cl_error_string(error)));
 
     for(auto& buffer : read_buffers)
     {

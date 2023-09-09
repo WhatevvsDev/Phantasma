@@ -188,30 +188,17 @@ namespace Raytracer
         }
 
         BuildBVH();
-
-		//Compute::create_kernel("");
-		//perform_raytracing = new ComputeOperation();
+		Compute::create_kernel("C:/Users/Matt/Desktop/AdvGfx/AdvGfx/compute/raytrace_tri.cl", "raytrace");
 	}
 
 	void raytrace(int width, int height, uint32_t* buffer)
 	{
-        for (int y = 0; y < height; y++) 
-        {
-            for (int x = 0; x < width; x++)
-            {
-                glm::vec3 pixelPos = p0 + (p1 - p0) * (x / (float)width) + (p2 - p0) * (y / (float)height);
-                ray.O = camPos;
-                ray.D = normalize( pixelPos - ray.O );
-                ray.t = 1e30f;
-
-                //for( int i = 0; i < N; i++ ) intersect_tri( ray, tris[i] );
-                intersect_bvh(ray, rootNodeIdx);
-
-                bool hit_anything = ray.t != 1e30f;
-
-                buffer[x + y * width] = hit_anything ? 0xffffffff : 0x00000000;
-	
-            }
-        }
+		ComputeOperation("raytrace_tri.cl")
+			//.write({bvhNode, 4096 *  sizeof(BVHNode)})
+			//.write({triIdx, 2048 * sizeof(uint)})
+			.read({buffer, (size_t)(width * height) * sizeof(uint32_t)})
+			.write({tris, 2048 * sizeof(Tri)})
+			.global_dispatch({width, height, 1})
+			.execute();
     }
 }	

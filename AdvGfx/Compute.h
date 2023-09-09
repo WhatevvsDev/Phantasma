@@ -20,6 +20,12 @@ struct ComputeDataHandle
         data_ptr = (void*)data.data();
     }
 
+    inline ComputeDataHandle(void* data, const size_t size)
+    {
+        data_byte_size = size;
+        data_ptr = data;
+    }
+
     friend struct ComputeOperation;
 private:
     void* data_ptr;
