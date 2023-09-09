@@ -6,5 +6,5 @@ namespace Compute
 {
 	void init();
 
-	void create_kernel(const std::string& path);
+	void create_kernel(const std::string& path, const std::string& entry_point);
 }
