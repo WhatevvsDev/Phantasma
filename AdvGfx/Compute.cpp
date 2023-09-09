@@ -184,11 +184,8 @@ void Compute::init()
     //write arrays A and B to the device
     compute.queue.enqueueWriteBuffer(buffer_A,CL_TRUE,0,sizeof(int)*10,A);
     compute.queue.enqueueWriteBuffer(buffer_B,CL_TRUE,0,sizeof(int)*10,B);
- 
- 
+
     //run the kernel
-    //cl::KernelFunctor simple_add(cl::Kernel(program,"simple_add"),queue,cl::NullRange,cl::NDRange(10),cl::NullRange);
-   // simple_add(buffer_A,buffer_B,buffer_C);
  
     //alternative way to run the kernel
     cl::Kernel kernel_add = compute.kernels["kernel.cl"];
@@ -205,43 +202,4 @@ void Compute::init()
     for(int i=0;i<10;i++){
         printf("got: %i", C[i]);
     }
-
-    /*
-     
-    cl::Program::Sources sources;
-    
-    create_kernel("C:/Users/Matt/Desktop/AdvGfx/AdvGfx/compute/kernel.cl");
-     
-    //// create buffers on the device
-    cl::Buffer buffer_A(compute.context,CL_MEM_READ_WRITE,sizeof(int)*10);
-    cl::Buffer buffer_B(compute.context,CL_MEM_READ_WRITE,sizeof(int)*10);
-    cl::Buffer buffer_C(compute.context,CL_MEM_READ_WRITE,sizeof(int)*10);
-     
-    int A[] = {2, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-    int B[] = {0, 1, 2, 0, 1, 2, 0, 1, 2, 0};
-     
-    //create queue to which we will push commands for the device.
-    compute.queue = cl::CommandQueue(compute.context, compute.device);
-     
-    //write arrays A and B to the device
-    compute.queue.enqueueWriteBuffer(buffer_A,CL_TRUE,0,sizeof(int)*10,A);
-    compute.queue.enqueueWriteBuffer(buffer_B,CL_TRUE,0,sizeof(int)*10,B);
-     
-    //run the kernel
-    compute.kernels["kernel.cl"].setArg(0,buffer_A);
-    compute.kernels["kernel.cl"].setArg(1,buffer_B);
-    compute.kernels["kernel.cl"].setArg(2,buffer_C);
-    compute.queue.enqueueNDRangeKernel(compute.kernels["kernel.cl"],cl::NullRange,cl::NDRange(10),cl::NullRange);
-    cl_int finished = compute.queue.finish();
-     
-    int C[10];
-
-    //read result C from the device to array C
-    compute.queue.enqueueReadBuffer(buffer_C,CL_TRUE,0,sizeof(int)*10,C);
-
-    for(auto& c : C)
-    {
-        printf("Got: %i\n", c);
-    }
-    */
 }
