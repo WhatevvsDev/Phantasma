@@ -79,8 +79,8 @@ namespace App
         glClear(GL_COLOR_BUFFER_BIT);
 
         // Limit to min 1.0f
-        render_time = max(render_time, 1.0f);
-        update_time = max(update_time, 1.0f);
+        render_time = fmax(render_time, 1.0f);
+        update_time = fmax(update_time, 1.0f);
 
         std::string title = std::format("{} Window {}x{} | {} ms ({} FPS) | {}ms update", app_desc.title, app_desc.width, app_desc.height, (int)render_time, (int)(1000.0f / render_time),  (int)update_time);
 
