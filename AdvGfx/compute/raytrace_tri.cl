@@ -70,8 +70,14 @@ void IntersectTri( struct Ray* ray, const struct Tri tri)
 //	}
 //}
 
+struct SceneData
+{
+	uint2 resolution;
+	uint tri_count;
+};
+
 //void kernel raytrace(global uint* buffer, global const struct BVHNode* nodes, global const struct Tri* tris, global const uint* trisIdx)
-void kernel raytrace(global uint* buffer, global const struct Tri* tris)
+void kernel raytrace(global uint* buffer, global const struct SceneData* sceneData, global const struct Tri* tris)
 {      
 	float3 camPos = (float3)( 0.0f, 0.0f, -18.0f );
     float3 p0 = (float3)( -1.0f, 1.0f, -15.0f );
@@ -81,9 +87,8 @@ void kernel raytrace(global uint* buffer, global const struct Tri* tris)
 	int x = get_global_id(0);
 	int y = get_global_id(1);
 	
-	int width = 640;
-	int height = 640;
-
+	int width = sceneData->resolution.x;
+	int height = sceneData->resolution.y;
 
 	float3 pixelPos = p0 + (p1 - p0) * (x / (float)width) + (p2 - p0) * (y / (float)height);
 
@@ -94,7 +99,7 @@ void kernel raytrace(global uint* buffer, global const struct Tri* tris)
 
 	//uint rootNodeIdx = 0;
 
-	for(int i = 0; i < 2048; i++)
+	for(int i = 0; i < sceneData->tri_count; i++)
 		IntersectTri(&ray, tris[i]);
 
     //intersect_bvh(&ray, rootNodeIdx, nodes, tris, trisIdx);

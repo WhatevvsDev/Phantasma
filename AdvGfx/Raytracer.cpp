@@ -168,6 +168,12 @@ void Subdivide( uint nodeIdx )
 	Subdivide( rightChildIdx );
 }
 
+struct SceneData
+{
+	uint resolution[2];
+	uint tri_count;
+} sceneData;
+
 namespace Raytracer
 {
     glm::vec3 camPos( 0, 0, -18 );
@@ -186,7 +192,7 @@ namespace Raytracer
             tris[i].vertex0 = r0 * 9.0f - glm::vec3( 5 );
             tris[i].vertex1 = tris[i].vertex0 + r1;
             tris[i].vertex2 = tris[i].vertex0 + r2;
-        }
+        }	
 
         BuildBVH();
 		Compute::create_kernel(get_current_directory_path() + "/raytrace_tri.cl", "raytrace");
@@ -194,12 +200,17 @@ namespace Raytracer
 
 	void raytrace(int width, int height, uint32_t* buffer)
 	{
+		sceneData.resolution[0] = width;
+		sceneData.resolution[1] = height;
+		sceneData.tri_count = N;
+
 		ComputeOperation("raytrace_tri.cl")
 			//.write({bvhNode, 4096 *  sizeof(BVHNode)})
 			//.write({triIdx, 2048 * sizeof(uint)})
 			.read({buffer, (size_t)(width * height) * sizeof(uint32_t)})
+			.write({&sceneData, sizeof(SceneData)})
 			.write({tris, 2048 * sizeof(Tri)})
 			.global_dispatch({width, height, 1})
 			.execute();
     }
-}	
+}
