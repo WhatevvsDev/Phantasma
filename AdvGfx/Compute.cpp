@@ -96,6 +96,72 @@ struct
 
 } compute;
 
+struct ComputeOperation
+{
+    ComputeOperation(const std::string& kernel_name);
+
+    template<typename T>
+    ComputeOperation& write(const std::vector<T>& data);
+
+    // Data should already be resized to accomodate data!
+    // For now only supports one read buffer.
+    template<typename T>
+    ComputeOperation& read(const std::vector<T>& data);
+
+private:
+    cl::Kernel& kernel;
+    int arg_count { 0 };
+    std::vector<cl::Buffer> write_buffers;
+    cl::Buffer read_buffer;
+};
+
+ComputeOperation::ComputeOperation(const std::string& kernel_name)
+    : kernel(compute.kernels.find(kernel_name)->second)
+{
+
+}
+
+template<typename T>
+ComputeOperation& ComputeOperation::write(const std::vector<T>& data)
+{
+    size_t data_size = sizeof(T);
+    size_t data_count = data.size();
+    size_t data_byte_count =  data_size * data_count;
+
+    cl::Buffer new_write_buffer(compute.context, CL_MEM_READ_WRITE, data_byte_count);
+   
+    compute.queue.enqueueWriteBuffer(new_write_buffer, CL_TRUE, 0, data_byte_count, data.data());
+ 
+    write_buffers.push_back(std::move(new_write_buffer));
+    
+    kernel.setArg(arg_count, write_buffers.back());
+
+    arg_count++;
+    return *this;
+}
+
+template<typename T>
+ComputeOperation& ComputeOperation::read(const std::vector<T>& data)
+{
+    size_t data_size = sizeof(T);
+    size_t data_count = data.size();
+    size_t data_byte_count =  data_size * data_count;
+
+    // Create and push new buffer
+    read_buffer = cl::Buffer(compute.context, CL_MEM_READ_WRITE, data_byte_count);
+    kernel.setArg(arg_count, read_buffer);
+    
+    // This should be dispach size!
+    compute.queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(10), cl::NullRange);
+    compute.queue.finish();
+
+    compute.queue.enqueueReadBuffer(read_buffer, CL_TRUE, 0, data_byte_count, (void*)data.data());
+
+    arg_count++;
+    return *this;
+}
+
+
 void Compute::create_kernel(const std::string& path, const std::string& entry_point)
 {
     std::string file_name_with_extension = path.substr(path.find_last_of("\\/") + 1);
@@ -161,45 +227,33 @@ void select_device()
     }
 }
 
+void get_context_and_command_queue()
+{
+    compute.context = (compute.device);
+    compute.queue = cl::CommandQueue(compute.context, compute.device);
+}
+
 void Compute::init()
 {
     select_platform();
     select_device();
-
-    compute.context = (compute.device);
+    get_context_and_command_queue();
   
     create_kernel("C:/Users/Matt/Desktop/AdvGfx/AdvGfx/compute/kernel.cl", "simple_add");
 
-    // create buffers on the device
-    cl::Buffer buffer_A(compute.context,CL_MEM_READ_WRITE,sizeof(int)*10);
-    cl::Buffer buffer_B(compute.context,CL_MEM_READ_WRITE,sizeof(int)*10);
-    cl::Buffer buffer_C(compute.context,CL_MEM_READ_WRITE,sizeof(int)*10);
- 
-    int A[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-    int B[] = {0, 1, 2, 0, 1, 2, 0, 1, 2, 0};
- 
-    //create queue to which we will push commands for the device.
-    compute.queue = cl::CommandQueue(compute.context, compute.device);
- 
-    //write arrays A and B to the device
-    compute.queue.enqueueWriteBuffer(buffer_A,CL_TRUE,0,sizeof(int)*10,A);
-    compute.queue.enqueueWriteBuffer(buffer_B,CL_TRUE,0,sizeof(int)*10,B);
+    std::vector<int> A = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    std::vector<int> B = {0, 1, 2, 0, 1, 2, 0, 1, 2, 0};
+    std::vector<int> C;
+    C.resize(10);
 
-    //run the kernel
- 
-    //alternative way to run the kernel
-    cl::Kernel kernel_add = compute.kernels["kernel.cl"];
-    kernel_add.setArg(0,buffer_A);
-    kernel_add.setArg(1,buffer_B);
-    kernel_add.setArg(2,buffer_C);
-    compute.queue.enqueueNDRangeKernel(kernel_add,cl::NullRange,cl::NDRange(10),cl::NullRange);
-    compute.queue.finish();
- 
-    int C[10];
-    //read result C from the device to array C
-    compute.queue.enqueueReadBuffer(buffer_C,CL_TRUE,0,sizeof(int)*10,C);
- 
-    for(int i=0;i<10;i++){
-        printf("got: %i", C[i]);
+    ComputeOperation simple_add_op("kernel.cl");
+    simple_add_op
+        .write(A)
+        .write(B)
+        .read(C);
+
+    for(int i=0; i<10; i++)
+    {
+        printf("got: %i \n", C[i]);
     }
 }

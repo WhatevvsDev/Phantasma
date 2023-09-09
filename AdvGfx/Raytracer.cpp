@@ -174,8 +174,6 @@ namespace Raytracer
 
 	void init()
 	{
-        LOGMSG(Log::MessageType::Debug, std::string("Size is: ") + std::to_string(sizeof(glm::vec3)));
-
 		for (int i = 0; i < N; i++)
         {
             glm::vec3 r0( RandomFloat(), RandomFloat(), RandomFloat() );
