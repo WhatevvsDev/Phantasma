@@ -99,6 +99,9 @@ namespace App
 
         ImGui::ShowDemoWindow();
 
+        // We need total delta time
+        Raytracer::update(update_time + render_time);
+        
         // Only get the render time
         update_time =  fps_timer.lap_delta();
         Raytracer::raytrace(app_desc.width, app_desc.height, render_buffer);

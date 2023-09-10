@@ -224,7 +224,6 @@ void Raytracer::cursor_input(GLFWwindow* window, double xpos, double ypos)
 {
 
 }
-
 namespace Raytracer
 {
     glm::vec3 camPos( 0, 0, -18 );
@@ -248,8 +247,8 @@ namespace Raytracer
         BuildBVH();
 		Compute::create_kernel(get_current_directory_path() + "/raytrace_tri.cl", "raytrace");
 	}
-
-	void raytrace(int width, int height, uint32_t* buffer)
+	
+	void update(const float delta_time_ms)
 	{
 		int moveHor = (move_d) - (move_a);
 		int moveVer = (move_space) - (move_lctrl);
@@ -258,8 +257,11 @@ namespace Raytracer
 		glm::vec3 dir = {moveHor, moveVer, moveWard};
 		glm::normalize(dir);
 
-		sceneData.cam_pos += dir;
+		sceneData.cam_pos += dir * delta_time_ms * 0.01f;
+	}
 
+	void raytrace(int width, int height, uint32_t* buffer)
+	{
 		sceneData.resolution[0] = width;
 		sceneData.resolution[1] = height;
 		sceneData.tri_count = N;
