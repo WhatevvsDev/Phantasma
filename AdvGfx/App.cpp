@@ -47,7 +47,8 @@ namespace App
         {
             LOGMSG(Log::MessageType::Default, "Created Window.");
         }
-
+        
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         glfwMakeContextCurrent(window);
         
         glfwSetKeyCallback(window, Raytracer::key_input);

@@ -75,51 +75,37 @@ struct SceneData
 	uint2 resolution;
 	uint tri_count;
 	uint dummy;
-	float3 cam_pos;
+	float4 cam_pos;
+	float4 cam_forward;
+	float4 cam_right;
+	float4 cam_up;
 };
 
-struct Ray pinhole_ray(uint2* pixel, struct SceneData* sceneData)
-{
-	float tanHalfAngle = tan(90.0f / 2.f);
-	float aspectScale = sceneData->resolution.x;
-
-	float f_x = (float)(pixel->x);
-	float f_y = (float)(pixel->y);
-
-	f_x += 0.5f - (sceneData->resolution.x / 2.f);
-	f_y += 0.5f - (sceneData->resolution.y / 2.f);
-
-	float2 shit = (float2)(f_x, f_y) * tanHalfAngle / aspectScale;
-	
-	float3 direction = normalize((float3)(shit.x, shit.y , 1));
-
-	struct Ray generated;
-	generated.O = sceneData->cam_pos;
-	generated.D = direction;
-	generated.t = 1e30f;
-
-	return generated;
-}
-
-
-//void kernel raytrace(global uint* buffer, global const struct BVHNode* nodes, global const struct Tri* tris, global const uint* trisIdx)
 void kernel raytrace(global uint* buffer, global const struct SceneData* sceneData, global const struct Tri* tris)
-{      
-	float3 camPos = (float3)( 0.0f, 0.0f, -18.0f );
-    float3 p0 = (float3)( -1.0f, 1.0f, -15.0f );
-	float3 p1 = (float3)( 1.0f, 1.0f, -15.0f );
-	float3 p2 = (float3)( -1.0f, -1.0f, -15.0f );
+{     
+	float3 cpos = (float3)(sceneData->cam_pos.x, sceneData->cam_pos.y, sceneData->cam_pos.z);
+
+	float3 cright = (float3)(sceneData->cam_right.x, sceneData->cam_right.y, sceneData->cam_right.z);
+	float3 cforward = (float3)(sceneData->cam_forward.x, sceneData->cam_forward.y, sceneData->cam_forward.z);
+	float3 cup = (float3)(sceneData->cam_up.x, sceneData->cam_up.y, sceneData->cam_up.z);
 	
 	int x = get_global_id(0);
 	int y = get_global_id(1);
-	uint2 pixel = (uint2)(x, y);
 	
 	int width = sceneData->resolution.x;
 	int height = sceneData->resolution.y;
 
-	float3 pixelPos = p0 + (p1 - p0) * (x / (float)width) + (p2 - p0) * (y / (float)height);
+	float x_t = ((x / (float)width) - 0.5f) * 2.0f;
+	float y_t = ((y / (float)height)- 0.5f) * 2.0f;
 
-	struct Ray ray = pinhole_ray(&pixel, sceneData);
+	float aspect_ratio = (float)(sceneData->resolution.x) / (float)(sceneData->resolution.y);
+
+	float3 pixelPos = cforward + cright * x_t * aspect_ratio + cup * y_t;
+
+	struct Ray ray;
+	ray.O = cpos;
+    ray.D = normalize( pixelPos );
+    ray.t = 1e30f;
 
 	//uint rootNodeIdx = 0;
 
@@ -138,4 +124,4 @@ void kernel raytrace(global uint* buffer, global const struct SceneData* sceneDa
 	{
 		buffer[x + y * width] = 0x00000000;
 	}
-}                                                                               
+}
