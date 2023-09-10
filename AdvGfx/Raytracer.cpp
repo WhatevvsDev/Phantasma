@@ -17,7 +17,9 @@ struct Tri
 
 struct Ray 
 { 
-    glm::vec3 O, D; float t = 1e30f; 
+	glm::vec3 O {};
+	glm::vec3 D {}; 
+	float t = 1e30f; 
 };
 
 struct AABB
@@ -150,7 +152,7 @@ void Subdivide( uint nodeIdx )
 	}
 	// abort split if one of the sides is empty
 	int leftCount = i - node.left_first;
-	if (leftCount == 0 || leftCount == node.tri_count) return;
+	if (leftCount == 0 || leftCount == (int)node.tri_count) return;
 	// create child nodes
 	int leftChildIdx = nodes_used++;
 	int rightChildIdx = nodes_used++;
@@ -172,10 +174,10 @@ void Subdivide( uint nodeIdx )
 
 struct SceneData
 {
-	uint resolution[2];
-	uint tri_count;
-	uint dummy;
-	glm::vec3 cam_pos{ 0.0f };
+	uint resolution[2]	{ 0, 0 };
+	uint tri_count		{ 0 };
+	uint dummy			{ 0 };
+	glm::vec3 cam_pos	{ 0.0f };
 } sceneData;
 
 // Temporary scuffed input
@@ -188,6 +190,12 @@ static bool move_lctrl = false;
 
 void Raytracer::key_input(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
+	// Unused parameters
+	(void)window;
+	(void)scancode;
+	(void)action;
+	(void)mods;
+
 	if(action != GLFW_PRESS && action != GLFW_RELEASE)
 		return;
 
@@ -218,12 +226,20 @@ void Raytracer::key_input(GLFWwindow* window, int key, int scancode, int action,
 
 void Raytracer::mouse_button_input(GLFWwindow* window, int button, int action, int mods)
 {
-
+	// Unused parameters
+	(void)window;
+	(void)button;
+	(void)action;
+	(void)mods;
 }
 void Raytracer::cursor_input(GLFWwindow* window, double xpos, double ypos)
 {
-
+	// Unused parameters
+	(void)window;
+	(void)xpos;
+	(void)ypos;
 }
+
 namespace Raytracer
 {
     glm::vec3 camPos( 0, 0, -18 );
