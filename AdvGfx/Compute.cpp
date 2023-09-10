@@ -182,9 +182,11 @@ void Compute::create_kernel(const std::string& path, const std::string& entry_po
         return;
     }
 
-    LOGMSG(Log::MessageType::Debug, "Build log: " + created_program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(compute.device));
 
-    LOGMSG(Log::MessageType::Debug, std::format("Created kernel: {}", path))
+    LOGMSG(Log::MessageType::Debug, std::format("Created kernel: {}", path));
+    std::string build_log = created_program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(compute.device);
+    if(build_log.length() > 10)
+        LOGMSG(Log::MessageType::Debug, "Build log: " + build_log);
 
     cl::Kernel kernel = cl::Kernel(created_program, entry_point.c_str(), &error);
 
@@ -204,7 +206,7 @@ void select_platform()
     cl::Platform::get(&all_platforms);
 
     if(all_platforms.empty())
-    {
+    {   
         LOGMSG(Log::MessageType::Error, "No platforms found. Check OpenCL installation!");
         exit(1);
     }
