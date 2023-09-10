@@ -6,6 +6,7 @@ My repository for my Phantasma Pathtracer built along with the Advanced Graphics
 - WASD - Move camera
 - Space/LCtrl - Move up/down
 - F1 - Toggle cursor
+- P - Screenshot
 
 ### Current features
 - GPU Acceleration via OpenCL
