@@ -128,11 +128,11 @@ void kernel raytrace(global uint* buffer, global const struct SceneData* sceneDa
 
     //intersect_bvh(&ray, rootNodeIdx, nodes, tris, trisIdx);
 
-	bool hit_anything = ray.t < 1e30f;
+	bool hit_anything = ray.t != 1e30f;
 
 	if(hit_anything)
 	{
-		buffer[x + y * width] = 0xffffffff;
+		buffer[x + y * width] = 0x01010101 * min((int)((1.0f / ray.t) * 255.0f), 255);
 	}
 	else
 	{
