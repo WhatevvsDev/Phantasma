@@ -191,7 +191,8 @@ void Raytracer::key_input(GLFWwindow* window, int key, int scancode, int action,
 		move_d = is_pressed;
 		break;
 		case GLFW_KEY_P:
-		screenshot = true;
+		if(is_pressed)
+			screenshot = true;
 		break;
 		case GLFW_KEY_SPACE:
 		move_space = is_pressed;
@@ -319,7 +320,9 @@ namespace Raytracer
 
 		if(screenshot)
 		{
-			stbi_write_png("render.png", width, height, 4, buffer, sizeof(uint32_t));
+			stbi_flip_vertically_on_write(true);
+			stbi_write_jpg("render.jpg", width, height, 4, buffer, width * 4 );
+			stbi_flip_vertically_on_write(false);
 			LOGMSG(Log::MessageType::Debug, "Saved screenshot.");
 			screenshot = false;
 		}
