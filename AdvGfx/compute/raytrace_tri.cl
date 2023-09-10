@@ -1,6 +1,8 @@
 struct Tri 
 { 
-    float3 vertex0, vertex1, vertex2; 
+    float3 vertex0;
+	float3 vertex1;
+	float3 vertex2; 
     float3 center;
 };
 

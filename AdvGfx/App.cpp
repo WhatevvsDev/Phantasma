@@ -48,7 +48,6 @@ namespace App
             LOGMSG(Log::MessageType::Default, "Created Window.");
         }
         
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         glfwMakeContextCurrent(window);
         
         glfwSetKeyCallback(window, Raytracer::key_input);
@@ -98,7 +97,7 @@ namespace App
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::ShowDemoWindow();
+        Raytracer::ui();
 
         // We need total delta time
         Raytracer::update(update_time + render_time);

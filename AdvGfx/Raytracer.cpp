@@ -11,8 +11,14 @@
 
 struct Tri 
 { 
-    glm::vec3 vertex0, vertex1, vertex2; 
+    glm::vec3 vertex0;
+	float pad_0;
+	glm::vec3 vertex1;
+	float pad_1;
+	glm::vec3 vertex2;
+	float pad_2;
     glm::vec3 centroid;
+	float pad_3;
 };
 
 struct Ray 
@@ -193,6 +199,7 @@ bool move_lctrl = false;
 float mouse_x = 0.0f;
 float mouse_y = 0.0f;
 glm::vec3 cam_rotation;
+bool mouse_active = false;
 
 void Raytracer::key_input(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -230,7 +237,16 @@ void Raytracer::key_input(GLFWwindow* window, int key, int scancode, int action,
 		case GLFW_KEY_ESCAPE:
 		exit(0);
 		break;
+		case GLFW_KEY_F1:
+		if(is_pressed)
+			mouse_active = !mouse_active;
+		break;
 	}
+
+	if(mouse_active)
+		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+	else
+		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 }
 
 void Raytracer::mouse_button_input(GLFWwindow* window, int button, int action, int mods)
@@ -242,12 +258,14 @@ void Raytracer::mouse_button_input(GLFWwindow* window, int button, int action, i
 	(void)mods;
 }
 
-
 void Raytracer::cursor_input(GLFWwindow* window, double xpos, double ypos)
 {
 	// Ignore first input to prevent janky motion.
 	static bool first_input = true;
 	if(first_input = false)
+		return;
+
+	if(mouse_active)
 		return;
 
 	// Unused parameters
@@ -267,8 +285,6 @@ void Raytracer::cursor_input(GLFWwindow* window, double xpos, double ypos)
 		cam_rotation.x = 89.9f * sgn(cam_rotation.x);
 	}
 
-	LOGMSG(Log::MessageType::Default, std::to_string(cam_rotation.x));
-
 	last_xpos = xpos;
 	last_ypos = ypos;
 }
@@ -279,18 +295,25 @@ namespace Raytracer
     glm::vec3 p0( -1, 1, -15 ), p1( 1, 1, -15 ), p2( -1, -1, -15 );
     Ray ray;
 
+	glm::vec3 testing_pos( 0, 0, 0 );
+
 	ComputeOperation* perform_raytracing;
 
 	void init()
 	{
+        glm::vec3 p = glm::vec3(RandomFloat(), RandomFloat(), RandomFloat());// * 20.0f * RandomFloat();
+
 		for (int i = 0; i < N; i++)
         {
+			p = glm::vec3(RandomFloat(), RandomFloat(), RandomFloat()) * 20.0f;
+
             glm::vec3 r0( RandomFloat(), RandomFloat(), RandomFloat() );
             glm::vec3 r1( RandomFloat(), RandomFloat(), RandomFloat() );
             glm::vec3 r2( RandomFloat(), RandomFloat(), RandomFloat() );
-            tris[i].vertex0 = r0 * 9.0f - glm::vec3( 5 );
-            tris[i].vertex1 = tris[i].vertex0 + r1;
-            tris[i].vertex2 = tris[i].vertex0 + r2;
+
+            tris[i].vertex0 = r0 + p;
+            tris[i].vertex1 = r1 + p;
+            tris[i].vertex2 = r2 + p;
         }	
 
         BuildBVH();
@@ -333,4 +356,19 @@ namespace Raytracer
 			.global_dispatch({width, height, 1})
 			.execute();
     }
+
+	void ui()
+	{
+		glm::vec3 last_pos = testing_pos;
+
+		if(ImGui::DragFloat3("pos", &testing_pos.x, 0.01f))
+		{
+			for(int i = 0; i < N; i++)
+			{
+				tris[i].vertex0 += testing_pos - last_pos;
+				tris[i].vertex1 += testing_pos - last_pos;
+				tris[i].vertex2 += testing_pos - last_pos;
+			}
+		}
+	}
 }
