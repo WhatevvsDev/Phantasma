@@ -95,6 +95,17 @@ struct
 
 } compute;
 
+#ifdef _DEBUG
+#define CHECKCL(func) \
+{\
+    cl_int function_result = func;\
+    if(function_result != CL_SUCCESS) LOGMSG(Log::MessageType::Error, get_cl_error_string(function_result));\
+}
+#else
+#define CHECKCL(result) func;
+#endif
+
+
 ComputeOperation::ComputeOperation(const std::string& kernel_name)
     : kernel(compute.kernels.find(kernel_name)->second)
 {
@@ -105,8 +116,8 @@ ComputeOperation& ComputeOperation::write(const ComputeDataHandle& data)
 {
     cl::Buffer new_write_buffer(compute.context, CL_MEM_READ_WRITE, data.data_byte_size);
    
-    compute.queue.enqueueWriteBuffer(new_write_buffer, CL_TRUE, 0, data.data_byte_size, data.data_ptr);
- 
+    CHECKCL(compute.queue.enqueueWriteBuffer(new_write_buffer, CL_TRUE, 0, data.data_byte_size, data.data_ptr));
+
     write_buffers.push_back(std::move(new_write_buffer));
     
     kernel.setArg(arg_count, write_buffers.back());
@@ -142,24 +153,15 @@ ComputeOperation& ComputeOperation::global_dispatch(glm::ivec3 size)
 
 void ComputeOperation::execute()
 {
-    // This should be dispach size!
-    cl_int error;
-
-    error = compute.queue.enqueueNDRangeKernel(kernel, cl::NullRange, 
+     CHECKCL(compute.queue.enqueueNDRangeKernel(kernel, cl::NullRange, 
         cl::NDRange(global_dispatch_size.x, global_dispatch_size.y, global_dispatch_size.z), 
-        cl::NullRange);
+        cl::NullRange));
 
-    if(error != CL_SUCCESS)
-        LOGMSG(Log::MessageType::Error, std::format("Could not enqueue work! {}", get_cl_error_string(error)));
-
-    error = compute.queue.finish();
-
-    if(error != CL_SUCCESS)
-        LOGMSG(Log::MessageType::Error, std::format("Could not finish work! {}", get_cl_error_string(error)));
+     CHECKCL(compute.queue.finish());
 
     for(auto& buffer : read_buffers)
     {
-        compute.queue.enqueueReadBuffer(buffer.buffer, CL_TRUE, 0, buffer.data_byte_count, buffer.data_destination);
+         CHECKCL(compute.queue.enqueueReadBuffer(buffer.buffer, CL_TRUE, 0, buffer.data_byte_count, buffer.data_destination));
     }
 }
 
