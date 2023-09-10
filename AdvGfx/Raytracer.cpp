@@ -5,6 +5,12 @@
 #include "IOUtility.h"
 #include "Compute.h"
 
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image.h"
+#include "stb_image_write.h"
+
+
 #include <GLFW/glfw3.h>
 
 #include <utility>
@@ -49,7 +55,6 @@ struct BVHNode
 // TODO: Swap triangle to bouding box centroid, instead of vertex centroid :)
 
 void UpdateNodeBounds( uint nodeIdx );
-
 void Subdivide( uint nodeIdx );
 
 // application data
@@ -156,6 +161,7 @@ float mouse_x = 0.0f;
 float mouse_y = 0.0f;
 glm::vec3 cam_rotation;
 bool mouse_active = false;
+bool screenshot = false;
 
 void Raytracer::key_input(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -183,6 +189,9 @@ void Raytracer::key_input(GLFWwindow* window, int key, int scancode, int action,
 		break;
 		case GLFW_KEY_D:
 		move_d = is_pressed;
+		break;
+		case GLFW_KEY_P:
+		screenshot = true;
 		break;
 		case GLFW_KEY_SPACE:
 		move_space = is_pressed;
@@ -249,7 +258,6 @@ namespace Raytracer
 {	
 	glm::vec3 testing_pos( 0, 0, 0 );
 
-
 	ComputeOperation* perform_raytracing;
 
 	void init()
@@ -308,6 +316,13 @@ namespace Raytracer
 			.write({triIdx, N * sizeof(uint)})
 			.global_dispatch({width, height, 1})
 			.execute();
+
+		if(screenshot)
+		{
+			stbi_write_png("render.png", width, height, 4, buffer, sizeof(uint32_t));
+			LOGMSG(Log::MessageType::Debug, "Saved screenshot.");
+			screenshot = false;
+		}
     }
 
 	void ui()

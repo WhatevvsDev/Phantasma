@@ -186,6 +186,8 @@
     <ClInclude Include="LogUtility.h" />
     <ClInclude Include="Math.h" />
     <ClInclude Include="Raytracer.h" />
+    <ClInclude Include="stb_image.h" />
+    <ClInclude Include="stb_image_write.h" />
     <ClInclude Include="strippedwindows.h" />
     <ClInclude Include="Timer.h" />
   </ItemGroup>

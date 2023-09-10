@@ -92,6 +92,12 @@
     <ClInclude Include="Common.h">
       <Filter>Utils</Filter>
     </ClInclude>
+    <ClInclude Include="stb_image.h">
+      <Filter>External Source</Filter>
+    </ClInclude>
+    <ClInclude Include="stb_image_write.h">
+      <Filter>External Source</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="compute\raytrace_tri.cl" />
