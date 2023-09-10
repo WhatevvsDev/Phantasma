@@ -31,14 +31,17 @@ struct Ray
 struct AABB
 {
     glm::vec3 min;
+	float pad_0;
     glm::vec3 max;
+	float pad_1;
 };
 
 struct BVHNode
 {
-    AABB aabb;
-    uint left_first, tri_count;
-    bool isLeaf() { return tri_count > 0; }
+	AABB aabb;
+    uint left_first;
+	uint tri_count;
+	uint pad_0[2];
 };
 
  #define N 2048
@@ -54,53 +57,6 @@ Tri tris[N];
 uint triIdx[N];
 BVHNode bvhNode[N * 2];
 uint rootNodeIdx = 0, nodes_used = 1;
-
-// functions
-
-void IntersectTri( Ray& ray, const Tri& tri )
-{
-	const glm::vec3 edge1 = tri.vertex1 - tri.vertex0;
-	const glm::vec3 edge2 = tri.vertex2 - tri.vertex0;
-	const glm::vec3 h = cross( ray.D, edge2 );
-	const float a = dot( edge1, h );
-	if (a > -0.0001f && a < 0.0001f) return; // ray parallel to triangle
-	const float f = 1 / a;
-	const glm::vec3 s = ray.O - tri.vertex0;
-	const float u = f * dot( s, h );
-	if (u < 0 || u > 1) return;
-	const glm::vec3 q = cross( s, edge1 );
-	const float v = f * dot( ray.D, q );
-	if (v < 0 || u + v > 1) return;
-	const float t = f * dot( edge2, q );
-	if (t > 0.0001f) ray.t = fmin( ray.t, t );
-}
-
-bool IntersectAABB( const Ray& ray, const glm::vec3 bmin, const glm::vec3 bmax )
-{
-	float tx1 = (bmin.x - ray.O.x) / ray.D.x, tx2 = (bmax.x - ray.O.x) / ray.D.x;
-	float tmin = fmin( tx1, tx2 ), tmax = fmax( tx1, tx2 );
-	float ty1 = (bmin.y - ray.O.y) / ray.D.y, ty2 = (bmax.y - ray.O.y) / ray.D.y;
-	tmin = fmax( tmin, fmin( ty1, ty2 ) ), tmax = fmin( tmax, fmax( ty1, ty2 ) );
-	float tz1 = (bmin.z - ray.O.z) / ray.D.z, tz2 = (bmax.z - ray.O.z) / ray.D.z;
-	tmin = fmax( tmin, fmin( tz1, tz2 ) ), tmax = fmin( tmax, fmax( tz1, tz2 ) );
-	return tmax >= tmin && tmin < ray.t && tmax > 0;
-}
-
-void intersect_bvh( Ray& ray, const uint nodeIdx )
-{
-	BVHNode& node = bvhNode[nodeIdx];
-	if (!IntersectAABB( ray, node.aabb.min, node.aabb.max )) return;
-	if (node.isLeaf())
-	{
-		for (uint i = 0; i < node.tri_count; i++ )
-			IntersectTri( ray, tris[triIdx[node.left_first + i]] );
-	}
-	else
-	{
-		intersect_bvh( ray, node.left_first );
-		intersect_bvh( ray, node.left_first + 1 );
-	}
-}
 
 void BuildBVH()
 {
@@ -290,12 +246,9 @@ void Raytracer::cursor_input(GLFWwindow* window, double xpos, double ypos)
 }
 
 namespace Raytracer
-{
-    glm::vec3 camPos( 0, 0, -18 );
-    glm::vec3 p0( -1, 1, -15 ), p1( 1, 1, -15 ), p2( -1, -1, -15 );
-    Ray ray;
-
+{	
 	glm::vec3 testing_pos( 0, 0, 0 );
+
 
 	ComputeOperation* perform_raytracing;
 
@@ -348,11 +301,11 @@ namespace Raytracer
 		sceneData.tri_count = N;
 
 		ComputeOperation("raytrace_tri.cl")
-			//.write({bvhNode, 4096 *  sizeof(BVHNode)})
-			//.write({triIdx, 2048 * sizeof(uint)})
 			.read({buffer, (size_t)(width * height) * sizeof(uint32_t)})
 			.write({&sceneData, sizeof(SceneData)})
 			.write({tris, 2048 * sizeof(Tri)})
+			.write({bvhNode, 4096 *  sizeof(BVHNode)})
+			.write({triIdx, 2048 * sizeof(uint)})
 			.global_dispatch({width, height, 1})
 			.execute();
     }

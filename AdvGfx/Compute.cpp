@@ -172,13 +172,15 @@ void Compute::create_kernel(const std::string& path, const std::string& entry_po
 
     cl::Program created_program(compute.context, sources);
 
-    cl_int error = created_program.build({compute.device});
+    cl_int error = created_program.build({compute.device}, "-w");
 
     if(error != CL_SUCCESS)
     {
         LOGMSG(Log::MessageType::Error, std::format("Failed to create kernel: {} \n {}", path, created_program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(compute.device)));
         return;
     }
+
+    LOGMSG(Log::MessageType::Debug, "Build log: " + created_program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(compute.device));
 
     LOGMSG(Log::MessageType::Debug, std::format("Created kernel: {}", path))
 

@@ -13,27 +13,22 @@ struct Ray
     float t; 
 };
 
-//struct AABB
-//{
-//    float3 min;
-//    float3 max;
-//};
-//
-//struct BVHNode
-//{
-//    struct AABB aabb;
-//    uint left_first, tri_count;
-//};
-
-void IntersectTri( struct Ray* ray, const struct Tri tri)
+struct BVHNode
 {
-	const float3 edge1 = tri.vertex1 - tri.vertex0;
-	const float3 edge2 = tri.vertex2 - tri.vertex0;
+    float3 aabb_min;
+    float3 aabb_max;
+    uint left_first, tri_count;
+};
+
+void IntersectTri( struct Ray* ray, const struct Tri* tri)
+{
+	const float3 edge1 = tri->vertex1 - tri->vertex0;
+	const float3 edge2 = tri->vertex2 - tri->vertex0;
 	const float3 h = cross( ray->D, edge2 );
 	const float a = dot( edge1, h );
 	if (a > -0.0001f && a < 0.0001f) return; // ray parallel to triangle
 	const float f = 1 / a;
-	const float3 s = ray->O - tri.vertex0;
+	const float3 s = ray->O - tri->vertex0;
 	const float u = f * dot( s, h );
 	if (u < 0 || u > 1) return;
 	const float3 q = cross( s, edge1 );
@@ -43,34 +38,35 @@ void IntersectTri( struct Ray* ray, const struct Tri tri)
 	if (t > 0.0001f) ray->t = min( ray->t, t );
 }
 
-//bool IntersectAABB( const struct Ray* ray, const float3 bmin, const float3 bmax )
-//{
-//	float tx1 = (bmin.x - ray->O.x) / ray->D.x, tx2 = (bmax.x - ray->O.x) / ray->D.x;
-//	float tmin = min( tx1, tx2 ), tmax = fmax( tx1, tx2 );
-//	float ty1 = (bmin.y - ray->O.y) / ray->D.y, ty2 = (bmax.y - ray->O.y) / ray->D.y;
-//	tmin = max( tmin, min( ty1, ty2 ) ), tmax = min( tmax, max( ty1, ty2 ) );
-//	float tz1 = (bmin.z - ray->O.z) / ray->D.z, tz2 = (bmax.z - ray->O.z) / ray->D.z;
-//	tmin = max( tmin, min( tz1, tz2 ) ), tmax = min( tmax, max( tz1, tz2 ) );
-//	return tmax >= tmin && tmin < ray->t && tmax > 0;
-//}
-//
-//void intersect_bvh( struct Ray* ray, const uint nodeIdx, struct BVHNode* nodes, struct Tri* tris, uint* trisIdx)
-//{
-//	struct BVHNode node = nodes[nodeIdx];
-//	if (!IntersectAABB( ray, node.aabb.min, node.aabb.max )) 
-//		return;
-//
-//	if (node.tri_count > 0)
-//	{
-//		for (uint i = 0; i < node.tri_count; i++ )
-//			IntersectTri( ray, tris[trisIdx[node.left_first + i]] );
-//	}
-//	else
-//	{
-//		intersect_bvh( ray, node.left_first, nodes, tris, trisIdx);
-//		intersect_bvh( ray, node.left_first + 1, nodes, tris, trisIdx);
-//	}
-//}
+bool IntersectAABB( const struct Ray* ray, const float3 bmin, const float3 bmax )
+{
+	float tx1 = (bmin.x - ray->O.x) / ray->D.x, tx2 = (bmax.x - ray->O.x) / ray->D.x;
+    float tmin = min( tx1, tx2 ), tmax = max( tx1, tx2 );
+    float ty1 = (bmin.y - ray->O.y) / ray->D.y, ty2 = (bmax.y - ray->O.y) / ray->D.y;
+    tmin = max( tmin, min( ty1, ty2 ) ), tmax = min( tmax, max( ty1, ty2 ) );
+    float tz1 = (bmin.z - ray->O.z) / ray->D.z, tz2 = (bmax.z - ray->O.z) / ray->D.z;
+    tmin = max( tmin, min( tz1, tz2 ) ), tmax = min( tmax, max( tz1, tz2 ) );
+    return tmax >= tmin && tmin < ray->t && tmax > 0;
+}
+
+void intersect_bvh( struct Ray* ray, const uint nodeIdx, struct BVHNode* nodes, struct Tri* tris, uint* trisIdx, uint depth)
+{
+	struct BVHNode* node = &nodes[nodeIdx];
+	if (!IntersectAABB( ray, node->aabb_min, node->aabb_max ))
+		return;
+	
+	if (node->tri_count > 0)
+	{
+		for (uint i = 0; i < node->tri_count; i++ )
+			IntersectTri( ray, &tris[trisIdx[node->left_first + i]] );
+		return;
+	}
+	else
+	{
+		intersect_bvh( ray, node->left_first, nodes, tris, trisIdx, depth - 1);
+		intersect_bvh( ray, node->left_first + 1, nodes, tris, trisIdx, depth - 1);
+	}
+}
 
 float3 lerp(float3 a, float3 b, float t){
     return a + t*(b-a);
@@ -87,11 +83,11 @@ struct SceneData
 	float4 cam_up;
 };
 
-void kernel raytrace(global uint* buffer, global const struct SceneData* sceneData, global const struct Tri* tris)
+void kernel raytrace(global uint* buffer, global const struct SceneData* sceneData, global const struct Tri* tris, global const struct BVHNode* nodes, global const uint* trisIdx)
 {     
 	float3 cpos = (float3)(sceneData->cam_pos.x, sceneData->cam_pos.y, sceneData->cam_pos.z);
 
-	float3 cright = (float3)(sceneData->cam_right.x, sceneData->cam_right.y, sceneData->cam_right.z);
+	float3 cright = (float3)(sceneData->cam_right.x, sceneData->cam_right.y, sceneData->cam_right.z);	
 	float3 cforward = (float3)(sceneData->cam_forward.x, sceneData->cam_forward.y, sceneData->cam_forward.z);
 	float3 cup = (float3)(sceneData->cam_up.x, sceneData->cam_up.y, sceneData->cam_up.z);
 	
@@ -114,12 +110,9 @@ void kernel raytrace(global uint* buffer, global const struct SceneData* sceneDa
     ray.D = normalize( pixelPos );
     ray.t = 1e30f;
 
-	//uint rootNodeIdx = 0;7
+	uint rootNodeIdx = 0;
 	
-	for(int i = 0; i < sceneData->tri_count; i++)
-		IntersectTri(&ray, tris[i]);
-
-    //intersect_bvh(&ray, rootNodeIdx, nodes, tris, trisIdx);
+    intersect_bvh(&ray, rootNodeIdx, nodes, tris, trisIdx, 2);
 
 	bool hit_anything = ray.t != 1e30f;
 
