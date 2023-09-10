@@ -70,6 +70,10 @@ void IntersectTri( struct Ray* ray, const struct Tri tri)
 //	}
 //}
 
+float3 lerp(float3 a, float3 b, float t){
+    return a + t*(b-a);
+}
+
 struct SceneData
 {
 	uint2 resolution;
@@ -107,8 +111,8 @@ void kernel raytrace(global uint* buffer, global const struct SceneData* sceneDa
     ray.D = normalize( pixelPos );
     ray.t = 1e30f;
 
-	//uint rootNodeIdx = 0;
-
+	//uint rootNodeIdx = 0;7
+	
 	for(int i = 0; i < sceneData->tri_count; i++)
 		IntersectTri(&ray, tris[i]);
 
@@ -122,6 +126,15 @@ void kernel raytrace(global uint* buffer, global const struct SceneData* sceneDa
 	}
 	else
 	{
-		buffer[x + y * width] = 0x00000000;
+		float3 sky_1 = (float3)(0.36f, 0.46f, 0.6f);
+		float3 sky_2 = (float3)(0.4f, 0.23f, 0.05f);
+
+		float3 sky = lerp(sky_1, sky_2, max(0.0f,ray.D.y));
+
+		int r = min((int)(sky.x * 255.0f), 255);
+		int g = min((int)(sky.y * 255.0f), 255);
+		int b = min((int)(sky.z * 255.0f), 255);
+
+		buffer[x + y * width] = 0x00010000 * b + 0x00000100 * g + 0x00000001 * r;
 	}
 }

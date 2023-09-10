@@ -245,6 +245,11 @@ void Raytracer::mouse_button_input(GLFWwindow* window, int button, int action, i
 
 void Raytracer::cursor_input(GLFWwindow* window, double xpos, double ypos)
 {
+	// Ignore first input to prevent janky motion.
+	static bool first_input = true;
+	if(first_input = false)
+		return;
+
 	// Unused parameters
 	(void)window;
 
@@ -254,7 +259,7 @@ void Raytracer::cursor_input(GLFWwindow* window, double xpos, double ypos)
 	mouse_x = xpos - last_xpos;
 	mouse_y = ypos - last_ypos;
 
-	cam_rotation += glm::vec3(-mouse_y, -mouse_x, 0) * 0.0025f;
+	cam_rotation += glm::vec3(-mouse_y, mouse_x, 0) * 0.0025f;
 
 	// limit pitch
 	if(fabs(cam_rotation.x) > 89.9f)
