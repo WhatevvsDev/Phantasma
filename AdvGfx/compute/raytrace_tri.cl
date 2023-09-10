@@ -93,11 +93,12 @@ void kernel raytrace(global uint* buffer, global const struct SceneData* sceneDa
 	float3 cforward = (float3)(sceneData->cam_forward.x, sceneData->cam_forward.y, sceneData->cam_forward.z);
 	float3 cup = (float3)(sceneData->cam_up.x, sceneData->cam_up.y, sceneData->cam_up.z);
 	
-	int x = get_global_id(0);
-	int y = get_global_id(1);
-	
 	int width = sceneData->resolution.x;
 	int height = sceneData->resolution.y;
+
+	int x = get_global_id(0);
+	int y = height - get_global_id(1);
+	uint pixel_dest = (x + y * width);
 
 	float x_t = ((x / (float)width) - 0.5f) * 2.0f;
 	float y_t = ((y / (float)height)- 0.5f) * 2.0f;
@@ -122,19 +123,26 @@ void kernel raytrace(global uint* buffer, global const struct SceneData* sceneDa
 
 	if(hit_anything)
 	{
-		buffer[x + y * width] = 0x01010101 * min((int)((1.0f / ray.t) * 255.0f), 255);
+		buffer[pixel_dest] = 0x01010101 * min((int)((1.0f / ray.t) * 255.0f), 255);
 	}
 	else
 	{
-		float3 sky_1 = (float3)(0.36f, 0.46f, 0.6f);
+		float3 sky_1 = (float3)(0.60f, 0.76f, 1.0f);
 		float3 sky_2 = (float3)(0.4f, 0.23f, 0.05f);
 
-		float3 sky = lerp(sky_1, sky_2, max(0.0f,ray.D.y));
+		float3 sky = lerp(sky_2, sky_1, (ray.D.y + 1.0f) * 0.5f);
+
+		float3 sun_dir = normalize((float3)(0.0f, -1.0f, -1.0f));
+
+		float sun_t = min(dot(ray.D, sun_dir), 0.0f);
+		float sun = smoothstep(0.99f, 1.0f, sun_t * sun_t * sun_t * sun_t);
+
+		sky = lerp(sky, (float3)(1.0f, 1.0f, 1.0f), sun);
 
 		int r = min((int)(sky.x * 255.0f), 255);
 		int g = min((int)(sky.y * 255.0f), 255);
 		int b = min((int)(sky.z * 255.0f), 255);
 
-		buffer[x + y * width] = 0x00010000 * b + 0x00000100 * g + 0x00000001 * r;
+		buffer[pixel_dest] = 0x00010000 * b + 0x00000100 * g + 0x00000001 * r;
 	}
 }

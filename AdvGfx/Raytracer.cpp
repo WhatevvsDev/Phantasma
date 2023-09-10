@@ -259,13 +259,15 @@ void Raytracer::cursor_input(GLFWwindow* window, double xpos, double ypos)
 	mouse_x = xpos - last_xpos;
 	mouse_y = ypos - last_ypos;
 
-	cam_rotation += glm::vec3(-mouse_y, mouse_x, 0) * 0.0025f;
+	cam_rotation += glm::vec3(-mouse_y, -mouse_x, 0) * 0.1f;
 
 	// limit pitch
 	if(fabs(cam_rotation.x) > 89.9f)
 	{
 		cam_rotation.x = 89.9f * sgn(cam_rotation.x);
 	}
+
+	LOGMSG(Log::MessageType::Default, std::to_string(cam_rotation.x));
 
 	last_xpos = xpos;
 	last_ypos = ypos;
@@ -301,7 +303,7 @@ namespace Raytracer
 		int moveVer = (move_space) - (move_lctrl);
 		int moveWard = (move_w) - (move_s);
 		
-		glm::mat4 rotation = glm::eulerAngleXYZ(cam_rotation.x, cam_rotation.y, cam_rotation.z);
+		glm::mat4 rotation = glm::eulerAngleXYZ(glm::radians(cam_rotation.x), glm::radians(cam_rotation.y), glm::radians(cam_rotation.z));
 
 		sceneData.cam_forward = glm::vec4(0, 0, 1.0f, 0) * rotation;
 		sceneData.cam_right = glm::vec4(1.0f, 0, 0, 0) * rotation;
