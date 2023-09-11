@@ -213,7 +213,7 @@ void Raytracer::key_input(GLFWwindow* window, int key, int scancode, int action,
 		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 	else
 		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-}
+}	
 
 void Raytracer::mouse_button_input(GLFWwindow* window, int button, int action, int mods)
 {
