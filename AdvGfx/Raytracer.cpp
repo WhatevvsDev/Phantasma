@@ -30,8 +30,10 @@ struct Tri
 struct Ray 
 { 
 	glm::vec3 O {};
+	float pad_0;
 	glm::vec3 D {}; 
 	float t = 1e30f; 
+	uint ray_hit;
 };
 
 struct AABB
@@ -50,7 +52,7 @@ struct BVHNode
 	uint pad_0[2];
 };
 
- #define N 2048
+ #define N 4
 
 // TODO: Swap triangle to bouding box centroid, instead of vertex centroid :)
 
@@ -265,18 +267,21 @@ namespace Raytracer
 	{
         glm::vec3 p = glm::vec3(RandomFloat(), RandomFloat(), RandomFloat());// * 20.0f * RandomFloat();
 
-		for (int i = 0; i < N; i++)
-        {
-			p = glm::vec3(RandomFloat(), RandomFloat(), RandomFloat()) * 20.0f;
+		glm::vec3 a( -100, 0, -100 );
+		glm::vec3 b( 100, 0, -100 );
+		glm::vec3 c( -100, 0, 100 );
+		glm::vec3 d( 100, 0, 100 );
 
-            glm::vec3 r0( RandomFloat(), RandomFloat(), RandomFloat() );
-            glm::vec3 r1( RandomFloat(), RandomFloat(), RandomFloat() );
-            glm::vec3 r2( RandomFloat(), RandomFloat(), RandomFloat() );
+		tris[0].vertex0 = a;
+		tris[0].vertex1 = b;
+		tris[0].vertex2 = c;
+		tris[1].vertex0 = b;
+		tris[1].vertex1 = c;
+		tris[1].vertex2 = d;
 
-            tris[i].vertex0 = r0 + p;
-            tris[i].vertex1 = r1 + p;
-            tris[i].vertex2 = r2 + p;
-        }	
+		tris[2].vertex0 = glm::vec3( 0, 0, 5 );
+		tris[2].vertex1 = glm::vec3( 10, 0, 5 );
+		tris[2].vertex2 = glm::vec3( 5, 5, 5 );
 
         BuildBVH();
 		Compute::create_kernel(get_current_directory_path() + "/raytrace_tri.cl", "raytrace");

@@ -49,9 +49,9 @@ bool IntersectAABB( const struct Ray* ray, const float3 bmin, const float3 bmax 
     return tmax >= tmin && tmin < ray->t && tmax > 0;
 }
 
-void intersect_bvh( struct Ray* ray, const uint nodeIdx, struct BVHNode* nodes, struct Tri* tris, uint* trisIdx, uint depth)
+void intersect_bvh( struct Ray* ray, const uint nodeIdx, const struct BVHNode* nodes, const struct Tri* tris, const uint* trisIdx, uint depth)
 {
-	struct BVHNode* node = &nodes[nodeIdx];
+	const struct BVHNode* node = &nodes[nodeIdx];
 	if (!IntersectAABB( ray, node->aabb_min, node->aabb_max ))
 		return;
 	
@@ -118,9 +118,15 @@ void kernel raytrace(global uint* buffer, global const struct SceneData* sceneDa
 
 	if(hit_anything)
 	{
-		buffer[pixel_dest] = 0x01010101 * min((int)((1.0f / ray.t) * 255.0f), 255);
+		float3 hit_pos = ray.O + (ray.D * ray.t);
+
+		int r = clamp((int)(hit_pos.x * 25.0f), 0, 255);
+		int g = clamp((int)(hit_pos.y * 25.0f), 0, 255);
+		int b = clamp((int)(hit_pos.z * 25.0f), 0, 255);
+
+		buffer[pixel_dest] = 0x00010000 * b + 0x00000100 * g + 0x00000001 * r;;
 	}
-	else
+	else // Sky
 	{
 		float3 sky_1 = (float3)(0.60f, 0.76f, 1.0f);
 		float3 sky_2 = (float3)(0.4f, 0.23f, 0.05f);
