@@ -149,6 +149,21 @@ bool ComputeKernel::is_valid()
     return state == ComputeKernelState::Compiled;
 }
 
+bool ComputeKernel::has_been_changed()
+{
+    WIN32_FILE_ATTRIBUTE_DATA fileData;
+
+    GetFileAttributesExA(path.c_str(), GetFileExInfoStandard, &fileData);
+
+    FILETIME current_write_time = fileData.ftLastWriteTime;
+
+    bool shader_updated = CompareFileTime(&current_write_time, &last_write_time) == 1;
+
+    last_write_time = current_write_time;
+
+    return shader_updated;
+}
+
 ComputeOperation::ComputeOperation(const std::string& kernel_name)
     : kernel(&compute.kernels.find(kernel_name)->second)
 {
@@ -296,11 +311,24 @@ void Compute::init()
     */
 }
 
-void Compute::recompile_kernels(bool recompile_all)
+void Compute::recompile_kernels(ComputeKernelRecompilationCondition condition)
 {
     for(auto& [key, kernel] : compute.kernels)
     {
-        bool recompile_kernel = (!kernel.is_valid()) || recompile_all;
+        bool recompile_kernel = false;
+
+        switch(condition)
+        {
+        case ComputeKernelRecompilationCondition::Force:
+            recompile_kernel = true;
+            break;
+        case ComputeKernelRecompilationCondition::CompilationError:
+            recompile_kernel = !kernel.is_valid();
+            break;
+        case ComputeKernelRecompilationCondition::SourceChanged:
+            recompile_kernel = kernel.has_been_changed();
+            break;
+        }
 
         if(recompile_kernel)
         {

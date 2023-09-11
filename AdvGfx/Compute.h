@@ -7,6 +7,8 @@
 #include <CL/opencl.hpp>
 #include <glm/glm.hpp>
 
+#include "strippedwindows.h"
+
 enum class ComputeKernelState
 {
     Empty,
@@ -17,12 +19,20 @@ enum class ComputeKernelState
     RANGE
 };
 
+enum class ComputeKernelRecompilationCondition
+{
+    Force,
+    CompilationError,
+    SourceChanged
+};
+
 // To allow recompilation at runtime
 struct ComputeKernel
 {
     ComputeKernel(const std::string& path, const std::string& entry_point);
     void compile();
     bool is_valid();
+    bool has_been_changed();
 
     std::string path;
     std::string entry_point;
@@ -30,6 +40,7 @@ struct ComputeKernel
     friend struct ComputeOperation;
 
 private:
+    FILETIME last_write_time;
     ComputeKernelState state;
     cl::Kernel cl_kernel;
     
@@ -103,5 +114,5 @@ namespace Compute
 
 	void create_kernel(const std::string& path, const std::string& entry_point);
 
-    void recompile_kernels(bool recompile_all = false);
+    void recompile_kernels(ComputeKernelRecompilationCondition condition);
 }

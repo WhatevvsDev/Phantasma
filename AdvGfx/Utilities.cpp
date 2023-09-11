@@ -14,6 +14,9 @@ std::string get_current_directory_path()
 	return std::string(buffer).substr(0, pos);
 }
 
+std::string latest_msg;
+Log::MessageType latest_msg_type;
+
 void Log::print(Log::MessageType type, const char* file, int line_number, const std::string& message)
 {
 	HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -26,9 +29,18 @@ void Log::print(Log::MessageType type, const char* file, int line_number, const 
 	std::string fileName { file };
 	fileName = fileName.substr(fileName.find_last_of("/\\") + 1).c_str();
 
+	latest_msg = message;
+	latest_msg_type = type;
+
 	// Print and reset color
 	printf("[%s: %i] - %s\n", fileName.c_str(), line_number, message.c_str());
 	SetConsoleTextAttribute(handle, 15);
+}
+
+
+std::pair<std::string, Log::MessageType> Log::get_latest_msg()
+{
+	return {latest_msg, latest_msg_type};
 }
 
 std::string read_file_to_string(const std::string& path)

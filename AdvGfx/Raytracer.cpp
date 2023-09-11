@@ -256,6 +256,12 @@ void Raytracer::cursor_input(GLFWwindow* window, double xpos, double ypos)
 	last_ypos = ypos;
 }
 
+struct
+{
+	bool recompile_changed_shaders_automatically { true };
+} settings;
+
+
 namespace Raytracer
 {	
 	ComputeOperation* perform_raytracing;
@@ -303,6 +309,9 @@ namespace Raytracer
 		glm::normalize(dir);
 
 		sceneData.cam_pos += glm::vec4(dir * delta_time_ms * 0.01f, 0.0f);
+
+		if(settings.recompile_changed_shaders_automatically)
+			Compute::recompile_kernels(ComputeKernelRecompilationCondition::SourceChanged);
 	}
 
 	void raytrace(int width, int height, uint32_t* buffer)
@@ -332,13 +341,28 @@ namespace Raytracer
 
 	void ui()
 	{
+		if(!mouse_active)
+			return;
+
+		auto latest_msg = Log::get_latest_msg();
+
+		auto message_color = (latest_msg.second == Log::MessageType::Error) ? IM_COL32(255, 0, 0, 255) : IM_COL32(255, 255, 255, 255);
+
+		ImGui::GetForegroundDrawList()->AddText(ImVec2(10, 10), message_color,latest_msg.first.data() ,latest_msg.first.data() + latest_msg.first.length());
+
+
 		ImGui::Begin("Debug");
 
 		if (ImGui::Button("Recompile Shaders"))
-			Compute::recompile_kernels(true);
+			Compute::recompile_kernels(ComputeKernelRecompilationCondition::Force);
 
 		if (ImGui::Button("Recompile Invalid Shaders"))
-			Compute::recompile_kernels();
+			Compute::recompile_kernels(ComputeKernelRecompilationCondition::CompilationError);
+
+		if (ImGui::Button("Recompile Changed Shaders"))
+			Compute::recompile_kernels(ComputeKernelRecompilationCondition::SourceChanged);
+
+		ImGui::Checkbox("Automatically recompile changed shaders?", &settings.recompile_changed_shaders_automatically);
 
 		ImGui::End();
 	}

@@ -5,6 +5,7 @@
 
 namespace Log
 {
+
 	enum class MessageType
 	{
 		Default,
@@ -32,6 +33,8 @@ namespace Log
 	}
 
 	void print(Log::MessageType type, const char* file, int line_number, const std::string& message);
+	
+	std::pair<std::string, MessageType> get_latest_msg();
 }
 
 #define LOGMSG(type, message) Log::print(type, __FILE__, __LINE__, message);
