@@ -102,7 +102,7 @@ struct
     if(function_result != CL_SUCCESS) LOGMSG(Log::MessageType::Error, get_cl_error_string(function_result));\
 }
 #else
-#define CHECKCL(result) func;
+#define CHECKCL(func) func;
 #endif
 
 ComputeKernel::ComputeKernel(const std::string& path, const std::string& entry_point)
