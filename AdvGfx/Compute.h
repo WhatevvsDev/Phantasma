@@ -22,7 +22,6 @@ enum class ComputeKernelState
 enum class ComputeKernelRecompilationCondition
 {
     Force,
-    CompilationError,
     SourceChanged
 };
 

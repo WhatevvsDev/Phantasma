@@ -356,9 +356,6 @@ namespace Raytracer
 		if (ImGui::Button("Recompile Shaders"))
 			Compute::recompile_kernels(ComputeKernelRecompilationCondition::Force);
 
-		if (ImGui::Button("Recompile Invalid Shaders"))
-			Compute::recompile_kernels(ComputeKernelRecompilationCondition::CompilationError);
-
 		if (ImGui::Button("Recompile Changed Shaders"))
 			Compute::recompile_kernels(ComputeKernelRecompilationCondition::SourceChanged);
 

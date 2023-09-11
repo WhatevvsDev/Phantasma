@@ -322,9 +322,6 @@ void Compute::recompile_kernels(ComputeKernelRecompilationCondition condition)
         case ComputeKernelRecompilationCondition::Force:
             recompile_kernel = true;
             break;
-        case ComputeKernelRecompilationCondition::CompilationError:
-            recompile_kernel = !kernel.is_valid();
-            break;
         case ComputeKernelRecompilationCondition::SourceChanged:
             recompile_kernel = kernel.has_been_changed();
             break;
