@@ -16,7 +16,3 @@ Latest Render
 
 ### Current features
 - GPU Acceleration via OpenCL
-
-Planned:
-- Model loading
-- Sky Model (Nishita?)
