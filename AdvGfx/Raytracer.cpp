@@ -46,8 +46,8 @@ struct BVHNode
 
 // TODO: Swap triangle to bouding box centroid, instead of vertex centroid :)
 
-void UpdateNodeBounds( uint nodeIdx );
-void Subdivide( uint nodeIdx );
+void update_node_bounds( uint nodeIdx );
+void subdivide( uint nodeIdx );
 
 // application data
 Tri tris[N];
@@ -55,7 +55,7 @@ uint triIdx[N];
 BVHNode bvhNode[N * 2];
 uint rootNodeIdx = 0, nodes_used = 1;
 
-void BuildBVH()
+void build_bvh()
 {
 	// populate triangle index array
 	for (int i = 0; i < N; i++) triIdx[i] = i;
@@ -65,12 +65,12 @@ void BuildBVH()
 	// assign all triangles to root node
 	BVHNode& root = bvhNode[rootNodeIdx];
 	root.left_first = 0, root.tri_count = N;
-	UpdateNodeBounds( rootNodeIdx );
+	update_node_bounds( rootNodeIdx );
 	// subdivide recursively
-	Subdivide( rootNodeIdx );
+	subdivide( rootNodeIdx );
 }
 
-void UpdateNodeBounds( uint nodeIdx )
+void update_node_bounds( uint nodeIdx )
 {
 	BVHNode& node = bvhNode[nodeIdx];
 	node.min = glm::vec3( 1e30f );
@@ -88,7 +88,7 @@ void UpdateNodeBounds( uint nodeIdx )
 	}
 }
 
-void Subdivide( uint nodeIdx )
+void subdivide( uint nodeIdx )
 {
 	// terminate recursion
 	BVHNode& node = bvhNode[nodeIdx];
@@ -124,11 +124,11 @@ void Subdivide( uint nodeIdx )
 	node.left_first = leftChildIdx;
 	node.tri_count = 0;
 
-	UpdateNodeBounds( leftChildIdx );
-	UpdateNodeBounds( rightChildIdx );
+	update_node_bounds( leftChildIdx );
+	update_node_bounds( rightChildIdx );
 	// recurse
-	Subdivide( leftChildIdx );
-	Subdivide( rightChildIdx );
+	subdivide( leftChildIdx );
+	subdivide( rightChildIdx );
 }
 
 struct SceneData
@@ -275,7 +275,7 @@ namespace Raytracer
 		tris[2].vertex1 = glm::vec3( 10, 0, 5 );
 		tris[2].vertex2 = glm::vec3( 5, 5, 5 );
 
-        BuildBVH();
+        build_bvh();
 		Compute::create_kernel("C:/Users/Matt/Desktop/AdvGfx/AdvGfx/compute/raytrace_tri.cl", "raytrace");
 	}
 	
