@@ -1,6 +1,7 @@
 #pragma once
 #include <unordered_map>
 #include <string>
+#include <array>
 
 #define CL_HPP_TARGET_OPENCL_VERSION 300
 #include <CL/opencl.hpp>
@@ -20,9 +21,10 @@ struct ComputeDataHandle
         data_ptr = (void*)data.data();
     }
 
-    inline ComputeDataHandle(void* data, const size_t size)
+    template<typename T>
+    inline ComputeDataHandle(T* data, const size_t count)
     {
-        data_byte_size = size;
+        data_byte_size = count * sizeof(data[0]);
         data_ptr = data;
     }
 

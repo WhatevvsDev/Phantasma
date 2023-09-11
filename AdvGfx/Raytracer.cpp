@@ -310,11 +310,11 @@ namespace Raytracer
 		sceneData.tri_count = N;
 
 		ComputeOperation("raytrace_tri.cl")
-			.read({buffer, (size_t)(width * height) * sizeof(uint32_t)})
-			.write({&sceneData, sizeof(SceneData)})
-			.write({tris, N * sizeof(Tri)})
-			.write({bvhNode, N * 2 * sizeof(BVHNode)})
-			.write({triIdx, N * sizeof(uint)})
+			.read({buffer, (size_t)(width * height)})
+			.write({&sceneData, 1})
+			.write({tris, N})
+			.write({bvhNode, N * 2})
+			.write({triIdx, N})
 			.global_dispatch({width, height, 1})
 			.execute();
 
