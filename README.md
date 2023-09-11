@@ -16,3 +16,4 @@ Latest Render
 
 ### Current features
 - GPU Acceleration via OpenCL
+- Live shader recompilation
