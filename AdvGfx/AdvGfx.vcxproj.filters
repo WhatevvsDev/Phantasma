@@ -63,6 +63,9 @@
     <ClCompile Include="Utilities.cpp">
       <Filter>Utils</Filter>
     </ClCompile>
+    <ClCompile Include="BVH.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="App.h">
@@ -91,6 +94,9 @@
     </ClInclude>
     <ClInclude Include="Common.h">
       <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="BVH.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

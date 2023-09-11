@@ -14,6 +14,8 @@
 
 #include <utility>
 
+#include "BVH.h"
+
 struct Tri 
 { 
     glm::vec3 vertex0;
@@ -34,20 +36,9 @@ struct Tri
 //	float t = 1e30f; 
 //};
 
-struct BVHNode
-{
-    glm::vec3 min;
-    uint left_first;
-    glm::vec3 max;
-	uint tri_count;
-};
-
  #define N 4
 
 // TODO: Swap triangle to bouding box centroid, instead of vertex centroid :)
-
-void update_node_bounds( uint nodeIdx );
-void subdivide( uint nodeIdx );
 
 // application data
 Tri tris[N];
@@ -232,8 +223,8 @@ void Raytracer::cursor_input(GLFWwindow* window, double xpos, double ypos)
 	static double last_xpos = 0.0;
 	static double last_ypos = 0.0;
 
-	mouse_x = xpos - last_xpos;
-	mouse_y = ypos - last_ypos;
+	mouse_x = (float)(xpos - last_xpos);
+	mouse_y = (float)(ypos - last_ypos);
 
 	cam_rotation += glm::vec3(-mouse_y, -mouse_x, 0) * 0.1f;
 

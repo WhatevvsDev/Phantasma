@@ -164,6 +164,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="App.cpp" />
+    <ClCompile Include="BVH.cpp" />
     <ClCompile Include="Compute.cpp" />
     <ClCompile Include="imgui.cpp" />
     <ClCompile Include="imgui_demo.cpp" />
@@ -180,6 +181,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="App.h" />
+    <ClInclude Include="BVH.h" />
     <ClInclude Include="Common.h" />
     <ClInclude Include="Compute.h" />
     <ClInclude Include="IOUtility.h" />
