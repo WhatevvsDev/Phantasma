@@ -35,20 +35,12 @@ struct Ray
 	uint ray_hit;
 };
 
-struct AABB
-{
-    glm::vec3 min;
-	float pad_0;
-    glm::vec3 max;
-	float pad_1;
-};
-
 struct BVHNode
 {
-	AABB aabb;
+    glm::vec3 min;
     uint left_first;
+    glm::vec3 max;
 	uint tri_count;
-	uint pad_0[2];
 };
 
  #define N 4
@@ -82,18 +74,18 @@ void BuildBVH()
 void UpdateNodeBounds( uint nodeIdx )
 {
 	BVHNode& node = bvhNode[nodeIdx];
-	node.aabb.min = glm::vec3( 1e30f );
-	node.aabb.max = glm::vec3( -1e30f );
+	node.min = glm::vec3( 1e30f );
+	node.max = glm::vec3( -1e30f );
 	for (uint first = node.left_first, i = 0; i < node.tri_count; i++)
 	{
 		uint leafTriIdx = triIdx[first + i];
 		Tri& leafTri = tris[leafTriIdx];
-		node.aabb.min = glm::min( node.aabb.min, leafTri.vertex0 ),
-		node.aabb.min = glm::min( node.aabb.min, leafTri.vertex1 ),
-		node.aabb.min = glm::min( node.aabb.min, leafTri.vertex2 ),
-		node.aabb.max = glm::max( node.aabb.max, leafTri.vertex0 ),
-		node.aabb.max = glm::max( node.aabb.max, leafTri.vertex1 ),
-		node.aabb.max = glm::max( node.aabb.max, leafTri.vertex2 );
+		node.min = glm::min( node.min, leafTri.vertex0 ),
+		node.min = glm::min( node.min, leafTri.vertex1 ),
+		node.min = glm::min( node.min, leafTri.vertex2 ),
+		node.max = glm::max( node.max, leafTri.vertex0 ),
+		node.max = glm::max( node.max, leafTri.vertex1 ),
+		node.max = glm::max( node.max, leafTri.vertex2 );
 	}
 }
 
@@ -103,11 +95,11 @@ void Subdivide( uint nodeIdx )
 	BVHNode& node = bvhNode[nodeIdx];
 	if (node.tri_count <= 2) return;
 	// determine split axis and position
-	glm::vec3 extent = node.aabb.max - node.aabb.min;
+	glm::vec3 extent = node.max - node.min;
 	int axis = 0;
 	if (extent.y > extent.x) axis = 1;
 	if (extent.z > extent[axis]) axis = 2;
-	float splitPos = node.aabb.min[axis] + extent[axis] * 0.5f;
+	float splitPos = node.min[axis] + extent[axis] * 0.5f;
 	// in-place partition
 	int i = node.left_first;
 	int j = i + node.tri_count - 1;
@@ -268,8 +260,6 @@ namespace Raytracer
 
 	void init()
 	{
-        glm::vec3 p = glm::vec3(RandomFloat(), RandomFloat(), RandomFloat());// * 20.0f * RandomFloat();
-
 		glm::vec3 a( -100, 0, -100 );
 		glm::vec3 b( 100, 0, -100 );
 		glm::vec3 c( -100, 0, 100 );

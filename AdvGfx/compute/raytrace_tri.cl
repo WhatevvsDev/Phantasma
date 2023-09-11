@@ -13,11 +13,13 @@ struct Ray
     float t; 
 };
 
+__attribute__ ((packed))
 struct BVHNode
 {
-    float3 aabb_min;
-    float3 aabb_max;
-    uint left_first, tri_count;
+    float minx, miny, minz;
+    uint left_first;
+    float maxx, maxy, maxz;
+	uint tri_count;
 };
 
 void IntersectTri( struct Ray* ray, const struct Tri* tri)
@@ -38,13 +40,13 @@ void IntersectTri( struct Ray* ray, const struct Tri* tri)
 	if (t > 0.0001f) ray->t = min( ray->t, t );
 }
 
-bool IntersectAABB( const struct Ray* ray, const float3 bmin, const float3 bmax )
+bool IntersectAABB( const struct Ray* ray, const struct BVHNode* node )
 {
-	float tx1 = (bmin.x - ray->O.x) / ray->D.x, tx2 = (bmax.x - ray->O.x) / ray->D.x;
+	float tx1 = (node->minx - ray->O.x) / ray->D.x, tx2 = (node->maxx - ray->O.x) / ray->D.x;
     float tmin = min( tx1, tx2 ), tmax = max( tx1, tx2 );
-    float ty1 = (bmin.y - ray->O.y) / ray->D.y, ty2 = (bmax.y - ray->O.y) / ray->D.y;
+    float ty1 = (node->miny - ray->O.y) / ray->D.y, ty2 = (node->maxy - ray->O.y) / ray->D.y;
     tmin = max( tmin, min( ty1, ty2 ) ), tmax = min( tmax, max( ty1, ty2 ) );
-    float tz1 = (bmin.z - ray->O.z) / ray->D.z, tz2 = (bmax.z - ray->O.z) / ray->D.z;
+    float tz1 = (node->minz - ray->O.z) / ray->D.z, tz2 = (node->maxz - ray->O.z) / ray->D.z;
     tmin = max( tmin, min( tz1, tz2 ) ), tmax = min( tmax, max( tz1, tz2 ) );
     return tmax >= tmin && tmin < ray->t && tmax > 0;
 }
@@ -52,7 +54,7 @@ bool IntersectAABB( const struct Ray* ray, const float3 bmin, const float3 bmax 
 void intersect_bvh( struct Ray* ray, const uint nodeIdx, const struct BVHNode* nodes, const struct Tri* tris, const uint* trisIdx, uint depth)
 {
 	const struct BVHNode* node = &nodes[nodeIdx];
-	if (!IntersectAABB( ray, node->aabb_min, node->aabb_max ))
+	if (!IntersectAABB( ray, node ))
 		return;
 	
 	if (node->tri_count > 0)
