@@ -26,14 +26,13 @@ struct Tri
 	float pad_3;
 };
 
-struct Ray 
-{ 
-	glm::vec3 O {};
-	float pad_0;
-	glm::vec3 D {}; 
-	float t = 1e30f; 
-	uint ray_hit;
-};
+//struct Ray 
+//{ 
+//	glm::vec3 O {};
+//	float pad_0;
+//	glm::vec3 D {}; 
+//	float t = 1e30f; 
+//};
 
 struct BVHNode
 {
