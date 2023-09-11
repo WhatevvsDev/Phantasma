@@ -11,7 +11,7 @@ Latest Render
 ### Controls
 - WASD - Move camera
 - Space/LCtrl - Move up/down
-- F1 - Toggle cursor
+- F1 - Toggle cursor / UI
 - P - Screenshot
 
 ### Current features
