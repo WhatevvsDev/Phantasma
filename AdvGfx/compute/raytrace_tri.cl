@@ -120,9 +120,9 @@ void kernel raytrace(global uint* buffer, global const struct SceneData* sceneDa
 	{
 		float3 hit_pos = ray.O + (ray.D * ray.t);
 
-		int r = clamp((int)(hit_pos.x * 25.0f), 0, 255);
-		int g = clamp((int)(hit_pos.y * 25.0f), 0, 255);
-		int b = clamp((int)(hit_pos.z * 25.0f), 0, 255);
+		int r = clamp((int)(hit_pos.x * 2.5f), 0, 255);
+		int g = clamp((int)(hit_pos.y * 25.5f), 0, 255);
+		int b = clamp((int)(hit_pos.z * 2.5f), 0, 255);
 
 		buffer[pixel_dest] = 0x00010000 * b + 0x00000100 * g + 0x00000001 * r;;
 	}

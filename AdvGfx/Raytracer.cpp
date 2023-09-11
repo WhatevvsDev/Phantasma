@@ -10,7 +10,6 @@
 #include "stb_image.h"
 #include "stb_image_write.h"
 
-
 #include <GLFW/glfw3.h>
 
 #include <utility>
@@ -259,8 +258,6 @@ void Raytracer::cursor_input(GLFWwindow* window, double xpos, double ypos)
 
 namespace Raytracer
 {	
-	glm::vec3 testing_pos( 0, 0, 0 );
-
 	ComputeOperation* perform_raytracing;
 
 	void init()
@@ -284,7 +281,7 @@ namespace Raytracer
 		tris[2].vertex2 = glm::vec3( 5, 5, 5 );
 
         BuildBVH();
-		Compute::create_kernel(get_current_directory_path() + "/raytrace_tri.cl", "raytrace");
+		Compute::create_kernel("C:/Users/Matt/Desktop/AdvGfx/AdvGfx/compute/raytrace_tri.cl", "raytrace");
 	}
 	
 	void update(const float delta_time_ms)
@@ -335,16 +332,14 @@ namespace Raytracer
 
 	void ui()
 	{
-		glm::vec3 last_pos = testing_pos;
+		ImGui::Begin("Debug");
 
-		if(ImGui::DragFloat3("pos", &testing_pos.x, 0.01f))
-		{
-			for(int i = 0; i < N; i++)
-			{
-				tris[i].vertex0 += testing_pos - last_pos;
-				tris[i].vertex1 += testing_pos - last_pos;
-				tris[i].vertex2 += testing_pos - last_pos;
-			}
-		}
+		if (ImGui::Button("Recompile Shaders"))
+			Compute::recompile_kernels(true);
+
+		if (ImGui::Button("Recompile Invalid Shaders"))
+			Compute::recompile_kernels();
+
+		ImGui::End();
 	}
 }

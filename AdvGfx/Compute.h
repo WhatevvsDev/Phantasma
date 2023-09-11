@@ -7,6 +7,34 @@
 #include <CL/opencl.hpp>
 #include <glm/glm.hpp>
 
+enum class ComputeKernelState
+{
+    Empty,
+    Source,
+    Program,
+    Built,
+    Compiled,
+    RANGE
+};
+
+// To allow recompilation at runtime
+struct ComputeKernel
+{
+    ComputeKernel(const std::string& path, const std::string& entry_point);
+    void compile();
+    bool is_valid();
+
+    std::string path;
+    std::string entry_point;
+
+    friend struct ComputeOperation;
+
+private:
+    ComputeKernelState state;
+    cl::Kernel cl_kernel;
+    
+};
+
 // To deal with templated c++ garbage
 // Abstracts over any type of vector
 struct ComputeDataHandle
@@ -63,7 +91,7 @@ private:
     glm::ivec3 local_dispatch_size{1, 1, 1};
     glm::ivec3 global_dispatch_size{1, 1, 1};
 
-    cl::Kernel& kernel;
+    ComputeKernel* kernel { nullptr };
 
     std::vector<cl::Buffer> write_buffers;
     std::vector<read_destination> read_buffers;
@@ -74,4 +102,6 @@ namespace Compute
 	void init();
 
 	void create_kernel(const std::string& path, const std::string& entry_point);
+
+    void recompile_kernels(bool recompile_all = false);
 }

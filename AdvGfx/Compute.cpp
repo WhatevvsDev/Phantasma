@@ -91,7 +91,7 @@ struct
     cl::Platform platform; // Driver
     cl::CommandQueue queue;
 
-    std::unordered_map<std::string, cl::Kernel> kernels;
+    std::unordered_map<std::string, ComputeKernel> kernels;
 
 } compute;
 
@@ -105,9 +105,52 @@ struct
 #define CHECKCL(result) func;
 #endif
 
+ComputeKernel::ComputeKernel(const std::string& path, const std::string& entry_point)
+    : path(path)
+    , entry_point(entry_point)
+{
+}
+
+void ComputeKernel::compile()
+{
+    state = ComputeKernelState::Empty;
+
+    cl::Program::Sources sources;
+    sources.push_back(read_file_to_string(path));
+    state = ComputeKernelState::Source;
+
+    cl::Program created_program(compute.context, sources);
+    state = ComputeKernelState::Program;
+
+    cl_int error = created_program.build({compute.device}, "-w");
+
+    if(error != CL_SUCCESS)
+    {
+        LOGMSG(Log::MessageType::Error, std::format("Failed to create kernel: {} \n {}", path, created_program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(compute.device)));
+        return;
+    }
+    state = ComputeKernelState::Built;
+
+    LOGMSG(Log::MessageType::Debug, std::format("Created kernel: {}", path));
+
+    cl_kernel = cl::Kernel(created_program, entry_point.c_str(), &error);
+
+    if(error != CL_SUCCESS)
+    {
+        LOGMSG(Log::MessageType::Error, std::format("Failed to create kernel: {} \n {} error", path, get_cl_error_string(error)))     
+        return;
+    }
+
+    state = ComputeKernelState::Compiled;
+}
+
+bool ComputeKernel::is_valid()
+{
+    return state == ComputeKernelState::Compiled;
+}
 
 ComputeOperation::ComputeOperation(const std::string& kernel_name)
-    : kernel(compute.kernels.find(kernel_name)->second)
+    : kernel(&compute.kernels.find(kernel_name)->second)
 {
 
 }
@@ -120,7 +163,7 @@ ComputeOperation& ComputeOperation::write(const ComputeDataHandle& data)
 
     write_buffers.push_back(std::move(new_write_buffer));
     
-    kernel.setArg(arg_count, write_buffers.back());
+    kernel->cl_kernel.setArg(arg_count, write_buffers.back());
 
     arg_count++;
     return *this;
@@ -133,7 +176,7 @@ ComputeOperation& ComputeOperation::read(const ComputeDataHandle& data)
 
     read_buffers.push_back({data.data_ptr, data.data_byte_size,std::move(new_read_buffer)});
 
-    kernel.setArg(arg_count, read_buffers.back().buffer);
+    kernel->cl_kernel.setArg(arg_count, read_buffers.back().buffer);
 
     arg_count++;
     return *this;
@@ -153,11 +196,14 @@ ComputeOperation& ComputeOperation::global_dispatch(glm::ivec3 size)
 
 void ComputeOperation::execute()
 {
-     CHECKCL(compute.queue.enqueueNDRangeKernel(kernel, cl::NullRange, 
-        cl::NDRange(global_dispatch_size.x, global_dispatch_size.y, global_dispatch_size.z), 
-        cl::NullRange));
+    if(!kernel->is_valid())
+        return;
 
-     CHECKCL(compute.queue.finish());
+    CHECKCL(compute.queue.enqueueNDRangeKernel(kernel->cl_kernel, cl::NullRange, 
+    cl::NDRange(global_dispatch_size.x, global_dispatch_size.y, global_dispatch_size.z), 
+    cl::NullRange));
+
+    CHECKCL(compute.queue.finish());
 
     for(auto& buffer : read_buffers)
     {
@@ -168,35 +214,16 @@ void ComputeOperation::execute()
 void Compute::create_kernel(const std::string& path, const std::string& entry_point)
 {
     std::string file_name_with_extension = path.substr(path.find_last_of("\\/") + 1);
-
-    cl::Program::Sources sources;
-    sources.push_back(read_file_to_string(path));
-
-    cl::Program created_program(compute.context, sources);
-
-    cl_int error = created_program.build({compute.device}, "-w");
-
-    if(error != CL_SUCCESS)
+    if(compute.kernels.find(file_name_with_extension) != compute.kernels.end())
     {
-        LOGMSG(Log::MessageType::Error, std::format("Failed to create kernel: {} \n {}", path, created_program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(compute.device)));
+        LOGMSG(Log::MessageType::Error, std::format("Kernel {} already exists, ignoring", file_name_with_extension));
         return;
     }
 
+    auto ref = compute.kernels.insert({file_name_with_extension, ComputeKernel(path, entry_point)});
 
-    LOGMSG(Log::MessageType::Debug, std::format("Created kernel: {}", path));
-    std::string build_log = created_program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(compute.device);
-    if(build_log.length() > 10)
-        LOGMSG(Log::MessageType::Debug, "Build log: " + build_log);
-
-    cl::Kernel kernel = cl::Kernel(created_program, entry_point.c_str(), &error);
-
-    if(error != CL_SUCCESS)
-    {
-        LOGMSG(Log::MessageType::Error, std::format("Failed to create kernel: {} \n {} error", path, get_cl_error_string(error)))     
-        return;
-    }
-
-    compute.kernels.insert({file_name_with_extension, kernel});
+    // Attempt to compile the newly created kernel
+    ref.first->second.compile();
 }
 
 void select_platform()
@@ -267,4 +294,17 @@ void Compute::init()
         printf("got: %i \n", C[i]);
     }
     */
+}
+
+void Compute::recompile_kernels(bool recompile_all)
+{
+    for(auto& [key, kernel] : compute.kernels)
+    {
+        bool recompile_kernel = (!kernel.is_valid()) || recompile_all;
+
+        if(recompile_kernel)
+        {
+            kernel.compile();
+        }
+    }
 }
