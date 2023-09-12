@@ -232,7 +232,12 @@ void Raytracer::cursor_input(GLFWwindow* window, double xpos, double ypos)
 
 namespace Raytracer
 {	
-
+	struct
+	{
+		bool recompile_changed_shaders_automatically { true };
+		bool fps_limit_enabled { true };
+		int fps_limit_value { 80 };
+	} settings;
 
 	void init()
 	{
