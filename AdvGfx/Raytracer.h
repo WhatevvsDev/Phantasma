@@ -3,6 +3,7 @@
 
 struct GLFWwindow;
 
+
 namespace Raytracer
 {
 	void init();

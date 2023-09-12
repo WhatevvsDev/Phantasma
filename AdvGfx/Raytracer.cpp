@@ -28,23 +28,15 @@ struct Tri
 	float pad_3;
 };
 
-//struct Ray 
-//{ 
-//	glm::vec3 O {};
-//	float pad_0;
-//	glm::vec3 D {}; 
-//	float t = 1e30f; 
-//};
-
- #define N 4
-
-// TODO: Swap triangle to bouding box centroid, instead of vertex centroid :)
+ #define N 12582
 
 // application data
 Tri tris[N];
 uint triIdx[N];
 BVHNode bvhNode[N * 2];
 uint rootNodeIdx = 0, nodes_used = 1;
+
+// TODO: Swap triangle to bouding box centroid, instead of vertex centroid :)
 
 void build_bvh()
 {
@@ -238,33 +230,20 @@ void Raytracer::cursor_input(GLFWwindow* window, double xpos, double ypos)
 	last_ypos = ypos;
 }
 
-struct
-{
-	bool recompile_changed_shaders_automatically { true };
-} settings;
-
-
 namespace Raytracer
 {	
-	ComputeOperation* perform_raytracing;
+
 
 	void init()
 	{
-		glm::vec3 a( -100, 0, -100 );
-		glm::vec3 b( 100, 0, -100 );
-		glm::vec3 c( -100, 0, 100 );
-		glm::vec3 d( 100, 0, 100 );
-
-		tris[0].vertex0 = a;
-		tris[0].vertex1 = b;
-		tris[0].vertex2 = c;
-		tris[1].vertex0 = b;
-		tris[1].vertex1 = c;
-		tris[1].vertex2 = d;
-
-		tris[2].vertex0 = glm::vec3( 0, 0, 5 );
-		tris[2].vertex1 = glm::vec3( 10, 0, 5 );
-		tris[2].vertex2 = glm::vec3( 5, 5, 5 );
+		for (int i = 0; i < N; i++)
+		{
+			glm::vec3 r0 = glm::vec3( RandomFloat(), RandomFloat(), RandomFloat() );
+			glm::vec3 r1 = glm::vec3( RandomFloat(), RandomFloat(), RandomFloat() );
+			glm::vec3 r2 = glm::vec3( RandomFloat(), RandomFloat(), RandomFloat() );
+			tris[i].vertex0 = r0 * 200 - glm::vec3( 5 );
+			tris[i].vertex1 = tris[i].vertex0 + r1, tris[i].vertex2 = tris[i].vertex0 + r2;
+		}
 
         build_bvh();
 		Compute::create_kernel("C:/Users/Matt/Desktop/AdvGfx/AdvGfx/compute/raytrace_tri.cl", "raytrace");
@@ -296,16 +275,17 @@ namespace Raytracer
 
 	void raytrace(int width, int height, uint32_t* buffer)
 	{
+
 		sceneData.resolution[0] = width;
 		sceneData.resolution[1] = height;
 		sceneData.tri_count = N;
 
 		ComputeOperation("raytrace_tri.cl")
 			.read({buffer, (size_t)(width * height)})
-			.write({&sceneData, 1})
 			.write({tris, N})
 			.write({bvhNode, N * 2})
 			.write({triIdx, N})
+			.write({&sceneData, 1})
 			.global_dispatch({width, height, 1})
 			.execute();
 
@@ -340,6 +320,11 @@ namespace Raytracer
 			Compute::recompile_kernels(ComputeKernelRecompilationCondition::SourceChanged);
 
 		ImGui::Checkbox("Automatically recompile changed shaders?", &settings.recompile_changed_shaders_automatically);
+
+		ImGui::Text("");
+		ImGui::Text("Framerate Limit");	
+		ImGui::InputInt("## Framerate Limit Value Input Int", &settings.fps_limit_value, 0, 0);
+		ImGui::Checkbox("Limit framerate?", &settings.fps_limit_enabled);
 
 		ImGui::End();
 	}

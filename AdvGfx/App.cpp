@@ -17,8 +17,8 @@ namespace App
     uint32_t* render_buffer { nullptr };
 
     Timer fps_timer;
-    float render_time { 1.0f };
-    float update_time { 1.0f };
+    float last_render_time { 1.0f };
+    float last_update_time { 1.0f };
 
     int init(AppDesc& desc)
     {
@@ -86,10 +86,10 @@ namespace App
         glClear(GL_COLOR_BUFFER_BIT);
 
         // Limit to min 1.0f
-        render_time = fmax(render_time, 1.0f);
-        update_time = fmax(update_time, 1.0f);
+        last_render_time = fmax(last_render_time, 1.0f);
+        last_update_time = fmax(last_update_time, 1.0f);
 
-        std::string title = std::format("{} Window {}x{} | {} ms ({} FPS) | {}ms update", app_desc.title, app_desc.width, app_desc.height, (int)render_time, (int)(1000.0f / render_time),  (int)update_time);
+        std::string title = std::format("{} Window {}x{} | {} ms ({} FPS) | {}ms update", app_desc.title, app_desc.width, app_desc.height, (int)last_render_time, (int)(1000.0f / last_render_time),  (int)last_update_time);
 
         glfwSetWindowTitle(window, title.c_str());
         
@@ -100,12 +100,12 @@ namespace App
         Raytracer::ui();
 
         // We need total delta time
-        Raytracer::update(update_time + render_time);
+        Raytracer::update(last_update_time + last_render_time);
         
         // Only get the render time
-        update_time =  fps_timer.lap_delta();
+        last_update_time =  fps_timer.lap_delta();
         Raytracer::raytrace(app_desc.width, app_desc.height, render_buffer);
-        render_time = fps_timer.lap_delta();
+        last_render_time = fps_timer.lap_delta();
 
         glDrawPixels(app_desc.width, app_desc.height, GL_RGBA, GL_UNSIGNED_BYTE, render_buffer);
 
