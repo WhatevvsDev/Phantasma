@@ -40,7 +40,7 @@ struct ComputeKernel
 
 private:
     FILETIME last_write_time;
-    ComputeKernelState state;
+    ComputeKernelState state { ComputeKernelState::Empty };
     cl::Kernel cl_kernel;
     
 };
