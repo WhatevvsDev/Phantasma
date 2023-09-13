@@ -427,4 +427,11 @@ namespace Raytracer
 
 		ImGui::End();
 	}
+
+	int Raytracer::get_target_fps()
+	{
+		return settings.fps_limit_enabled ? 
+			settings.fps_limit_value :
+			1000;
+	}
 }

@@ -11,6 +11,8 @@ namespace Raytracer
 	void update(const float delta_time_ms);
 	void ui();
 
+	int get_target_fps();
+
 	void key_input(GLFWwindow* window, int key, int scancode, int action, int mods);
 	void mouse_button_input(GLFWwindow* window, int button, int action, int mods);
 	void cursor_input(GLFWwindow* window, double xpos, double ypos);
