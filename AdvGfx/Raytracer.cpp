@@ -255,20 +255,19 @@ namespace Raytracer
 	float camera_speed_t_to_m_per_second()
 	{
 		float speed = 0;
+		float adjusted_t = settings.camera_speed_t * 2.0f - 1.0f;
 
-		if(settings.camera_speed_t > 0.45f)
+		float value = pow(adjusted_t * 9.95f, 2.0f) * sgn(adjusted_t);
+
+		LOGMSG(Log::MessageType::Default, std::format("value: {}\n", value));
+
+		if(settings.camera_speed_t > 0.5f)
 		{
-			float adjusted_t = (settings.camera_speed_t * 2) - 1.0f;
-			speed = pow(1.0f + adjusted_t * 9, 2);
-		}
-		else if(settings.camera_speed_t < 0.45f)
-		{
-			float adjusted_t = (1.0f - (settings.camera_speed_t * 2)) * 100.0f;
-			speed =  1.0f / adjusted_t;
+			speed = value + 1.0f;
 		}
 		else
 		{
-			speed =  1.0f;
+			speed = 1.0f / fabsf(value - 1.0f);
 		}
 
 		return glm::clamp(speed, 0.01f, 100.0f);
