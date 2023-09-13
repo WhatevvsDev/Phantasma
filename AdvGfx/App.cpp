@@ -53,6 +53,7 @@ namespace App
         glfwSetKeyCallback(window, Raytracer::key_input);
         glfwSetMouseButtonCallback(window, Raytracer::mouse_button_input);
         glfwSetCursorPosCallback(window, Raytracer::cursor_input);
+        glfwSetScrollCallback(window, Raytracer::scroll_input);
 
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();

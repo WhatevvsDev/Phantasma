@@ -14,4 +14,5 @@ namespace Raytracer
 	void key_input(GLFWwindow* window, int key, int scancode, int action, int mods);
 	void mouse_button_input(GLFWwindow* window, int button, int action, int mods);
 	void cursor_input(GLFWwindow* window, double xpos, double ypos);
+	void scroll_input(GLFWwindow* window, double xoffset, double yoffset);
 };
