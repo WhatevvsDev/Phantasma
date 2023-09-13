@@ -171,7 +171,7 @@ void kernel raytrace(global uint* buffer, global struct Tri* tris, global struct
 		int g = clamp((int)(hit_pos.y * 25.5f), 0, 255);
 		int b = clamp((int)(hit_pos.z * 2.5f), 0, 255);
 
-		buffer[pixel_dest] = 0x00010000 * b + 0x00000100 * g + 0x00000001 * r;;
+		buffer[pixel_dest] = 0x00010000 * b + 0x00000100 * g + 0x00000001 * r;
 	}
 	else // Sky
 	{

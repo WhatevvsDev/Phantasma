@@ -20,7 +20,4 @@ namespace Raytracer
 		void cursor_input(GLFWwindow* window, double xpos, double ypos);
 		void scroll_input(GLFWwindow* window, double xoffset, double yoffset);
 	};
-
-	void import_lut(const std::string& path);
-	void apply_lut(const std::string& name);
 };

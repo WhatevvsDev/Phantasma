@@ -104,5 +104,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="compute\example.cl" />
+    <None Include="compute\reinhard_tonemapping.cl" />
+    <None Include="compute\approximate_aces_tonemapping.cl" />
   </ItemGroup>
 </Project>

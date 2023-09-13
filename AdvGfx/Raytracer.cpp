@@ -17,6 +17,14 @@
 
 #include "BVH.h"
 
+enum class TonemappingType
+{
+	None,
+	ApproximateACES,
+	//Filmic,
+	Reinhard
+};
+
 struct Tri 
 { 
     glm::vec3 vertex0;
@@ -135,6 +143,8 @@ namespace Raytracer
 		int fps_limit_value { 80 };
 
 		float camera_speed_t {0.5f};
+
+		TonemappingType active_tonemapping { TonemappingType::None };
 	} settings;
 
 	namespace Input
@@ -276,6 +286,13 @@ namespace Raytracer
 
 	void init()
 	{
+		// TODO: Implement the other tonemapping filters
+		// Create tonemapping shaders
+		Compute::create_kernel("C:/Users/Matt/Desktop/AdvGfx/AdvGfx/compute/reinhard_tonemapping.cl", "reinhard");
+		Compute::create_kernel("C:/Users/Matt/Desktop/AdvGfx/AdvGfx/compute/approximate_aces_tonemapping.cl", "approximate_aces");
+		//Compute::create_kernel("C:/Users/Matt/Desktop/AdvGfx/AdvGfx/compute/raytrace_tri.cl", "raytrace");
+
+
 		for (int i = 0; i < N; i++)
 		{
 			glm::vec3 r0 = glm::vec3( RandomFloat(), RandomFloat(), RandomFloat() );
@@ -328,6 +345,28 @@ namespace Raytracer
 			.write({&sceneData, 1})
 			.global_dispatch({width, height, 1})
 			.execute();
+
+		
+		if(settings.active_tonemapping != TonemappingType::None)
+		{
+			ComputeOperation* op { nullptr};
+
+			switch(settings.active_tonemapping)
+			{
+				case TonemappingType::Reinhard:
+					op = new ComputeOperation("reinhard_tonemapping.cl");
+					break;
+				case TonemappingType::ApproximateACES:
+					op = new ComputeOperation("approximate_aces_tonemapping.cl");
+					break;
+			}
+
+			op->read_write({buffer, (size_t)(width * height)})
+				.write({&sceneData, 1})
+				.global_dispatch({width, height, 1})
+				.execute();
+			delete op;
+		}
 
 		if(Input::screenshot)
 		{
@@ -424,6 +463,26 @@ namespace Raytracer
 		ImGui::InputInt("## Framerate Limit Value Input Int", &settings.fps_limit_value, 0, 0);
 		ImGui::Checkbox("Limit framerate?", &settings.fps_limit_enabled);
 		
+		// Has to be in order!
+		static std::pair<TonemappingType, std::string> tonemapping_text[] =
+		{
+			{TonemappingType::None, "None"},
+			{TonemappingType::ApproximateACES, "Approximate ACES"},
+			{TonemappingType::Reinhard, "Reinhard"},
+		};
+
+
+		if(ImGui::BeginCombo("Tonemapping", tonemapping_text[(int)settings.active_tonemapping].second.c_str()))
+		{
+			for(auto& tonemap : tonemapping_text)
+			{
+				if(ImGui::Selectable(tonemap.second.c_str(), settings.active_tonemapping == tonemap.first))
+				{
+					settings.active_tonemapping = tonemap.first;
+				}
+			}
+			ImGui::EndCombo();
+		}
 
 		ImGui::End();
 	}
@@ -433,15 +492,5 @@ namespace Raytracer
 		return settings.fps_limit_enabled ? 
 			settings.fps_limit_value :
 			1000;
-	}
-
-	void Raytracer::import_lut(const std::string& path)
-	{
-
-	}
-
-	void Raytracer::apply_lut(const std::string& name)
-	{
-
 	}
 }

@@ -79,8 +79,9 @@ struct ComputeOperation
     ComputeOperation& write(const ComputeDataHandle& data);
 
     // Data should already be resized to accomodate data!
-    // For now only supports one read buffer.
     ComputeOperation& read(const ComputeDataHandle& data);
+
+    ComputeOperation& read_write(const ComputeDataHandle& data);
 
     ComputeOperation& local_dispatch(glm::ivec3 size);
 

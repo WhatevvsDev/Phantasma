@@ -172,7 +172,7 @@ ComputeOperation::ComputeOperation(const std::string& kernel_name)
 
 ComputeOperation& ComputeOperation::write(const ComputeDataHandle& data)
 {
-    cl::Buffer new_write_buffer(compute.context, CL_MEM_READ_WRITE, data.data_byte_size);
+    cl::Buffer new_write_buffer = cl::Buffer(compute.context, CL_MEM_WRITE_ONLY, data.data_byte_size);
    
     CHECKCL(compute.queue.enqueueWriteBuffer(new_write_buffer, CL_TRUE, 0, data.data_byte_size, data.data_ptr));
 
@@ -187,11 +187,27 @@ ComputeOperation& ComputeOperation::write(const ComputeDataHandle& data)
 ComputeOperation& ComputeOperation::read(const ComputeDataHandle& data)
 {
     // Create and push new buffer
-    cl::Buffer new_read_buffer = cl::Buffer(compute.context, CL_MEM_READ_WRITE, data.data_byte_size);
+    cl::Buffer new_read_buffer = cl::Buffer(compute.context, CL_MEM_READ_ONLY, data.data_byte_size);
 
     read_buffers.push_back({data.data_ptr, data.data_byte_size,std::move(new_read_buffer)});
 
     kernel->cl_kernel.setArg(arg_count, read_buffers.back().buffer);
+
+    arg_count++;
+    return *this;
+}
+
+ComputeOperation& ComputeOperation::read_write(const ComputeDataHandle& data)
+{
+    // Create and push new buffer
+    cl::Buffer new_read_write_buffer = cl::Buffer(compute.context, CL_MEM_READ_WRITE, data.data_byte_size);
+
+    write_buffers.push_back(new_read_write_buffer);
+    read_buffers.push_back({data.data_ptr, data.data_byte_size, new_read_write_buffer});
+
+    CHECKCL(compute.queue.enqueueWriteBuffer(new_read_write_buffer, CL_TRUE, 0, data.data_byte_size, data.data_ptr));
+    
+    kernel->cl_kernel.setArg(arg_count, new_read_write_buffer);
 
     arg_count++;
     return *this;
