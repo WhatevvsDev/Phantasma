@@ -50,10 +50,10 @@ namespace App
         
         glfwMakeContextCurrent(window);
         
-        glfwSetKeyCallback(window, Raytracer::key_input);
-        glfwSetMouseButtonCallback(window, Raytracer::mouse_button_input);
-        glfwSetCursorPosCallback(window, Raytracer::cursor_input);
-        glfwSetScrollCallback(window, Raytracer::scroll_input);
+        glfwSetKeyCallback(window, Raytracer::Input::key_input);
+        glfwSetMouseButtonCallback(window, Raytracer::Input::mouse_button_input);
+        glfwSetCursorPosCallback(window, Raytracer::Input::cursor_input);
+        glfwSetScrollCallback(window, Raytracer::Input::scroll_input);
 
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
