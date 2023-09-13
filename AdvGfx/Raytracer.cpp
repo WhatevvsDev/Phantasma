@@ -37,7 +37,7 @@ struct Tri
 	float pad_3;
 };
 
- #define N 12582
+ #define N 131072
 
 // application data
 Tri tris[N];
@@ -298,7 +298,7 @@ namespace Raytracer
 			glm::vec3 r0 = glm::vec3( RandomFloat(), RandomFloat(), RandomFloat() );
 			glm::vec3 r1 = glm::vec3( RandomFloat(), RandomFloat(), RandomFloat() );
 			glm::vec3 r2 = glm::vec3( RandomFloat(), RandomFloat(), RandomFloat() );
-			tris[i].vertex0 = r0 * 200 - glm::vec3( 5 );
+			tris[i].vertex0 = r0 * 250 - glm::vec3( 125 );
 			tris[i].vertex1 = tris[i].vertex0 + r1, tris[i].vertex2 = tris[i].vertex0 + r2;
 		}
 

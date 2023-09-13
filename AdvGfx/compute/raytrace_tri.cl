@@ -175,15 +175,15 @@ void kernel raytrace(global uint* buffer, global struct Tri* tris, global struct
 	}
 	else // Sky
 	{
-		if(ray.bvh_hits != 0)
+		//if(ray.bvh_hits != 0)
 		{
-			int rb = clamp((int)(ray.bvh_hits), 0, 255);
-			int gb = clamp((int)(ray.bvh_hits), 0, 255);
-			int bb = clamp((int)(ray.bvh_hits), 0, 255);
+			//int rb = clamp((int)(ray.bvh_hits), 0, 255);
+			//int gb = clamp((int)(ray.bvh_hits), 0, 255);
+			//int bb = clamp((int)(ray.bvh_hits), 0, 255);
 
-			buffer[pixel_dest] = 0x00010000 * bb + 0x00000100 * gb + 0x00000001 * rb;
+			//buffer[pixel_dest] = 0x00010000 * bb + 0x00000100 * gb + 0x00000001 * rb;
 		}
-		else
+		//else
 		{
 			float3 sky_1 = (float3)(0.60f, 0.76f, 1.0f);
 			float3 sky_2 = (float3)(0.4f, 0.23f, 0.05f);
