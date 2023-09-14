@@ -362,3 +362,4 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /AdvGfx/imgui.ini
+/AdvGfx/phantasma.settings.json

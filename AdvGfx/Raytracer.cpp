@@ -10,6 +10,11 @@
 #include "stb_image.h"
 #include "stb_image_write.h"
 
+#include <fstream>
+#include <ostream>
+#include "json.hpp"
+using json = nlohmann::json;
+
 #include <GLFW/glfw3.h>
 
 #include <utility>
@@ -286,6 +291,19 @@ namespace Raytracer
 
 	void init()
 	{
+		std::ifstream f("phantasma.settings.json");
+
+		if(f.good())
+		{
+			json settings_data = json::parse(f);
+
+			settings.active_tonemapping = settings_data["settings"]["active_tonemapping"];
+			settings.camera_speed_t = settings_data["settings"]["camera_speed_t"];
+			settings.fps_limit_enabled = settings_data["settings"]["fps_limit_enabled"];
+			settings.fps_limit_value = settings_data["settings"]["fps_limit_value"];
+			settings.recompile_changed_shaders_automatically = settings_data["settings"]["recompile_changed_shaders_automatically"];
+		}
+
 		// TODO: Implement the other tonemapping filters
 		// Create tonemapping shaders
 		Compute::create_kernel("C:/Users/Matt/Desktop/AdvGfx/AdvGfx/compute/reinhard_tonemapping.cl", "reinhard");
@@ -305,7 +323,22 @@ namespace Raytracer
         build_bvh();
 		Compute::create_kernel("C:/Users/Matt/Desktop/AdvGfx/AdvGfx/compute/raytrace_tri.cl", "raytrace");
 	}
-	
+
+	void terminate()
+	{
+		json settings_data;
+
+		settings_data["settings"]["active_tonemapping"] = settings.active_tonemapping;
+		settings_data["settings"]["camera_speed_t"] = settings.camera_speed_t;
+		settings_data["settings"]["fps_limit_enabled"] = settings.fps_limit_enabled;
+		settings_data["settings"]["fps_limit_value"] = settings.fps_limit_value;
+		settings_data["settings"]["recompile_changed_shaders_automatically"] = settings.recompile_changed_shaders_automatically;
+
+		std::ofstream o("phantasma.settings.json");
+		o << settings_data << std::endl;
+	}
+
+
 	void update(const float delta_time_ms)
 	{
 		Input::show_move_speed_timer -= (delta_time_ms / 1000.0f);

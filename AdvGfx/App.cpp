@@ -78,6 +78,8 @@ namespace App
             App::update();
         }
 
+        Raytracer::terminate();
+
         glfwTerminate();
         return 0;
     }
