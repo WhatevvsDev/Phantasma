@@ -1,3 +1,14 @@
+float3 lerp(float3 a, float3 b, float t)
+{
+    return a + t*(b-a);
+}
+
+float3 reflected(float3 normal, float3 direction)
+{
+	float projected = dot(-normal, direction);
+	return (direction + normal * projected * 2);
+}
+
 struct Tri 
 { 
     float3 vertex0;
@@ -117,15 +128,54 @@ void intersect_bvh( struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct
 	}
 }
 
-float3 reflected(float3 normal, float3 direction)
+float3 Sky(struct Ray* ray, float3* sun_dir)
 {
-	float projected = dot(-normal, direction);
-	return (direction + normal * projected * 2);
+	float3 sky_1 = (float3)(0.60f, 0.76f, 1.0f);
+	float3 sky_2 = (float3)(0.1f, 0.12f, 0.2f);
+
+	float3 sky = lerp(sky_2, sky_1, (ray->D.y + 1.0f) * 0.5f);
+
+	float sunp = min(dot(ray->D, -*sun_dir), 0.0f);
+	float sun = smoothstep(0.99f, 1.0f, sunp * sunp * sunp * sunp);
+
+	return lerp(sky, (float3)(1.0f, 1.0f, 1.0f), sun);
 }
 
-float3 lerp(float3 a, float3 b, float t){
-    return a + t*(b-a);
+float3 trace(struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* tris, uint* trisIdx)
+{
+	float3 sun_dir = normalize((float3)(0.0f, 1.0f, 0.7f));
+
+	intersect_bvh(ray, 0, nodes, tris, trisIdx);
+	
+	bool hit_anything = ray->t < 1e30;
+
+	if(hit_anything)
+	{
+		float3 hit_pos = ray->O + (ray->D * ray->t) * 0.999999f;
+		
+		struct Ray shadow_ray;
+		shadow_ray.O = hit_pos;
+		shadow_ray.D = sun_dir;
+		shadow_ray.t = 1e30f;
+		shadow_ray.bvh_hits = 0;
+
+		intersect_bvh(&shadow_ray, 0, nodes, tris, trisIdx);
+
+		bool shadow = shadow_ray.t < 1e30;
+		float3 normal = cross(tris[ray->tri_hit].vertex0 - tris[ray->tri_hit].vertex1,tris[ray->tri_hit].vertex0 - tris[ray->tri_hit].vertex2);
+		normal = normalize(normal);
+
+		float3 diffuse = (dot(normal, sun_dir) + 1.0f) * 0.5f * (1.0f - shadow);
+
+		return diffuse;
+	}
+	else // Sky
+	{
+		return Sky(ray, &sun_dir);
+	}
 }
+
+
 
 struct SceneData
 {
@@ -161,73 +211,19 @@ void kernel raytrace(global uint* buffer, global struct Tri* tris, global struct
 
 	float3 pixelPos = cforward + cright * x_t * aspect_ratio + cup * y_t;
 
+	// Actual raytracing
+
 	struct Ray ray;
 	ray.O = cpos;
     ray.D = normalize( pixelPos );
     ray.t = 1e30f;
 	ray.bvh_hits = 0;
 
-	uint rootNodeIdx = 0;
-	
-    intersect_bvh(&ray, rootNodeIdx, nodes, tris, trisIdx);
-	
-	bool hit_anything = ray.t < 1e30;
-	
-	float3 sun_dir = normalize((float3)(0.0f, 1.0f, 0.7f));
+	float3 color = trace(&ray, 0, nodes, tris, trisIdx);
 
-	float3 sky_1 = (float3)(0.60f, 0.76f, 1.0f);
-	float3 sky_2 = (float3)(0.1f, 0.12f, 0.2f);
+	int r = clamp((int)(color.x * 255.0f), 0, 255);
+	int g = clamp((int)(color.y * 255.0f), 0, 255);
+	int b = clamp((int)(color.z * 255.0f), 0, 255);
 
-	float3 sky = lerp(sky_2, sky_1, (ray.D.y + 1.0f) * 0.5f);
-
-	float sun_t = min(dot(ray.D, -sun_dir), 0.0f);
-	float sun = smoothstep(0.99f, 1.0f, sun_t * sun_t * sun_t * sun_t);
-
-	sky = lerp(sky, (float3)(1.0f, 1.0f, 1.0f), sun);
-
-	if(hit_anything)
-	{
-		float3 hit_pos = ray.O + (ray.D * ray.t) * 0.999999f;
-		
-		struct Ray shadow_ray;
-		shadow_ray.O = hit_pos;
-		shadow_ray.D = sun_dir;
-		shadow_ray.t = 1e30f;
-		shadow_ray.bvh_hits = 0;
-
-		intersect_bvh(&shadow_ray, rootNodeIdx, nodes, tris, trisIdx);
-
-		bool shadow = shadow_ray.t < 1e30;
-		float3 normal = cross(tris[ray.tri_hit].vertex0 - tris[ray.tri_hit].vertex1,tris[ray.tri_hit].vertex0 - tris[ray.tri_hit].vertex2);
-		normal = normalize(normal);
-
-		float3 diffuse = (dot(normal, sun_dir) + 1.0f) * 0.5f * (1.0f - shadow);
-
-		int r = clamp((int)(diffuse.x * 255.0f), 0, 255);
-		int g = clamp((int)(diffuse.y * 255.0f), 0, 255);
-		int b = clamp((int)(diffuse.z * 255.0f), 0, 255);
-
-		buffer[pixel_dest] = 0x00010000 * b + 0x00000100 * g + 0x00000001 * r;
-	}
-	else // Sky
-	{
-		//if(ray.bvh_hits != 0)
-		{
-			//int rb = clamp((int)(ray.bvh_hits), 0, 255);
-			//int gb = clamp((int)(ray.bvh_hits), 0, 255);
-			//int bb = clamp((int)(ray.bvh_hits), 0, 255);
-
-			//buffer[pixel_dest] = 0x00010000 * bb + 0x00000100 * gb + 0x00000001 * rb;
-		}
-		//else
-		{
-			
-
-			int r = min((int)(sky.x * 255.0f), 255);
-			int g = min((int)(sky.y * 255.0f), 255);
-			int b = min((int)(sky.z * 255.0f), 255);
-
-			buffer[pixel_dest] = 0x00010000 * b + 0x00000100 * g + 0x00000001 * r;
-		}
-	}
+	buffer[pixel_dest] = 0x00010000 * b + 0x00000100 * g + 0x00000001 * r;
 }
