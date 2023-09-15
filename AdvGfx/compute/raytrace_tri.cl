@@ -117,6 +117,12 @@ void intersect_bvh( struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct
 	}
 }
 
+float3 reflected(float3 normal, float3 direction)
+{
+	float projected = dot(-normal, direction);
+	return (direction + normal * projected * 2);
+}
+
 float3 lerp(float3 a, float3 b, float t){
     return a + t*(b-a);
 }
@@ -162,28 +168,44 @@ void kernel raytrace(global uint* buffer, global struct Tri* tris, global struct
 	ray.bvh_hits = 0;
 
 	uint rootNodeIdx = 0;
-
-	//for(int i = 0; i < 12582; i++)
-	//	IntersectTri(&ray, &tris[i]);
 	
     intersect_bvh(&ray, rootNodeIdx, nodes, tris, trisIdx);
 	
 	bool hit_anything = ray.t < 1e30;
+	
+	float3 sun_dir = normalize((float3)(0.0f, 1.0f, 0.7f));
+
+	float3 sky_1 = (float3)(0.60f, 0.76f, 1.0f);
+	float3 sky_2 = (float3)(0.1f, 0.12f, 0.2f);
+
+	float3 sky = lerp(sky_2, sky_1, (ray.D.y + 1.0f) * 0.5f);
+
+	float sun_t = min(dot(ray.D, -sun_dir), 0.0f);
+	float sun = smoothstep(0.99f, 1.0f, sun_t * sun_t * sun_t * sun_t);
+
+	sky = lerp(sky, (float3)(1.0f, 1.0f, 1.0f), sun);
 
 	if(hit_anything)
 	{
-		float3 hit_pos = ray.O + (ray.D * ray.t);
+		float3 hit_pos = ray.O + (ray.D * ray.t) * 0.999999f;
+		
+		struct Ray shadow_ray;
+		shadow_ray.O = hit_pos;
+		shadow_ray.D = sun_dir;
+		shadow_ray.t = 1e30f;
+		shadow_ray.bvh_hits = 0;
 
+		intersect_bvh(&shadow_ray, rootNodeIdx, nodes, tris, trisIdx);
+
+		bool shadow = shadow_ray.t < 1e30;
 		float3 normal = cross(tris[ray.tri_hit].vertex0 - tris[ray.tri_hit].vertex1,tris[ray.tri_hit].vertex0 - tris[ray.tri_hit].vertex2);
 		normal = normalize(normal);
 
-		//dint r = clamp((int)(hit_pos.x * 2.5f), 0, 255);
-		//int g = clamp((int)(hit_pos.y * 2.5f), 0, 255);
-		//int b = clamp((int)(hit_pos.z * 2.5f), 0, 255);
+		float3 diffuse = (dot(normal, sun_dir) + 1.0f) * 0.5f * (1.0f - shadow);
 
-		int r = clamp((int)(normal.x * 20.0f), 0, 255);
-		int g = clamp((int)(normal.y * 255.0f), 0, 255);
-		int b = clamp((int)(normal.z * 255.0f), 0, 255);
+		int r = clamp((int)(diffuse.x * 255.0f), 0, 255);
+		int g = clamp((int)(diffuse.y * 255.0f), 0, 255);
+		int b = clamp((int)(diffuse.z * 255.0f), 0, 255);
 
 		buffer[pixel_dest] = 0x00010000 * b + 0x00000100 * g + 0x00000001 * r;
 	}
@@ -199,17 +221,7 @@ void kernel raytrace(global uint* buffer, global struct Tri* tris, global struct
 		}
 		//else
 		{
-			float3 sky_1 = (float3)(0.60f, 0.76f, 1.0f);
-			float3 sky_2 = (float3)(0.4f, 0.23f, 0.05f);
-
-			float3 sky = lerp(sky_2, sky_1, (ray.D.y + 1.0f) * 0.5f);
-
-			float3 sun_dir = normalize((float3)(0.0f, -1.0f, -1.0f));
-
-			float sun_t = min(dot(ray.D, sun_dir), 0.0f);
-			float sun = smoothstep(0.99f, 1.0f, sun_t * sun_t * sun_t * sun_t);
-
-			sky = lerp(sky, (float3)(1.0f, 1.0f, 1.0f), sun);
+			
 
 			int r = min((int)(sky.x * 255.0f), 255);
 			int g = min((int)(sky.y * 255.0f), 255);
