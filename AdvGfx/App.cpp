@@ -92,7 +92,14 @@ namespace App
         last_render_time = fmax(last_render_time, 1.0f);
         last_update_time = fmax(last_update_time, 1.0f);
 
-        std::string title = std::format("{} Window {}x{} | {} ms ({} FPS) | {}ms update", app_desc.title, app_desc.width, app_desc.height, (int)last_render_time, (int)(1000.0f / last_render_time),  (int)last_update_time);
+        std::string title = std::format("{} Window {}x{} | {} ms ({} {}) | {}ms update", 
+            app_desc.title, 
+            app_desc.width, 
+            app_desc.height, 
+            (int)last_render_time, 
+            (int)(1000.0f / last_render_time),  
+            (Raytracer::get_target_fps() == 1000) ? "FPS" : "Limited FPS",
+            (int)last_update_time);
 
         glfwSetWindowTitle(window, title.c_str());
         

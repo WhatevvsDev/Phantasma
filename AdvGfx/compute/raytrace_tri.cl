@@ -12,6 +12,7 @@ struct Ray
     float3 D; 
     float t;
 	int bvh_hits;
+	int tri_hit;
 };
 
 struct BVHNode
@@ -22,22 +23,28 @@ struct BVHNode
 	int tri_count;
 };
 
-void IntersectTri( struct Ray* ray, struct Tri* tri)
+void IntersectTri( struct Ray* ray, struct Tri* tris, uint triIdx)
 {
-	const float3 edge1 = tri->vertex1 - tri->vertex0;
-	const float3 edge2 = tri->vertex2 - tri->vertex0;
+	const float3 edge1 = tris[triIdx].vertex1 - tris[triIdx].vertex0;
+	const float3 edge2 = tris[triIdx].vertex2 - tris[triIdx].vertex0;
 	const float3 h = cross( ray->D, edge2 );
 	const float a = dot( edge1, h );
 	if (a > -0.0001f && a < 0.0001f) return; // ray parallel to triangle
 	const float f = 1 / a;
-	const float3 s = ray->O - tri->vertex0;
+	const float3 s = ray->O - tris[triIdx].vertex0;
 	const float u = f * dot( s, h );
 	if (u < 0 || u > 1) return;
 	const float3 q = cross( s, edge1 );
 	const float v = f * dot( ray->D, q );
 	if (v < 0 || u + v > 1) return;
 	const float t = f * dot( edge2, q );
-	if (t > 0.0001f) ray->t = min( ray->t, t );
+	if (t > 0.0001f) 
+	if(ray->t > t)
+	{
+		ray->t = t;
+		ray->tri_hit = triIdx;
+	}
+
 }
 
 float IntersectAABB( struct Ray* ray, struct BVHNode* node )
@@ -66,7 +73,7 @@ void intersect_bvh( struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct
 		if(node->tri_count > 0)
 		{
 			for (uint i = 0; i < node->tri_count; i++ )
-				IntersectTri( ray, &tris[trisIdx[node->left_first + i]]);
+				IntersectTri( ray, tris, trisIdx[node->left_first + i]);
 
 			if(stack_ptr == 0)
 				break;
@@ -167,9 +174,16 @@ void kernel raytrace(global uint* buffer, global struct Tri* tris, global struct
 	{
 		float3 hit_pos = ray.O + (ray.D * ray.t);
 
-		int r = clamp((int)(hit_pos.x * 2.5f), 0, 255);
-		int g = clamp((int)(hit_pos.y * 25.5f), 0, 255);
-		int b = clamp((int)(hit_pos.z * 2.5f), 0, 255);
+		float3 normal = cross(tris[ray.tri_hit].vertex0 - tris[ray.tri_hit].vertex1,tris[ray.tri_hit].vertex0 - tris[ray.tri_hit].vertex2);
+		normal = normalize(normal);
+
+		//dint r = clamp((int)(hit_pos.x * 2.5f), 0, 255);
+		//int g = clamp((int)(hit_pos.y * 2.5f), 0, 255);
+		//int b = clamp((int)(hit_pos.z * 2.5f), 0, 255);
+
+		int r = clamp((int)(normal.x * 20.0f), 0, 255);
+		int g = clamp((int)(normal.y * 255.0f), 0, 255);
+		int b = clamp((int)(normal.z * 255.0f), 0, 255);
 
 		buffer[pixel_dest] = 0x00010000 * b + 0x00000100 * g + 0x00000001 * r;
 	}

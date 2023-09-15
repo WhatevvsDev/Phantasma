@@ -43,7 +43,7 @@ struct Tri
 	float pad_3;
 };
 
- #define N 131072
+ #define N 12582 
 
 // application data
 Tri tris[N];
@@ -287,6 +287,21 @@ namespace Raytracer
 
 		return glm::clamp(speed, 0.01f, 100.0f);
 	}
+	#pragma warning(disable:4996)
+	void load_model()
+	{
+		FILE* file = fopen( "C:/Users/Matt/Desktop/AdvGfx/x64/Debug/unity.tri", "r" );
+		float a, b, c, d, e, f, g, h, i;
+		for (int t = 0; t < N; t++) 
+		{
+			fscanf_s( file, "%f %f %f %f %f %f %f %f %f\n", 
+				&a, &b, &c, &d, &e, &f, &g, &h, &i );
+			tris[t].vertex0 = glm::vec3( a, b, c );
+			tris[t].vertex1 = glm::vec3( d, e, f );
+			tris[t].vertex2 = glm::vec3( g, h, i );
+		}
+		fclose( file );
+	}
 
 	void init()
 	{
@@ -309,7 +324,7 @@ namespace Raytracer
 		Compute::create_kernel("C:/Users/Matt/Desktop/AdvGfx/AdvGfx/compute/approximate_aces_tonemapping.cl", "approximate_aces");
 		//Compute::create_kernel("C:/Users/Matt/Desktop/AdvGfx/AdvGfx/compute/raytrace_tri.cl", "raytrace");
 
-
+		/*
 		for (int i = 0; i < N; i++)
 		{
 			glm::vec3 r0 = glm::vec3( RandomFloat(), RandomFloat(), RandomFloat() );
@@ -318,6 +333,8 @@ namespace Raytracer
 			tris[i].vertex0 = r0 * 250 - glm::vec3( 125 );
 			tris[i].vertex1 = tris[i].vertex0 + r1, tris[i].vertex2 = tris[i].vertex0 + r2;
 		}
+		*/
+		load_model();
 
         build_bvh();
 		Compute::create_kernel("C:/Users/Matt/Desktop/AdvGfx/AdvGfx/compute/raytrace_tri.cl", "raytrace");
@@ -336,7 +353,6 @@ namespace Raytracer
 		std::ofstream o("phantasma.settings.json");
 		o << settings_data << std::endl;
 	}
-
 
 	void update(const float delta_time_ms)
 	{
