@@ -34,7 +34,7 @@ struct BVHNode
 	int tri_count;
 };
 
-void IntersectTri( struct Ray* ray, struct Tri* tris, uint triIdx)
+void intersect_tri( struct Ray* ray, struct Tri* tris, uint triIdx)
 {
 	const float3 edge1 = tris[triIdx].vertex1 - tris[triIdx].vertex0;
 	const float3 edge2 = tris[triIdx].vertex2 - tris[triIdx].vertex0;
@@ -58,7 +58,7 @@ void IntersectTri( struct Ray* ray, struct Tri* tris, uint triIdx)
 
 }
 
-float IntersectAABB( struct Ray* ray, struct BVHNode* node )
+float intersect_aabb( struct Ray* ray, struct BVHNode* node )
 {
 	float tx1 = (node->minx - ray->O.x) / ray->D.x, tx2 = (node->maxx - ray->O.x) / ray->D.x;
 	float tmin = min( tx1, tx2 ), tmax = max( tx1, tx2 );
@@ -76,7 +76,7 @@ void intersect_bvh( struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct
 	struct BVHNode* traversal_stack[32];
 	uint stack_ptr = 0; 
 
-	if (IntersectAABB( ray, node ) == 1e30f)
+	if (intersect_aabb( ray, node ) == 1e30f)
 		return;
 
 	while(1)
@@ -84,7 +84,7 @@ void intersect_bvh( struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct
 		if(node->tri_count > 0)
 		{
 			for (uint i = 0; i < node->tri_count; i++ )
-				IntersectTri( ray, tris, trisIdx[node->left_first + i]);
+				intersect_tri( ray, tris, trisIdx[node->left_first + i]);
 
 			if(stack_ptr == 0)
 				break;
@@ -98,8 +98,8 @@ void intersect_bvh( struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct
 			// Optimization potential: we create children next to each other, maybe delete right_child?
 			struct BVHNode* left_child = &nodes[node->left_first];
 			struct BVHNode* right_child = &nodes[node->left_first + 1];
-			float left_dist = IntersectAABB(ray, left_child);
-			float right_dist = IntersectAABB(ray, right_child);
+			float left_dist = intersect_aabb(ray, left_child);
+			float right_dist = intersect_aabb(ray, right_child);
 
 			if(left_dist > right_dist)
 			{
@@ -128,7 +128,7 @@ void intersect_bvh( struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct
 	}
 }
 
-float3 Sky(struct Ray* ray, float3* sun_dir)
+float3 sky_color(struct Ray* ray, float3* sun_dir)
 {
 	float3 sky_1 = (float3)(0.60f, 0.76f, 1.0f);
 	float3 sky_2 = (float3)(0.1f, 0.12f, 0.2f);
@@ -164,14 +164,15 @@ float3 trace(struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* t
 		bool shadow = shadow_ray.t < 1e30;
 		float3 normal = cross(tris[ray->tri_hit].vertex0 - tris[ray->tri_hit].vertex1,tris[ray->tri_hit].vertex0 - tris[ray->tri_hit].vertex2);
 		normal = normalize(normal);
+		normal *= -sign(dot(normal,ray->D)); // Flip if inner normal
 
-		float3 diffuse = (dot(normal, sun_dir) + 1.0f) * 0.5f * (1.0f - shadow);
+		float3 diffuse = (dot(normal, sun_dir)) * (1.0f - shadow);
 
 		return diffuse;
 	}
 	else // Sky
 	{
-		return Sky(ray, &sun_dir);
+		return sky_color(ray, &sun_dir);
 	}
 }
 
