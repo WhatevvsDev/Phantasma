@@ -183,20 +183,14 @@ struct SceneData
 	uint resolution_y;
 	uint tri_count;
 	uint dummy;
-	float4 cam_pos;
-	float4 cam_forward;
-	float4 cam_right;
-	float4 cam_up;
+	float3 cam_pos;
+	float3 cam_forward;
+	float3 cam_right;
+	float3 cam_up;
 };
 
 void kernel raytrace(global uint* buffer, global struct Tri* tris, global struct BVHNode* nodes, global uint* trisIdx, global struct SceneData* sceneData)
 {     
-	float3 cpos = (float3)(sceneData->cam_pos.x, sceneData->cam_pos.y, sceneData->cam_pos.z);
-
-	float3 cright = (float3)(sceneData->cam_right.x, sceneData->cam_right.y, sceneData->cam_right.z);	
-	float3 cforward = (float3)(sceneData->cam_forward.x, sceneData->cam_forward.y, sceneData->cam_forward.z);
-	float3 cup = (float3)(sceneData->cam_up.x, sceneData->cam_up.y, sceneData->cam_up.z);
-	
 	int width = sceneData->resolution_x;
 	int height = sceneData->resolution_y;
 
@@ -209,12 +203,12 @@ void kernel raytrace(global uint* buffer, global struct Tri* tris, global struct
 
 	float aspect_ratio = (float)(sceneData->resolution_x) / (float)(sceneData->resolution_y);
 
-	float3 pixelPos = cforward + cright * x_t * aspect_ratio + cup * y_t;
+	float3 pixelPos = sceneData->cam_forward + sceneData->cam_right * x_t * aspect_ratio + sceneData->cam_up * y_t;
 
 	// Actual raytracing
 
 	struct Ray ray;
-	ray.O = cpos;
+	ray.O = sceneData->cam_pos;
     ray.D = normalize( pixelPos );
     ray.t = 1e30f;
 	ray.bvh_hits = 0;
