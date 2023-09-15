@@ -7,8 +7,9 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb_image.h"
-#include "stb_image_write.h"
+
+#include <stb_image.h>
+#include <stb_image_write.h>
 
 #include <fstream>
 #include <ostream>
@@ -136,9 +137,9 @@ namespace Raytracer
 		uint tri_count		{ 0 };
 		uint dummy			{ 0 };
 		glm::vec4 cam_pos	{ 0.0f };
-		glm::vec4 cam_forward;
-		glm::vec4 cam_right;
-		glm::vec4 cam_up;
+		glm::vec4 cam_forward { 0.0f };
+		glm::vec4 cam_right { 0.0f };
+		glm::vec4 cam_up { 0.0f };
 	} sceneData;
 
 	struct
@@ -231,11 +232,6 @@ namespace Raytracer
 
 		void cursor_input(GLFWwindow* window, double xpos, double ypos)
 		{
-			// Ignore first input to prevent janky motion.
-			static bool first_input = true;
-			if(first_input = false)
-				return;
-
 			if(mouse_active)
 				return;
 
@@ -261,9 +257,12 @@ namespace Raytracer
 		}
 
 		void scroll_input(GLFWwindow* window, double xoffset, double yoffset)
-	{
+		{
+			(void)xoffset;
+			(void)window;
+
 		float old_camera_speed_t = settings.camera_speed_t;
-		settings.camera_speed_t += yoffset * 0.01f;
+		settings.camera_speed_t += (float)yoffset * 0.01f;
 		settings.camera_speed_t = glm::fclamp(settings.camera_speed_t, 0.0f, 1.0f);
 		if(settings.camera_speed_t != old_camera_speed_t)
 			show_move_speed_timer = 2.0f;
@@ -423,20 +422,21 @@ namespace Raytracer
 
 				camera_speed_visual_t = glm::lerp(camera_speed_visual_t, settings.camera_speed_t, 0.65f);
 
-				float move_bar_width = sceneData.resolution[0] * 0.35f;
-				float move_bar_padding = (sceneData.resolution[0] - move_bar_width) * 0.5f;
+				float move_bar_width = (float)sceneData.resolution[0] * 0.35f;
+				float move_bar_padding = ((float)sceneData.resolution[0] - move_bar_width) * 0.5f;
 				float move_bar_height = 3;
-				auto min = ImVec2(move_bar_padding, sceneData.resolution[1] - move_bar_height - 32);
-				auto max = ImVec2(move_bar_padding + move_bar_width, sceneData.resolution[1] - 32);
+				{
+					auto minpos = ImVec2(move_bar_padding, (float)sceneData.resolution[1] - move_bar_height - 32);
+					auto maxpos = ImVec2(move_bar_padding + move_bar_width, (float)sceneData.resolution[1] - 32);
 
-				draw_list.AddRectFilled(min, max, IM_COL32(223, 223, 223, 255), 0.0f,  ImDrawCornerFlags_All);
-				draw_list.AddRect(ImVec2(min.x - 1, min.y - 1), ImVec2(max.x + 1, max.y + 1), IM_COL32(32, 32, 32, 255), 0.0f,  ImDrawCornerFlags_All, 2.0f);
+					draw_list.AddRectFilled(minpos, maxpos, IM_COL32(223, 223, 223, 255), 0.0f,  ImDrawCornerFlags_All);
+					draw_list.AddRect(ImVec2(minpos.x - 1, minpos.y - 1), ImVec2(maxpos.x + 1, maxpos.y + 1), IM_COL32(32, 32, 32, 255), 0.0f,  ImDrawCornerFlags_All, 2.0f);
 							
-				std::string text = std::format("Camera speed: {} m/s", camera_speed_t_to_m_per_second());
-				auto text_size = ImGui::CalcTextSize(text.c_str());
-				ImGui::GetForegroundDrawList()->AddText(ImVec2(min.x + move_bar_width * 0.5f - text_size.x * 0.5f, min.y - 32 - text_size.y), IM_COL32(223, 223, 223, 255), text.data() ,text.data() + text.length());
-
-			 // Movement speed bar, divisions
+					std::string text = std::format("Camera speed: {} m/s", camera_speed_t_to_m_per_second());
+					auto text_size = ImGui::CalcTextSize(text.c_str());
+					ImGui::GetForegroundDrawList()->AddText(ImVec2(minpos.x + move_bar_width * 0.5f - text_size.x * 0.5f, minpos.y - 32 - text_size.y), IM_COL32(223, 223, 223, 255), text.data() ,text.data() + text.length());
+				}
+				// Movement speed bar, divisions
 				int divisior_count = 5;
 				for(int i = 0; i < divisior_count + 2; i++)
 				{
@@ -454,21 +454,22 @@ namespace Raytracer
 					float hor_offset = move_bar_width * (float(i) / ((float)divisior_count + 1.0f));
 					float width_half_extent = 2;
 
-					auto min = ImVec2(move_bar_padding + hor_offset - width_half_extent - cap_extra_width, sceneData.resolution[1] - move_bar_height - 32 - cap_extra_height - divisor_extra_height *0.5f);
-					auto max = ImVec2(move_bar_padding + hor_offset + width_half_extent + cap_extra_width, sceneData.resolution[1] - 32 + cap_extra_height + divisor_extra_height *0.5f);
+					auto minpos = ImVec2(move_bar_padding + hor_offset - width_half_extent - cap_extra_width, sceneData.resolution[1] - move_bar_height - 32 - cap_extra_height - divisor_extra_height *0.5f);
+					auto maxpos = ImVec2(move_bar_padding + hor_offset + width_half_extent + cap_extra_width, sceneData.resolution[1] - 32 + cap_extra_height + divisor_extra_height *0.5f);
 
-					draw_list.AddRectFilled(min, max, IM_COL32(223, 223, 223, 255), 0.0f,  ImDrawCornerFlags_All);
-					draw_list.AddRect(ImVec2(min.x - 1, min.y - 1), ImVec2(max.x + 1, max.y + 1), IM_COL32(0, 0, 0, 255), 0.0f,  ImDrawCornerFlags_All, 2.0f);
+					draw_list.AddRectFilled(minpos, maxpos, IM_COL32(223, 223, 223, 255), 0.0f,  ImDrawCornerFlags_All);
+					draw_list.AddRect(ImVec2(minpos.x - 1, minpos.y - 1), ImVec2(maxpos.x + 1, maxpos.y + 1), IM_COL32(0, 0, 0, 255), 0.0f,  ImDrawCornerFlags_All, 2.0f);
 				}
+				{
+					float t_bar_half_width = 4;
+					float t_bar_half_height = 10;
 
-				float t_bar_half_width = 4;
-				float t_bar_half_height = 10;
+					auto minpos = ImVec2(move_bar_padding - t_bar_half_width + move_bar_width * camera_speed_visual_t, sceneData.resolution[1] - move_bar_height - 32 - t_bar_half_height);
+					auto maxpos = ImVec2(move_bar_padding + t_bar_half_width + move_bar_width * camera_speed_visual_t, sceneData.resolution[1] - 32 + t_bar_half_height);
 
-				min = ImVec2(move_bar_padding - t_bar_half_width + move_bar_width * camera_speed_visual_t, sceneData.resolution[1] - move_bar_height - 32 - t_bar_half_height);
-				max = ImVec2(move_bar_padding + t_bar_half_width + move_bar_width * camera_speed_visual_t, sceneData.resolution[1] - 32 + t_bar_half_height);
-
-				draw_list.AddRectFilled(min, max, IM_COL32(223, 223, 223, 255), 0.0f,  ImDrawCornerFlags_All);
-				draw_list.AddRect(ImVec2(min.x - 1, min.y - 1), ImVec2(max.x + 1, max.y + 1), IM_COL32(32, 32, 32, 255), 0.0f,  ImDrawCornerFlags_All, 2.0f);
+					draw_list.AddRectFilled(minpos, maxpos, IM_COL32(223, 223, 223, 255), 0.0f,  ImDrawCornerFlags_All);
+					draw_list.AddRect(ImVec2(minpos.x - 1, minpos.y - 1), ImVec2(maxpos.x + 1, maxpos.y + 1), IM_COL32(32, 32, 32, 255), 0.0f,  ImDrawCornerFlags_All, 2.0f);
+				}
 			}
 		}
 

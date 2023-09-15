@@ -1,3 +1,4 @@
+#pragma warning(push, 0)
 //
 // Copyright (c) 2008-2023 The Khronos Group Inc.
 //
@@ -11265,3 +11266,4 @@ public:
 } // namespace cl
 
 #endif // CL_HPP_
+#pragma warning(pop)

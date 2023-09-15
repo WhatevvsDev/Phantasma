@@ -39,7 +39,7 @@ struct ComputeKernel
     friend struct ComputeOperation;
 
 private:
-    FILETIME last_write_time;
+    FILETIME last_write_time {};
     ComputeKernelState state { ComputeKernelState::Empty };
     cl::Kernel cl_kernel;
     

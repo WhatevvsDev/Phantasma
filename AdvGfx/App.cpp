@@ -110,7 +110,7 @@ namespace App
         Raytracer::raytrace(app_desc.width, app_desc.height, render_buffer);
         float sleep_time = (1000.0f / Raytracer::get_target_fps() - fps_timer.peek_delta() - last_update_time);
         if(sleep_time < 0) sleep_time = 0;
-        Sleep(sleep_time);
+        Sleep((DWORD)sleep_time);
         last_render_time = fps_timer.lap_delta();
 
         glDrawPixels(app_desc.width, app_desc.height, GL_RGBA, GL_UNSIGNED_BYTE, render_buffer);
