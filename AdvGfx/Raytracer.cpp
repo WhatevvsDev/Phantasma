@@ -290,7 +290,7 @@ namespace Raytracer
 	#pragma warning(disable:4996)
 	void load_model()
 	{
-		FILE* file = fopen( "C:/Users/Matt/Desktop/AdvGfx/x64/Debug/unity.tri", "r" );
+		FILE* file = fopen((get_current_directory_path() + "\\unity.tri").c_str(), "r" );
 		float a, b, c, d, e, f, g, h, i;
 		for (int t = 0; t < N; t++) 
 		{
@@ -320,8 +320,8 @@ namespace Raytracer
 
 		// TODO: Implement the other tonemapping filters
 		// Create tonemapping shaders
-		Compute::create_kernel("C:/Users/Matt/Desktop/AdvGfx/AdvGfx/compute/reinhard_tonemapping.cl", "reinhard");
-		Compute::create_kernel("C:/Users/Matt/Desktop/AdvGfx/AdvGfx/compute/approximate_aces_tonemapping.cl", "approximate_aces");
+		Compute::create_kernel(get_current_directory_path() + "\\..\\..\\AdvGfx\\compute\\reinhard_tonemapping.cl", "reinhard");
+		Compute::create_kernel(get_current_directory_path() + "\\..\\..\\AdvGfx\\compute\\approximate_aces_tonemapping.cl", "approximate_aces");
 		//Compute::create_kernel("C:/Users/Matt/Desktop/AdvGfx/AdvGfx/compute/raytrace_tri.cl", "raytrace");
 
 		/*
@@ -337,7 +337,7 @@ namespace Raytracer
 		load_model();
 
         build_bvh();
-		Compute::create_kernel("C:/Users/Matt/Desktop/AdvGfx/AdvGfx/compute/raytrace_tri.cl", "raytrace");
+		Compute::create_kernel(get_current_directory_path() + "\\..\\..\\AdvGfx\\compute\\raytrace_tri.cl", "raytrace");
 	}
 
 	void terminate()
