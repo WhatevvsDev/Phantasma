@@ -175,8 +175,6 @@ float3 trace(struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* t
 	}
 }
 
-
-
 struct SceneData
 {
 	uint resolution_x;
