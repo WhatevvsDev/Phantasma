@@ -109,6 +109,11 @@ ComputeKernel::ComputeKernel(const std::string& path, const std::string& entry_p
     : path(path)
     , entry_point(entry_point)
 {
+    WIN32_FILE_ATTRIBUTE_DATA fileData;
+
+    GetFileAttributesExA(path.c_str(), GetFileExInfoStandard, &fileData);
+
+    last_write_time = fileData.ftLastWriteTime;
 }
 
 void ComputeKernel::compile()
