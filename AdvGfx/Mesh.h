@@ -3,7 +3,9 @@
 
 #include "Math.h"
 
-struct MeshTri 
+struct BVH;
+
+struct Tri 
 { 
     glm::vec3 vertex0;
 	float pad_0;
@@ -11,11 +13,11 @@ struct MeshTri
 	float pad_1;
 	glm::vec3 vertex2;
 	float pad_2;
-    glm::vec3 centroid;
-	float pad_3;
 };
 
 struct Mesh
 {
-	std::vector<MeshTri> create();
+	Mesh(const std::string& path);
+	std::vector<Tri> tris;
+	BVH* bvh;
 };

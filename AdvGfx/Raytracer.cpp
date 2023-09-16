@@ -18,7 +18,6 @@ using json = nlohmann::json;
 
 #include <GLFW/glfw3.h>
 
-#include <utility>
 #include <format>
 
 #include "BVH.h"
@@ -32,18 +31,6 @@ enum class TonemappingType
 	Reinhard
 };
 
-struct Tri 
-{ 
-    glm::vec3 vertex0;
-	float pad_0;
-	glm::vec3 vertex1;
-	float pad_1;
-	glm::vec3 vertex2;
-	float pad_2;
-    glm::vec3 centroid;
-	float pad_3;
-};
-
  #define N 16000
 
 // application data
@@ -53,82 +40,6 @@ BVHNode bvhNode[N * 2];
 uint rootNodeIdx = 0, nodes_used = 1;
 
 // TODO: Swap triangle to bouding box centroid, instead of vertex centroid :)
-
-void build_bvh()
-{
-	// populate triangle index array
-	for (int i = 0; i < N; i++) triIdx[i] = i;
-	// calculate triangle centroids for partitioning
-	for (int i = 0; i < N; i++)
-		tris[i].centroid = (tris[i].vertex0 + tris[i].vertex1 + tris[i].vertex2) * 0.3333f;
-	// assign all triangles to root node
-	BVHNode& root = bvhNode[rootNodeIdx];
-	root.left_first = 0, root.tri_count = N;
-	update_node_bounds( rootNodeIdx );
-	// subdivide recursively
-	subdivide( rootNodeIdx );
-}
-
-void update_node_bounds( uint nodeIdx )
-{
-	BVHNode& node = bvhNode[nodeIdx];
-	node.min = glm::vec3( 1e30f );
-	node.max = glm::vec3( -1e30f );
-	for (uint first = node.left_first, i = 0; i < node.tri_count; i++)
-	{
-		uint leafTriIdx = triIdx[first + i];
-		Tri& leafTri = tris[leafTriIdx];
-		node.min = glm::min( node.min, leafTri.vertex0 ),
-		node.min = glm::min( node.min, leafTri.vertex1 ),
-		node.min = glm::min( node.min, leafTri.vertex2 ),
-		node.max = glm::max( node.max, leafTri.vertex0 ),
-		node.max = glm::max( node.max, leafTri.vertex1 ),
-		node.max = glm::max( node.max, leafTri.vertex2 );
-	}
-}
-
-void subdivide( uint nodeIdx )
-{
-	// terminate recursion
-	BVHNode& node = bvhNode[nodeIdx];
-	if (node.tri_count <= 2) return;
-	// determine split axis and position
-	glm::vec3 extent = node.max - node.min;
-	int axis = 0;
-	if (extent.y > extent.x) axis = 1;
-	if (extent.z > extent[axis]) axis = 2;
-	float splitPos = node.min[axis] + extent[axis] * 0.5f;
-	// in-place partition
-	int i = node.left_first;
-	int j = i + node.tri_count - 1;
-	while (i <= j)
-	{
-		if (tris[triIdx[i]].centroid[axis] < splitPos)
-			i++;
-		else
-			std::swap( triIdx[i], triIdx[j--] );
-	}
-	// abort split if one of the sides is empty
-	int leftCount = i - node.left_first;
-	if (leftCount == 0 || leftCount == (int)node.tri_count) return;
-	// create child nodes
-	int leftChildIdx = nodes_used++;
-	int rightChildIdx = nodes_used++;
-
-	bvhNode[leftChildIdx].left_first = node.left_first;
-	bvhNode[leftChildIdx].tri_count = leftCount;
-	bvhNode[rightChildIdx].left_first = i;
-	bvhNode[rightChildIdx].tri_count = node.tri_count - leftCount;
-
-	node.left_first = leftChildIdx;
-	node.tri_count = 0;
-
-	update_node_bounds( leftChildIdx );
-	update_node_bounds( rightChildIdx );
-	// recurse
-	subdivide( leftChildIdx );
-	subdivide( rightChildIdx );
-}
 
 namespace Raytracer
 {	
@@ -309,8 +220,12 @@ namespace Raytracer
 	ComputeWriteBuffer* bvh_compute_buffer;
 	ComputeWriteBuffer* tri_idx_compute_buffer;
 
+	Mesh* bruh;
+
 	void init()
 	{
+		bruh = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\simple_test.gltf");
+
 		std::ifstream f("phantasma.settings.json");
 
 		if(f.good())
@@ -330,13 +245,13 @@ namespace Raytracer
 		
 		load_model();
 
-        build_bvh();
+        //build_bvh();
 		Compute::create_kernel(get_current_directory_path() + "\\..\\..\\AdvGfx\\compute\\raytrace_tri.cl", "raytrace");
 
 		//screen_compute_buffer = {buffer, (size_t)(sceneData.resolution[0] * sceneData.resolution[1])};
-		tris_compute_buffer		= new ComputeWriteBuffer({tris, N});
-		bvh_compute_buffer		= new ComputeWriteBuffer({bvhNode, N * 2});
-		tri_idx_compute_buffer	= new ComputeWriteBuffer({triIdx, N});
+		tris_compute_buffer		= new ComputeWriteBuffer({bruh->tris});
+		bvh_compute_buffer		= new ComputeWriteBuffer({bruh->bvh->bvhNodes});
+		tri_idx_compute_buffer	= new ComputeWriteBuffer({bruh->bvh->triIdx});
 	}
 
 	void terminate()

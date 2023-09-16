@@ -14,7 +14,6 @@ struct Tri
     float3 vertex0;
 	float3 vertex1;
 	float3 vertex2; 
-    float3 center;
 };
 
 struct Ray 
@@ -55,7 +54,6 @@ void intersect_tri( struct Ray* ray, struct Tri* tris, uint triIdx)
 		ray->t = t;
 		ray->tri_hit = triIdx;
 	}
-
 }
 
 float intersect_aabb( struct Ray* ray, struct BVHNode* node )
@@ -143,38 +141,61 @@ float3 sky_color(struct Ray* ray, float3* sun_dir)
 	return lerp(sky, (float3)(1.0f, 1.0f, 1.0f), sun);
 }
 
-float3 trace(struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* tris, uint* trisIdx)
+float3 trace(struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* tris, uint* trisIdx, uint depth)
 {
 	float3 sun_dir = normalize((float3)(0.0f, 1.0f, 0.7f));
 
-	intersect_bvh(ray, 0, nodes, tris, trisIdx);
-	
-	bool hit_anything = ray->t < 1e30;
+	// Keeping track of current ray in the stack
+	struct Ray current_ray = *ray;
 
-	if(hit_anything)
+	float3 diffuse = (float3)(1.0f);
+
+	while(1)
 	{
-		float3 hit_pos = ray->O + (ray->D * ray->t) * 0.999999f;
-		
-		struct Ray shadow_ray;
-		shadow_ray.O = hit_pos;
-		shadow_ray.D = sun_dir;
-		shadow_ray.t = 1e30f;
-		shadow_ray.bvh_hits = 0;
+		if(depth <= 0)
+			return (float3)(1.0f, 1.0f, 0.0f);
 
-		//intersect_bvh(&shadow_ray, 0, nodes, tris, trisIdx);
+		intersect_bvh(&current_ray, 0, nodes, tris, trisIdx);
 
-		bool shadow = shadow_ray.t < 1e30;
-		float3 normal = cross(tris[ray->tri_hit].vertex0 - tris[ray->tri_hit].vertex1,tris[ray->tri_hit].vertex0 - tris[ray->tri_hit].vertex2);
-		normal = normalize(normal);
-		normal *= -sign(dot(normal,ray->D)); // Flip if inner normal
+		bool hit_anything = current_ray.t < 1e30;
 
-		float3 diffuse = normal;//(dot(normal, sun_dir)) * (1.0f - shadow);
+		if(hit_anything)
+		{
+			float3 hit_pos = current_ray.O + (current_ray.D * current_ray.t) * 0.999999f;
+			float3 normal = cross(tris[current_ray.tri_hit].vertex0 - tris[current_ray.tri_hit].vertex1,tris[current_ray.tri_hit].vertex0 - tris[current_ray.tri_hit].vertex2);
+			normal = normalize(normal);
+			normal *= -sign(dot(normal,current_ray.D)); // Flip if inner normal
 
-		return diffuse;
-	}
-	else // Sky
-	{
-		return sky_color(ray, &sun_dir);
+			if(current_ray.tri_hit % 2 == 0)
+			{
+				struct Ray shadow_ray;
+				shadow_ray.O = hit_pos;
+				shadow_ray.D = sun_dir;
+				shadow_ray.t = 1e30f;
+				shadow_ray.bvh_hits = 0;
+
+				intersect_bvh(&shadow_ray, 0, nodes, tris, trisIdx);
+
+				bool shadow = shadow_ray.t < 1e30;
+
+				diffuse = (float3)(dot(normal, sun_dir)) * (1.0f - shadow);
+				return diffuse;
+			}
+			else
+			{
+				current_ray.O = hit_pos;
+				current_ray.D = reflected(normal, current_ray.D);;
+				current_ray.t = 1e30f;
+				current_ray.bvh_hits = 0;
+				current_ray.tri_hit = 0;
+
+				depth--;
+			}
+		}
+		else
+		{
+			return sky_color(&current_ray, &sun_dir);
+		}
 	}
 }
 
@@ -212,9 +233,10 @@ void kernel raytrace(global uint* buffer, global struct Tri* tris, global struct
 	ray.O = sceneData->cam_pos;
     ray.D = normalize( pixelPos );
     ray.t = 1e30f;
+	ray.tri_hit = 0;
 	ray.bvh_hits = 0;
 
-	float3 color = trace(&ray, 0, nodes, tris, trisIdx);
+	float3 color = trace(&ray, 0, nodes, tris, trisIdx, 32);
 
 	int r = clamp((int)(color.x * 255.0f), 0, 255);
 	int g = clamp((int)(color.y * 255.0f), 0, 255);

@@ -1,6 +1,8 @@
 #include "Mesh.h"
 #include "LogUtility.h"
 
+#include "BVH.h"
+
 #include <stb_image.h>
 #include <stb_image_write.h>
 
@@ -17,7 +19,7 @@
 #include "json.hpp"
 #include "tiny_gltf.h"
 
-std::vector<MeshTri> Mesh::create()
+Mesh::Mesh(const std::string& path)
 {
 	tinygltf::Model model;
 	tinygltf::TinyGLTF loader;
@@ -26,7 +28,7 @@ std::vector<MeshTri> Mesh::create()
 	std::string warning;
 
 	// Loading mesh 
-	loader.LoadASCIIFromFile(&model, &error, &warning, "C:/Users/Matt/Desktop/glTF-Sample-Models-master/2.0/DamagedHelmet/glTF-Embedded/DamagedHelmet.gltf");
+	loader.LoadASCIIFromFile(&model, &error, &warning, path);
 
 	if(!error.empty())
 		LOGMSG(Log::MessageType::Error, error)
@@ -50,7 +52,11 @@ std::vector<MeshTri> Mesh::create()
 	int index_data_size = tinygltf::GetNumComponentsInType(index_accessor.type) * tinygltf::GetComponentSizeInBytes(index_accessor.componentType);
 	int index_count = index_buffer.byteLength / index_data_size;
 
-	std::vector<MeshTri> tris;
+	bool indices_exist = false;
+
+	if(!indices_exist)
+		index_count = vertex_count;
+		
 	tris.resize(index_count / 3);
 
 	for(int i = 0, t = 0; i < index_count; i += 3, t++)
@@ -58,9 +64,18 @@ std::vector<MeshTri> Mesh::create()
 		// Indices into the vertex buffer for each vertex of a triangle
 		int tri_indices[3] {};
 
-		memcpy(&tri_indices[0], &model.buffers[index_buffer.buffer].data[(i + 0) * index_data_size], index_data_size);
-		memcpy(&tri_indices[1], &model.buffers[index_buffer.buffer].data[(i + 1) * index_data_size], index_data_size);
-		memcpy(&tri_indices[2], &model.buffers[index_buffer.buffer].data[(i + 2) * index_data_size], index_data_size);
+		if(indices_exist)
+		{
+			memcpy(&tri_indices[0], &model.buffers[index_buffer.buffer].data[(i + 0) * index_data_size], index_data_size);
+			memcpy(&tri_indices[1], &model.buffers[index_buffer.buffer].data[(i + 1) * index_data_size], index_data_size);
+			memcpy(&tri_indices[2], &model.buffers[index_buffer.buffer].data[(i + 2) * index_data_size], index_data_size);
+		}
+		else
+		{
+			tri_indices[0] = i + 0;
+			tri_indices[1] = i + 1;
+			tri_indices[2] = i + 2;
+		}
 
 		auto vert_buf = model.buffers[vertex_buffer.buffer].data.data();
 
@@ -69,7 +84,8 @@ std::vector<MeshTri> Mesh::create()
 		tris[t].vertex0 = float_buf[tri_indices[0]];
 		tris[t].vertex1 = float_buf[tri_indices[1]];
 		tris[t].vertex2 = float_buf[tri_indices[2]];
+
 	}
 
-	return tris;
+	bvh = new BVH(tris);
 }
