@@ -169,6 +169,30 @@ bool ComputeKernel::has_been_changed()
     return shader_updated;
 }
 
+
+ComputeReadBuffer::ComputeReadBuffer(const ComputeDataHandle& data)
+    : internal_buffer(cl::Buffer(compute.context, CL_MEM_READ_ONLY, data.data_byte_size))
+    , data_handle(data)
+{
+        
+}
+
+ComputeWriteBuffer::ComputeWriteBuffer(const ComputeDataHandle& data)
+    : internal_buffer(cl::Buffer(compute.context, CL_MEM_WRITE_ONLY, data.data_byte_size))
+{
+    // Automatically write itself to GPU
+    CHECKCL(compute.queue.enqueueWriteBuffer(internal_buffer, CL_TRUE, 0, data.data_byte_size, data.data_ptr));
+    compute.queue.finish();
+}
+
+ComputeReadWriteBuffer::ComputeReadWriteBuffer(const ComputeDataHandle& data)
+    : internal_buffer(cl::Buffer(compute.context, CL_MEM_READ_WRITE, data.data_byte_size))
+    , data_handle(data)
+    , read(data)
+{
+    
+}
+
 ComputeOperation::ComputeOperation(const std::string& kernel_name)
     : kernel(&compute.kernels.find(kernel_name)->second)
 {
@@ -177,42 +201,47 @@ ComputeOperation::ComputeOperation(const std::string& kernel_name)
 
 ComputeOperation& ComputeOperation::write(const ComputeDataHandle& data)
 {
-    cl::Buffer new_write_buffer = cl::Buffer(compute.context, CL_MEM_WRITE_ONLY, data.data_byte_size);
-   
-    CHECKCL(compute.queue.enqueueWriteBuffer(new_write_buffer, CL_TRUE, 0, data.data_byte_size, data.data_ptr));
+    // Create and push new temporary buffer
+    ComputeWriteBuffer cwb(data);
 
-    write_buffers.push_back(std::move(new_write_buffer));
+    write_buffers_non_persistent.push_back(std::move(cwb));
+    auto& cwb_ref = write_buffers_non_persistent.back();
     
-    kernel->cl_kernel.setArg(arg_count, write_buffers.back());
+    CHECKCL(compute.queue.enqueueWriteBuffer(cwb_ref.internal_buffer, CL_TRUE, 0, data.data_byte_size, data.data_ptr));
+    
+    kernel->cl_kernel.setArg(arg_count, cwb_ref);
 
     arg_count++;
     return *this;
 }
 
-ComputeOperation& ComputeOperation::read(const ComputeDataHandle& data)
-{
-    // Create and push new buffer
-    cl::Buffer new_read_buffer = cl::Buffer(compute.context, CL_MEM_READ_ONLY, data.data_byte_size);
-
-    read_buffers.push_back({data.data_ptr, data.data_byte_size,std::move(new_read_buffer)});
-
-    kernel->cl_kernel.setArg(arg_count, read_buffers.back().buffer);
+ComputeOperation& ComputeOperation::write(const ComputeWriteBuffer& buffer)
+{    
+    kernel->cl_kernel.setArg(arg_count, buffer);
 
     arg_count++;
     return *this;
 }
 
-ComputeOperation& ComputeOperation::read_write(const ComputeDataHandle& data)
+ComputeOperation& ComputeOperation::read(const ComputeReadBuffer& buffer)
+{
+    read_buffers.push_back(&buffer);
+
+    kernel->cl_kernel.setArg(arg_count, buffer.internal_buffer);
+
+    arg_count++;
+    return *this;
+}
+
+ComputeOperation& ComputeOperation::read_write(const ComputeReadWriteBuffer& buffer)
 {
     // Create and push new buffer
-    cl::Buffer new_read_write_buffer = cl::Buffer(compute.context, CL_MEM_READ_WRITE, data.data_byte_size);
+    write_buffers_non_persistent.push_back(buffer.data_handle);
+    read_buffers.push_back(&buffer.read);
 
-    write_buffers.push_back(new_read_write_buffer);
-    read_buffers.push_back({data.data_ptr, data.data_byte_size, new_read_write_buffer});
-
-    CHECKCL(compute.queue.enqueueWriteBuffer(new_read_write_buffer, CL_TRUE, 0, data.data_byte_size, data.data_ptr));
+    CHECKCL(compute.queue.enqueueWriteBuffer(buffer.internal_buffer, CL_TRUE, 0, buffer.data_handle.data_byte_size, buffer.data_handle.data_ptr));
     
-    kernel->cl_kernel.setArg(arg_count, new_read_write_buffer);
+    kernel->cl_kernel.setArg(arg_count, buffer.internal_buffer);
 
     arg_count++;
     return *this;
@@ -243,7 +272,7 @@ void ComputeOperation::execute()
 
     for(auto& buffer : read_buffers)
     {
-         CHECKCL(compute.queue.enqueueReadBuffer(buffer.buffer, CL_TRUE, 0, buffer.data_byte_count, buffer.data_destination));
+         CHECKCL(compute.queue.enqueueReadBuffer(buffer->internal_buffer, CL_TRUE, 0, buffer->data_handle.data_byte_size, buffer->data_handle.data_ptr));
     }
 }
 

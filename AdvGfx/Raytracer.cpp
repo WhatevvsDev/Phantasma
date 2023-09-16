@@ -304,6 +304,11 @@ namespace Raytracer
 		fclose( file );
 	}
 
+	ComputeReadBuffer* screen_compute_buffer;
+	ComputeWriteBuffer* tris_compute_buffer;
+	ComputeWriteBuffer* bvh_compute_buffer;
+	ComputeWriteBuffer* tri_idx_compute_buffer;
+
 	void init()
 	{
 		std::ifstream f("phantasma.settings.json");
@@ -327,6 +332,11 @@ namespace Raytracer
 
         build_bvh();
 		Compute::create_kernel(get_current_directory_path() + "\\..\\..\\AdvGfx\\compute\\raytrace_tri.cl", "raytrace");
+
+		//screen_compute_buffer = {buffer, (size_t)(sceneData.resolution[0] * sceneData.resolution[1])};
+		tris_compute_buffer		= new ComputeWriteBuffer({tris, N});
+		bvh_compute_buffer		= new ComputeWriteBuffer({bvhNode, N * 2});
+		tri_idx_compute_buffer	= new ComputeWriteBuffer({triIdx, N});
 	}
 
 	void terminate()
@@ -375,16 +385,18 @@ namespace Raytracer
 		sceneData.tri_count = N;
 
 		ComputeOperation("raytrace_tri.cl")
-			.read({buffer, (size_t)(width * height)})
+			.read(ComputeReadBuffer({buffer, (size_t)(width * height)}))
 			//.write({tris, N})
-			.write({tris, N})
-			.write({bvhNode, N * 2})
-			.write({triIdx, N})
+			//.write({bvhNode, N * 2})
+			//.write({triIdx, N})
+			.write(*tris_compute_buffer)
+			.write(*bvh_compute_buffer)
+			.write(*tri_idx_compute_buffer)
 			.write({&sceneData, 1})
 			.global_dispatch({width, height, 1})
 			.execute();
 
-		
+		/*
 		if(settings.active_tonemapping != TonemappingType::None)
 		{
 			ComputeOperation* op { nullptr};
@@ -405,6 +417,7 @@ namespace Raytracer
 				.execute();
 			delete op;
 		}
+		*/
 
 		if(Input::screenshot)
 		{

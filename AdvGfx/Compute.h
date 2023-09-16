@@ -49,6 +49,8 @@ private:
 // Abstracts over any type of vector
 struct ComputeDataHandle
 {
+    inline ComputeDataHandle() {};
+
     template<typename T>
     inline ComputeDataHandle(const std::vector<T>& data)
     {
@@ -67,9 +69,42 @@ struct ComputeDataHandle
     }
 
     friend struct ComputeOperation;
+    friend struct ComputeReadBuffer;
+    friend struct ComputeWriteBuffer;
+    friend struct ComputeReadWriteBuffer;
 private:
-    void* data_ptr;
-    size_t data_byte_size;
+    void* data_ptr { nullptr };
+    size_t data_byte_size { 0 };
+};
+
+struct ComputeReadBuffer
+{
+    ComputeReadBuffer(const ComputeDataHandle& data);
+
+    friend struct ComputeOperation;
+private:
+    cl::Buffer internal_buffer;
+    ComputeDataHandle data_handle;
+};
+
+struct ComputeWriteBuffer
+{
+    ComputeWriteBuffer(const ComputeDataHandle& data);
+
+    friend struct ComputeOperation;
+private:
+    cl::Buffer internal_buffer;
+};
+
+struct ComputeReadWriteBuffer
+{
+    ComputeReadWriteBuffer(const ComputeDataHandle& data);
+
+    friend struct ComputeOperation;
+private:
+    cl::Buffer internal_buffer;
+    ComputeReadBuffer read;
+    ComputeDataHandle data_handle;
 };
 
 struct ComputeOperation
@@ -78,10 +113,12 @@ struct ComputeOperation
 
     ComputeOperation& write(const ComputeDataHandle& data);
 
-    // Data should already be resized to accomodate data!
-    ComputeOperation& read(const ComputeDataHandle& data);
+    ComputeOperation& write(const ComputeWriteBuffer& buffer);
 
-    ComputeOperation& read_write(const ComputeDataHandle& data);
+    // Data should already be resized to accomodate data!
+    ComputeOperation& read(const ComputeReadBuffer& buffer);
+
+    ComputeOperation& read_write(const ComputeReadWriteBuffer& buffer);
 
     ComputeOperation& local_dispatch(glm::ivec3 size);
 
@@ -92,8 +129,7 @@ struct ComputeOperation
 private:
     struct read_destination
     {
-        void* data_destination;
-        size_t data_byte_count;
+        ComputeDataHandle data_handle;
         cl::Buffer buffer;
     };
 
@@ -104,8 +140,10 @@ private:
 
     ComputeKernel* kernel { nullptr };
 
-    std::vector<cl::Buffer> write_buffers;
-    std::vector<read_destination> read_buffers;
+    std::vector<ComputeWriteBuffer> write_buffers_non_persistent;
+
+    std::vector<const ComputeReadBuffer const *> read_buffers;
+
 };
 
 namespace Compute
