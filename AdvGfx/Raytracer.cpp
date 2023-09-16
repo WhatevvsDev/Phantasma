@@ -384,11 +384,10 @@ namespace Raytracer
 		sceneData.resolution[1] = height;
 		sceneData.tri_count = N;
 
+		ComputeReadWriteBuffer screen_buffer({buffer, (size_t)(width * height)});
+
 		ComputeOperation("raytrace_tri.cl")
 			.read(ComputeReadBuffer({buffer, (size_t)(width * height)}))
-			//.write({tris, N})
-			//.write({bvhNode, N * 2})
-			//.write({triIdx, N})
 			.write(*tris_compute_buffer)
 			.write(*bvh_compute_buffer)
 			.write(*tri_idx_compute_buffer)
@@ -396,7 +395,7 @@ namespace Raytracer
 			.global_dispatch({width, height, 1})
 			.execute();
 
-		/*
+		
 		if(settings.active_tonemapping != TonemappingType::None)
 		{
 			ComputeOperation* op { nullptr};
@@ -411,13 +410,13 @@ namespace Raytracer
 					break;
 			}
 
-			op->read_write({buffer, (size_t)(width * height)})
+			op->read_write(screen_buffer)
 				.write({&sceneData, 1})
 				.global_dispatch({width, height, 1})
 				.execute();
 			delete op;
 		}
-		*/
+		
 
 		if(Input::screenshot)
 		{

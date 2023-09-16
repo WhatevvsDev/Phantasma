@@ -188,7 +188,6 @@ ComputeWriteBuffer::ComputeWriteBuffer(const ComputeDataHandle& data)
 ComputeReadWriteBuffer::ComputeReadWriteBuffer(const ComputeDataHandle& data)
     : internal_buffer(cl::Buffer(compute.context, CL_MEM_READ_WRITE, data.data_byte_size))
     , data_handle(data)
-    , read(data)
 {
     
 }
@@ -208,7 +207,7 @@ ComputeOperation& ComputeOperation::write(const ComputeDataHandle& data)
     auto& cwb_ref = write_buffers_non_persistent.back();
     
     CHECKCL(compute.queue.enqueueWriteBuffer(cwb_ref.internal_buffer, CL_TRUE, 0, data.data_byte_size, data.data_ptr));
-    
+
     kernel->cl_kernel.setArg(arg_count, cwb_ref);
 
     arg_count++;
@@ -235,9 +234,8 @@ ComputeOperation& ComputeOperation::read(const ComputeReadBuffer& buffer)
 
 ComputeOperation& ComputeOperation::read_write(const ComputeReadWriteBuffer& buffer)
 {
-    // Create and push new buffer
-    write_buffers_non_persistent.push_back(buffer.data_handle);
-    read_buffers.push_back(&buffer.read);
+    // Push buffer
+    readwrite_buffers.push_back(&buffer);
 
     CHECKCL(compute.queue.enqueueWriteBuffer(buffer.internal_buffer, CL_TRUE, 0, buffer.data_handle.data_byte_size, buffer.data_handle.data_ptr));
     
@@ -271,6 +269,10 @@ void ComputeOperation::execute()
     CHECKCL(compute.queue.finish());
 
     for(auto& buffer : read_buffers)
+    {
+         CHECKCL(compute.queue.enqueueReadBuffer(buffer->internal_buffer, CL_TRUE, 0, buffer->data_handle.data_byte_size, buffer->data_handle.data_ptr));
+    }
+    for(auto& buffer : readwrite_buffers)
     {
          CHECKCL(compute.queue.enqueueReadBuffer(buffer->internal_buffer, CL_TRUE, 0, buffer->data_handle.data_byte_size, buffer->data_handle.data_ptr));
     }

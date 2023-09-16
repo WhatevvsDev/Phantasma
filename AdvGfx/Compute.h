@@ -103,7 +103,6 @@ struct ComputeReadWriteBuffer
     friend struct ComputeOperation;
 private:
     cl::Buffer internal_buffer;
-    ComputeReadBuffer read;
     ComputeDataHandle data_handle;
 };
 
@@ -116,6 +115,7 @@ struct ComputeOperation
     ComputeOperation& write(const ComputeWriteBuffer& buffer);
 
     // Data should already be resized to accomodate data!
+    // Buffer should not be created inline
     ComputeOperation& read(const ComputeReadBuffer& buffer);
 
     ComputeOperation& read_write(const ComputeReadWriteBuffer& buffer);
@@ -141,8 +141,8 @@ private:
     ComputeKernel* kernel { nullptr };
 
     std::vector<ComputeWriteBuffer> write_buffers_non_persistent;
-
     std::vector<const ComputeReadBuffer const *> read_buffers;
+    std::vector<const ComputeReadWriteBuffer const *> readwrite_buffers;
 
 };
 
