@@ -159,14 +159,14 @@ float3 trace(struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* t
 		shadow_ray.t = 1e30f;
 		shadow_ray.bvh_hits = 0;
 
-		intersect_bvh(&shadow_ray, 0, nodes, tris, trisIdx);
+		//intersect_bvh(&shadow_ray, 0, nodes, tris, trisIdx);
 
 		bool shadow = shadow_ray.t < 1e30;
 		float3 normal = cross(tris[ray->tri_hit].vertex0 - tris[ray->tri_hit].vertex1,tris[ray->tri_hit].vertex0 - tris[ray->tri_hit].vertex2);
 		normal = normalize(normal);
 		normal *= -sign(dot(normal,ray->D)); // Flip if inner normal
 
-		float3 diffuse = (dot(normal, sun_dir)) * (1.0f - shadow);
+		float3 diffuse = normal;//(dot(normal, sun_dir)) * (1.0f - shadow);
 
 		return diffuse;
 	}

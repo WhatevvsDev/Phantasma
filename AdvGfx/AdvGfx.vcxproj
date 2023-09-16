@@ -71,20 +71,20 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <ExternalIncludePath>$(SolutionDir)Dependencies\ImGUI;$(SolutionDir)Dependencies\glm;$(SolutionDir)Dependencies\GLFW3\include;$(SolutionDir)Dependencies\OpenCL\include;$(SolutionDir)Dependencies\STB;$(SolutionDir)Dependencies\NlohmannJSON;$(ExternalIncludePath)</ExternalIncludePath>
+    <ExternalIncludePath>$(SolutionDir)Dependencies\ImGUI;$(SolutionDir)Dependencies\glm;$(SolutionDir)Dependencies\GLFW3\include;$(SolutionDir)Dependencies\OpenCL\include;$(SolutionDir)Dependencies\STB;$(SolutionDir)Dependencies\NlohmannJSON;$(SolutionDir)Dependencies\TinyGLTF;$(ExternalIncludePath)</ExternalIncludePath>
     <SourcePath>$(SolutionDir)Dependencies\ImGUI;$(SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <ExternalIncludePath>$(SolutionDir)Dependencies\ImGUI;$(SolutionDir)Dependencies\glm;$(SolutionDir)Dependencies\GLFW3\include;$(SolutionDir)Dependencies\OpenCL\include;$(SolutionDir)Dependencies\STB;$(SolutionDir)Dependencies\NlohmannJSON;$(ExternalIncludePath)</ExternalIncludePath>
+    <ExternalIncludePath>$(SolutionDir)Dependencies\ImGUI;$(SolutionDir)Dependencies\glm;$(SolutionDir)Dependencies\GLFW3\include;$(SolutionDir)Dependencies\OpenCL\include;$(SolutionDir)Dependencies\STB;$(SolutionDir)Dependencies\NlohmannJSON;$(SolutionDir)Dependencies\TinyGLTF;$(ExternalIncludePath)</ExternalIncludePath>
     <SourcePath>$(SolutionDir)Dependencies\ImGUI;$(SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <SourcePath>$(SolutionDir)Dependencies\ImGUI;$(VC_SourcePath);</SourcePath>
-    <ExternalIncludePath>$(SolutionDir)Dependencies\ImGUI;$(SolutionDir)Dependencies\glm;$(SolutionDir)Dependencies\GLFW3\include;$(SolutionDir)Dependencies\OpenCL\include;$(SolutionDir)Dependencies\STB;$(SolutionDir)Dependencies\NlohmannJSON;$(ExternalIncludePath)</ExternalIncludePath>
+    <ExternalIncludePath>$(SolutionDir)Dependencies\ImGUI;$(SolutionDir)Dependencies\glm;$(SolutionDir)Dependencies\GLFW3\include;$(SolutionDir)Dependencies\OpenCL\include;$(SolutionDir)Dependencies\STB;$(SolutionDir)Dependencies\NlohmannJSON;$(SolutionDir)Dependencies\TinyGLTF;$(ExternalIncludePath)</ExternalIncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <SourcePath>$(SolutionDir)Dependencies\ImGUI;$(VC_SourcePath);</SourcePath>
-    <ExternalIncludePath>$(SolutionDir)Dependencies\ImGUI;$(SolutionDir)Dependencies\glm;$(SolutionDir)Dependencies\GLFW3\include;$(SolutionDir)Dependencies\OpenCL\include;$(SolutionDir)Dependencies\STB;$(SolutionDir)Dependencies\NlohmannJSON;$(ExternalIncludePath)</ExternalIncludePath>
+    <ExternalIncludePath>$(SolutionDir)Dependencies\ImGUI;$(SolutionDir)Dependencies\glm;$(SolutionDir)Dependencies\GLFW3\include;$(SolutionDir)Dependencies\OpenCL\include;$(SolutionDir)Dependencies\STB;$(SolutionDir)Dependencies\NlohmannJSON;$(SolutionDir)Dependencies\TinyGLTF;$(ExternalIncludePath)</ExternalIncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -178,6 +178,7 @@
     <ClCompile Include="imgui_tables.cpp" />
     <ClCompile Include="imgui_widgets.cpp" />
     <ClCompile Include="Math.cpp" />
+    <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Raytracer.cpp" />
     <ClCompile Include="Source.cpp" />
     <ClCompile Include="Timer.cpp" />
@@ -191,6 +192,7 @@
     <ClInclude Include="IOUtility.h" />
     <ClInclude Include="LogUtility.h" />
     <ClInclude Include="Math.h" />
+    <ClInclude Include="Mesh.h" />
     <ClInclude Include="Raytracer.h" />
     <ClInclude Include="strippedwindows.h" />
     <ClInclude Include="Timer.h" />

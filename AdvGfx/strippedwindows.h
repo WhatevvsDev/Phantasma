@@ -6,7 +6,7 @@
 #define VC_EXTRALEAN
 #endif
 #define NOGDICAPMASKS
-// #define NOVIRTUALKEYCODES
+// #define NOVIRTUALKEYCODES <- Required for GLFW (?) I think
 #define NOWINMESSAGES
 #define NOWINSTYLES
 #define NOSYSMETRICS
@@ -23,7 +23,7 @@
 #define NOCTLMGR
 #define NODRAWTEXT
 #define NOKERNEL
-#define NONLS
+//#define NONLS <- Required for unicode support(?) in TinyGLTF I think
 #define NOMEMMGR
 #define NOMETAFILE
 #define NOMINMAX

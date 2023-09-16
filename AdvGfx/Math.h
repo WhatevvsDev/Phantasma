@@ -24,7 +24,11 @@ float Rand( float range );
 uint RandomUInt( uint& customSeed );
 float RandomFloat( uint& customSeed );
 
+#ifndef SGN_TEMPLATED_FUNC
 // taken from https://stackoverflow.com/questions/1903954/is-there-a-standard-sign-function-signum-sgn-in-c-c
-template <typename T> int sgn(T val) {
+template <typename T> 
+int sgn(T val) {
     return (T(0) < val) - (val < T(0));
 }
+#define SGN_TEMPLATED_FUNC
+#endif

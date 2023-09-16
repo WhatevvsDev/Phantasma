@@ -22,6 +22,7 @@ using json = nlohmann::json;
 #include <format>
 
 #include "BVH.h"
+#include "Mesh.h"
 
 enum class TonemappingType
 {
@@ -43,7 +44,7 @@ struct Tri
 	float pad_3;
 };
 
- #define N 12582 
+ #define N 16000
 
 // application data
 Tri tris[N];
@@ -244,7 +245,7 @@ namespace Raytracer
 			mouse_x = (float)(xpos - last_xpos);
 			mouse_y = (float)(ypos - last_ypos);
 
-			cam_rotation += glm::vec3(-mouse_y, -mouse_x, 0) * 0.1f;
+			cam_rotation += glm::vec3(-mouse_y, mouse_x, 0) * 0.1f;
 
 			// limit pitch
 			if(fabs(cam_rotation.x) > 89.9f)
@@ -318,22 +319,10 @@ namespace Raytracer
 			settings.recompile_changed_shaders_automatically = settings_data["settings"]["recompile_changed_shaders_automatically"];
 		}
 
-		// TODO: Implement the other tonemapping filters
 		// Create tonemapping shaders
 		Compute::create_kernel(get_current_directory_path() + "\\..\\..\\AdvGfx\\compute\\reinhard_tonemapping.cl", "reinhard");
 		Compute::create_kernel(get_current_directory_path() + "\\..\\..\\AdvGfx\\compute\\approximate_aces_tonemapping.cl", "approximate_aces");
-		//Compute::create_kernel("C:/Users/Matt/Desktop/AdvGfx/AdvGfx/compute/raytrace_tri.cl", "raytrace");
-
-		/*
-		for (int i = 0; i < N; i++)
-		{
-			glm::vec3 r0 = glm::vec3( RandomFloat(), RandomFloat(), RandomFloat() );
-			glm::vec3 r1 = glm::vec3( RandomFloat(), RandomFloat(), RandomFloat() );
-			glm::vec3 r2 = glm::vec3( RandomFloat(), RandomFloat(), RandomFloat() );
-			tris[i].vertex0 = r0 * 250 - glm::vec3( 125 );
-			tris[i].vertex1 = tris[i].vertex0 + r1, tris[i].vertex2 = tris[i].vertex0 + r2;
-		}
-		*/
+		
 		load_model();
 
         build_bvh();
@@ -364,7 +353,7 @@ namespace Raytracer
 		glm::mat4 rotation = glm::eulerAngleXYZ(glm::radians(Input::cam_rotation.x), glm::radians(Input::cam_rotation.y), glm::radians(Input::cam_rotation.z));
 
 		sceneData.cam_forward = glm::vec4(0, 0, 1.0f, 0) * rotation;
-		sceneData.cam_right = glm::vec4(1.0f, 0, 0, 0) * rotation;
+		sceneData.cam_right = glm::vec4(-1.0f, 0, 0, 0) * rotation;
 		sceneData.cam_up = glm::vec4(0, 1.0f, 0, 0) * rotation;
 
 		glm::vec3 dir = 
@@ -387,6 +376,7 @@ namespace Raytracer
 
 		ComputeOperation("raytrace_tri.cl")
 			.read({buffer, (size_t)(width * height)})
+			//.write({tris, N})
 			.write({tris, N})
 			.write({bvhNode, N * 2})
 			.write({triIdx, N})
