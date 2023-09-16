@@ -130,14 +130,16 @@ void intersect_bvh( struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct
 
 float3 sky_color(struct Ray* ray, float3* sun_dir)
 {
-	float3 sky_1 = (float3)(0.60f, 0.76f, 1.0f);
-	float3 sky_2 = (float3)(0.1f, 0.12f, 0.2f);
-
-	float3 sky = lerp(sky_2, sky_1, (ray->D.y + 1.0f) * 0.5f);
+	float3 sky_color = (float3)(0.333f, 0.61f, 0.84f);
+	float3 horizon_color = (float3)(0.9f, 0.9f, 0.92f);
+	
+	float rd = (ray->D.y + 1.0f) * 0.5f;
+	float horizont = smoothstep(0.3f, 0.75f, 1.0f - rd);
+	
+	float3 sky = lerp(sky_color, horizon_color, horizont);
 
 	float sunp = min(dot(ray->D, -*sun_dir), 0.0f);
 	float sun = smoothstep(0.99f, 1.0f, sunp * sunp * sunp * sunp);
-
 	return lerp(sky, (float3)(1.0f, 1.0f, 1.0f), sun);
 }
 
