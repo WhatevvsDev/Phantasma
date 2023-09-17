@@ -17,3 +17,12 @@ Latest Render
 ### Current features
 - GPU Acceleration via OpenCL
 - Live shader recompilation
+
+### Using
+- [GLFW](https://www.glfw.org/)
+- [GLM](https://github.com/g-truc/glm)
+- [OpenCL](https://www.khronos.org/opencl/)
+- [ImGui](https://github.com/ocornut/imgui)
+- [TinyGLTF](https://github.com/syoyo/tinygltf)
+- [Nlohmann JSON](https://github.com/nlohmann/json)
+- [STB](https://github.com/nothings/stb)
