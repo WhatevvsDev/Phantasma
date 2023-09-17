@@ -263,7 +263,6 @@ namespace Raytracer
 			.global_dispatch({width, height, 1})
 			.execute();
 
-		
 		if(settings.active_tonemapping != TonemappingType::None)
 		{
 			ComputeOperation* op { nullptr};

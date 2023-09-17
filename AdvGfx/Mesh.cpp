@@ -46,13 +46,15 @@ Mesh::Mesh(const std::string& path)
 	int vertex_count = vertex_buffer.byteLength / vertex_data_size;
 
 	// Indices
+
 	auto index_accessor = model.accessors[primitive.indices];
 	auto& index_buffer = model.bufferViews[index_accessor.bufferView];
 
 	int index_data_size = tinygltf::GetNumComponentsInType(index_accessor.type) * tinygltf::GetComponentSizeInBytes(index_accessor.componentType);
 	int index_count = index_buffer.byteLength / index_data_size;
 
-	bool indices_exist = false;
+	// TODO: Do this properly
+	bool indices_exist = (index_count != vertex_count);
 
 	if(!indices_exist)
 		index_count = vertex_count;
