@@ -18,7 +18,7 @@ Latest Render
 - GPU Acceleration via OpenCL
 - Live shader recompilation
 
-### Using
+### Using (And thanks to)
 - [GLFW](https://www.glfw.org/)
 - [GLM](https://github.com/g-truc/glm)
 - [OpenCL](https://www.khronos.org/opencl/)
