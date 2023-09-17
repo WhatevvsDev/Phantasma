@@ -198,7 +198,7 @@
     <ClInclude Include="Timer.h" />
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="compute\raytrace_tri.cl">
+    <CopyFileToFolders Include="compute\raytrace.cl">
       <FileType>Document</FileType>
     </CopyFileToFolders>
   </ItemGroup>

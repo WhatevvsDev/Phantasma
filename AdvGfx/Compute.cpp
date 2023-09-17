@@ -349,7 +349,7 @@ void Compute::init()
   
     // Example
     /*
-    create_kernel("C:/Users/Matt/Desktop/AdvGfx/AdvGfx/compute/kernel.cl", "simple_add");
+    create_kernel("C:/Users/Matt/Desktop/AdvGfx/AdvGfx/compute/example.cl", "example");
 
     std::vector<int> A = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
     std::vector<int> B = {0, 1, 2, 0, 1, 2, 0, 1, 2, 0};

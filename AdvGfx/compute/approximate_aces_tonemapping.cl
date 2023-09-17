@@ -22,7 +22,7 @@ float3 aces_approx(float3 v)
     return clamp((v*(a*v+b))/(v*(c*v+d)+e), 0.0f, 1.0f);
 }
 
-void kernel approximate_aces(global uint* buffer, global struct SceneData* sceneData)
+void kernel approximate_aces_tonemapping(global uint* buffer, global struct SceneData* sceneData)
 {     
 	int width = sceneData->resolution_x;
 	int height = sceneData->resolution_y;

@@ -15,7 +15,7 @@ float luminance(float3 v)
     return dot(v, (float3)(0.2126f, 0.7152f, 0.0722f));
 }
 
-void kernel reinhard(global uint* buffer, global struct SceneData* sceneData)
+void kernel reinhard_tonemapping(global uint* buffer, global struct SceneData* sceneData)
 {     	
 	int width = sceneData->resolution_x;
 	int height = sceneData->resolution_y;

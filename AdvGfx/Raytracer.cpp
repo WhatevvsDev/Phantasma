@@ -19,6 +19,7 @@ using json = nlohmann::json;
 #include <GLFW/glfw3.h>
 
 #include <format>
+#include <filesystem>
 
 #include "BVH.h"
 #include "Mesh.h"
@@ -156,8 +157,8 @@ namespace Raytracer
 	{
 		bruh = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\simple_test.gltf");
 
+		// Load raytracer settings
 		std::ifstream f("phantasma.settings.json");
-
 		if(f.good())
 		{
 			json settings_data = json::parse(f);
@@ -169,12 +170,20 @@ namespace Raytracer
 			settings.recompile_changed_shaders_automatically = settings_data["settings"]["recompile_changed_shaders_automatically"];
 		}
 
-		// Create tonemapping shaders
-		Compute::create_kernel(get_current_directory_path() + "\\..\\..\\AdvGfx\\compute\\reinhard_tonemapping.cl", "reinhard");
-		Compute::create_kernel(get_current_directory_path() + "\\..\\..\\AdvGfx\\compute\\approximate_aces_tonemapping.cl", "approximate_aces");
-		
-        //build_bvh();
-		Compute::create_kernel(get_current_directory_path() + "\\..\\..\\AdvGfx\\compute\\raytrace_tri.cl", "raytrace");
+		// Search for, and automatically compile compute shaders
+		std::string compute_directory = get_current_directory_path() + "\\..\\..\\AdvGfx\\compute\\";
+		for (const auto & possible_compute_shader : std::filesystem::directory_iterator(compute_directory))
+		{
+			std::string file_path = possible_compute_shader.path().string();
+			std::string file_name_with_extension = file_path.substr(file_path.find_last_of("/\\") + 1);
+			std::string file_extension = file_name_with_extension.substr(file_name_with_extension.find_last_of(".") + 1);
+			std::string file_name = file_name_with_extension.substr(0, file_name_with_extension.length() - file_extension.length() - 1);
+
+			if(file_extension != "cl")
+				continue;
+			
+			Compute::create_kernel(file_path, file_name);
+		}
 
 		//screen_compute_buffer = {buffer, (size_t)(sceneData.resolution[0] * sceneData.resolution[1])};
 		tris_compute_buffer		= new ComputeWriteBuffer({bruh->tris});
@@ -236,7 +245,7 @@ namespace Raytracer
 
 		ComputeReadWriteBuffer screen_buffer({buffer, (size_t)(width * height)});
 
-		ComputeOperation("raytrace_tri.cl")
+		ComputeOperation("raytrace.cl")
 			.read(ComputeReadBuffer({buffer, (size_t)(width * height)}))
 			.write(*tris_compute_buffer)
 			.write(*bvh_compute_buffer)

@@ -106,7 +106,7 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="compute\raytrace_tri.cl" />
+    <CopyFileToFolders Include="compute\raytrace.cl" />
   </ItemGroup>
   <ItemGroup>
     <None Include="compute\example.cl" />
