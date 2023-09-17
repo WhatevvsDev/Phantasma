@@ -33,19 +33,9 @@ enum class TonemappingType
 
 // TODO: Swap triangle to bouding box centroid, instead of vertex centroid :)
 
+
 namespace Raytracer
 {	
-	struct SceneData
-	{
-		uint resolution[2]	{ 0, 0 };
-		uint tri_count		{ 0 };
-		uint dummy			{ 0 };
-		glm::vec4 cam_pos	{ 0.0f };
-		glm::vec4 cam_forward { 0.0f };
-		glm::vec4 cam_right { 0.0f };
-		glm::vec4 cam_up { 0.0f };
-	} sceneData;
-
 	struct
 	{
 		bool recompile_changed_shaders_automatically { true };
@@ -60,12 +50,6 @@ namespace Raytracer
 	namespace Input
 	{
 		// Temporary scuffed input
-		bool move_w = false;
-		bool move_a = false;
-		bool move_s = false;
-		bool move_d = false;
-		bool move_space = false;
-		bool move_lctrl = false;
 		float mouse_x = 0.0f;
 		float mouse_y = 0.0f;
 		glm::vec3 cam_rotation;
@@ -73,7 +57,7 @@ namespace Raytracer
 		bool screenshot = false;
 		float show_move_speed_timer = 0;
 
-		void key_input(GLFWwindow* window, int key, int scancode, int action, int mods)
+		void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 		{
 			// Unused parameters
 			(void)window;
@@ -81,42 +65,22 @@ namespace Raytracer
 			(void)action;
 			(void)mods;
 
-			if(action != GLFW_PRESS && action != GLFW_RELEASE)
-				return;
-
 			bool is_pressed = (action == GLFW_PRESS);
 
-			switch(key)
+			if(is_pressed)
 			{
-				case GLFW_KEY_W:
-				move_w = is_pressed;
-				break;
-				case GLFW_KEY_A:
-				move_a = is_pressed;
-				break;
-				case GLFW_KEY_S:
-				move_s = is_pressed;
-				break;
-				case GLFW_KEY_D:
-				move_d = is_pressed;
-				break;
-				case GLFW_KEY_P:
-				if(is_pressed)
-					screenshot = true;
-				break;
-				case GLFW_KEY_SPACE:
-				move_space = is_pressed;
-				break;
-				case GLFW_KEY_LEFT_CONTROL:
-				move_lctrl = is_pressed;
-				break;
-				case GLFW_KEY_ESCAPE:
-				exit(0);
-				break;
-				case GLFW_KEY_F1:
-				if(is_pressed)
-					mouse_active = !mouse_active;
-				break;
+				switch(key)
+				{
+					case GLFW_KEY_P:
+						screenshot = true;
+					break;
+					case GLFW_KEY_ESCAPE:
+						exit(0);
+					break;
+					case GLFW_KEY_F1:
+						mouse_active = !mouse_active;
+					break;
+				}
 			}
 
 			if(mouse_active)
@@ -125,22 +89,13 @@ namespace Raytracer
 				glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 		}	
 
-		void mouse_button_input(GLFWwindow* window, int button, int action, int mods)
+		void cursor_callback(GLFWwindow* window, double xpos, double ypos)
 		{
 			// Unused parameters
 			(void)window;
-			(void)button;
-			(void)action;
-			(void)mods;
-		}
 
-		void cursor_input(GLFWwindow* window, double xpos, double ypos)
-		{
 			if(mouse_active)
 				return;
-
-			// Unused parameters
-			(void)window;
 
 			static double last_xpos = 0.0;
 			static double last_ypos = 0.0;
@@ -152,26 +107,23 @@ namespace Raytracer
 
 			// limit pitch
 			if(fabs(cam_rotation.x) > 89.9f)
-			{
 				cam_rotation.x = 89.9f * sgn(cam_rotation.x);
-			}
 
 			last_xpos = xpos;
 			last_ypos = ypos;
 		}
-
-		void scroll_input(GLFWwindow* window, double xoffset, double yoffset)
-		{
-			(void)xoffset;
-			(void)window;
-
-		float old_camera_speed_t = settings.camera_speed_t;
-		settings.camera_speed_t += (float)yoffset * 0.01f;
-		settings.camera_speed_t = glm::fclamp(settings.camera_speed_t, 0.0f, 1.0f);
-		if(settings.camera_speed_t != old_camera_speed_t)
-			show_move_speed_timer = 2.0f;
 	}
-	}
+
+	struct SceneData
+	{
+		uint resolution[2]	{ 0, 0 };
+		uint tri_count		{ 0 };
+		uint dummy			{ 0 };
+		glm::vec4 cam_pos	{ 0.0f };
+		glm::vec4 cam_forward { 0.0f };
+		glm::vec4 cam_right { 0.0f };
+		glm::vec4 cam_up { 0.0f };
+	} sceneData;
 
 	float camera_speed_t_to_m_per_second()
 	{
@@ -247,9 +199,9 @@ namespace Raytracer
 	void update(const float delta_time_ms)
 	{
 		Input::show_move_speed_timer -= (delta_time_ms / 1000.0f);
-		int moveHor = (Input::move_d) - (Input::move_a);
-		int moveVer = (Input::move_space) - (Input::move_lctrl);
-		int moveWard = (Input::move_w) - (Input::move_s);
+		int moveHor =	(ImGui::IsKeyDown(ImGuiKey_D))		- (ImGui::IsKeyDown(ImGuiKey_A));
+		int moveVer =	(ImGui::IsKeyDown(ImGuiKey_Space))	- (ImGui::IsKeyDown(ImGuiKey_LeftCtrl));
+		int moveWard =	(ImGui::IsKeyDown(ImGuiKey_W))		- (ImGui::IsKeyDown(ImGuiKey_S));
 		
 		glm::mat4 rotation = glm::eulerAngleXYZ(glm::radians(Input::cam_rotation.x), glm::radians(Input::cam_rotation.y), glm::radians(Input::cam_rotation.z));
 
@@ -261,12 +213,19 @@ namespace Raytracer
 			sceneData.cam_forward * moveWard + 
 			sceneData.cam_up * moveVer + 
 			sceneData.cam_right * moveHor;
+
 		glm::normalize(dir);
 
 		sceneData.cam_pos += glm::vec4(dir * delta_time_ms * 0.01f, 0.0f) * camera_speed_t_to_m_per_second();
 
 		if(settings.recompile_changed_shaders_automatically)
 			Compute::recompile_kernels(ComputeKernelRecompilationCondition::SourceChanged);
+
+		float old_camera_speed_t = settings.camera_speed_t;
+		settings.camera_speed_t += ImGui::GetIO().MouseWheel * 0.01f;
+		settings.camera_speed_t = glm::fclamp(settings.camera_speed_t, 0.0f, 1.0f);
+		if(settings.camera_speed_t != old_camera_speed_t)
+			Input::show_move_speed_timer = 2.0f;
 	}
 
 	void raytrace(int width, int height, uint32_t* buffer)
