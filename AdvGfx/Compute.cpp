@@ -118,6 +118,7 @@ ComputeKernel::ComputeKernel(const std::string& path, const std::string& entry_p
 
 void ComputeKernel::compile()
 {
+    ComputeKernelState previous_state = state;
     state = ComputeKernelState::Empty;
 
     cl::Program::Sources sources;
@@ -136,7 +137,14 @@ void ComputeKernel::compile()
     }
     state = ComputeKernelState::Built;
 
-    LOGMSG(Log::MessageType::Debug, std::format("Created kernel: {}", path));
+    if(previous_state != ComputeKernelState::Empty)
+    {
+        LOGMSG(Log::MessageType::Debug, std::format("Recompiled kernel: {}", path));
+    }
+    else
+    {
+        LOGMSG(Log::MessageType::Debug, std::format("Created kernel: {}", path));
+    }
 
     cl_kernel = cl::Kernel(created_program, entry_point.c_str(), &error);
 
@@ -168,7 +176,6 @@ bool ComputeKernel::has_been_changed()
 
     return shader_updated;
 }
-
 
 ComputeReadBuffer::ComputeReadBuffer(const ComputeDataHandle& data)
     : internal_buffer(cl::Buffer(compute.context, CL_MEM_READ_ONLY, data.data_byte_size))
