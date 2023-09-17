@@ -31,14 +31,6 @@ enum class TonemappingType
 	Reinhard
 };
 
- #define N 16000
-
-// application data
-Tri tris[N];
-uint triIdx[N];
-BVHNode bvhNode[N * 2];
-uint rootNodeIdx = 0, nodes_used = 1;
-
 // TODO: Swap triangle to bouding box centroid, instead of vertex centroid :)
 
 namespace Raytracer
@@ -200,20 +192,6 @@ namespace Raytracer
 		return glm::clamp(speed, 0.01f, 100.0f);
 	}
 	#pragma warning(disable:4996)
-	void load_model()
-	{
-		FILE* file = fopen((get_current_directory_path() + "\\unity.tri").c_str(), "r" );
-		float a, b, c, d, e, f, g, h, i;
-		for (int t = 0; t < N; t++) 
-		{
-			fscanf_s( file, "%f %f %f %f %f %f %f %f %f\n", 
-				&a, &b, &c, &d, &e, &f, &g, &h, &i );
-			tris[t].vertex0 = glm::vec3( a, b, c );
-			tris[t].vertex1 = glm::vec3( d, e, f );
-			tris[t].vertex2 = glm::vec3( g, h, i );
-		}
-		fclose( file );
-	}
 
 	ComputeReadBuffer* screen_compute_buffer;
 	ComputeWriteBuffer* tris_compute_buffer;
@@ -243,8 +221,6 @@ namespace Raytracer
 		Compute::create_kernel(get_current_directory_path() + "\\..\\..\\AdvGfx\\compute\\reinhard_tonemapping.cl", "reinhard");
 		Compute::create_kernel(get_current_directory_path() + "\\..\\..\\AdvGfx\\compute\\approximate_aces_tonemapping.cl", "approximate_aces");
 		
-		load_model();
-
         //build_bvh();
 		Compute::create_kernel(get_current_directory_path() + "\\..\\..\\AdvGfx\\compute\\raytrace_tri.cl", "raytrace");
 
@@ -297,7 +273,7 @@ namespace Raytracer
 	{
 		sceneData.resolution[0] = width;
 		sceneData.resolution[1] = height;
-		sceneData.tri_count = N;
+		sceneData.tri_count = bruh->tris.size();
 
 		ComputeReadWriteBuffer screen_buffer({buffer, (size_t)(width * height)});
 
