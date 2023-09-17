@@ -18,6 +18,9 @@ using json = nlohmann::json;
 
 #include <GLFW/glfw3.h>
 
+#include <ImGuizmo.h>
+#include "Math.h"
+
 #include <format>
 #include <filesystem>
 
@@ -151,11 +154,14 @@ namespace Raytracer
 	ComputeWriteBuffer* bvh_compute_buffer;
 	ComputeWriteBuffer* tri_idx_compute_buffer;
 
-	Mesh* bruh;
+	Mesh* loaded_model;
+	glm::mat4 object_matrix;
 
 	void init()
 	{
-		bruh = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\simple_test.gltf");
+		loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\simple_test.gltf");
+
+		object_matrix = glm::mat4(1.0f);
 
 		// Load raytracer settings
 		std::ifstream f("phantasma.settings.json");
@@ -189,9 +195,9 @@ namespace Raytracer
 		}
 
 		//screen_compute_buffer = {buffer, (size_t)(sceneData.resolution[0] * sceneData.resolution[1])};
-		tris_compute_buffer		= new ComputeWriteBuffer({bruh->tris});
-		bvh_compute_buffer		= new ComputeWriteBuffer({bruh->bvh->bvhNodes});
-		tri_idx_compute_buffer	= new ComputeWriteBuffer({bruh->bvh->triIdx});
+		tris_compute_buffer		= new ComputeWriteBuffer({loaded_model->tris});
+		bvh_compute_buffer		= new ComputeWriteBuffer({loaded_model->bvh->bvhNodes});
+		tri_idx_compute_buffer	= new ComputeWriteBuffer({loaded_model->bvh->triIdx});
 	}
 
 	void terminate()
@@ -244,7 +250,7 @@ namespace Raytracer
 	{
 		sceneData.resolution[0] = width;
 		sceneData.resolution[1] = height;
-		sceneData.tri_count = bruh->tris.size();
+		sceneData.tri_count = loaded_model->tris.size();
 
 		ComputeReadWriteBuffer screen_buffer({buffer, (size_t)(width * height)});
 
@@ -289,6 +295,8 @@ namespace Raytracer
 			Input::screenshot = false;
 		}
     }
+
+	
 
 	void ui()
 	{
@@ -355,6 +363,12 @@ namespace Raytracer
 
 		if(!Input::mouse_active)
 			return;
+
+		auto view = glm::lookAtRH(glm::vec3(sceneData.cam_pos), glm::vec3(sceneData.cam_pos) + glm::vec3(sceneData.cam_forward), glm::vec3(0.0f, 1.0f, 0.0f));
+
+		glm::mat4 projection = glm::perspectiveRH(glm::radians(90.0f), 1200.0f / 800.0f, 0.1f, 1000.0f);
+
+		ImGuizmo::Manipulate((float*)&view, (float*)&projection, ImGuizmo::TRANSLATE, ImGuizmo::WORLD, (float*)&object_matrix);
 
 		auto latest_msg = Log::get_latest_msg();
 

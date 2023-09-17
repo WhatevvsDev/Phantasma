@@ -11,6 +11,7 @@
 
 // Include all GLM extensions
 #include <glm/ext.hpp> // perspective, translate, rotate
+#include <glm/gtc/matrix_transform.hpp>
 
 // Taken from https://github.com/jbikker/tmpl8rt_IGAD
 typedef unsigned int uint;

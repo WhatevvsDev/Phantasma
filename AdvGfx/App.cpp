@@ -6,6 +6,10 @@
 #include "LogUtility.h"
 
 #include <GLFW/glfw3.h>
+
+#include <ImGuizmo.h>
+#include "Math.h"
+
 #include <cmath>
 #include <format>
 
@@ -104,8 +108,10 @@ namespace App
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
+        ImGuizmo::BeginFrame();
 
-        Raytracer::ui();
+        ImGuizmo::SetRect(0, 0, app_desc.width, app_desc.height);
+		ImGuizmo::SetDrawlist(ImGui::GetForegroundDrawList());
 
         // We need total delta time
         Raytracer::update(last_update_time + last_render_time);
@@ -117,6 +123,8 @@ namespace App
         if(sleep_time < 0) sleep_time = 0;
         Sleep((DWORD)sleep_time);
         last_render_time = fps_timer.lap_delta();
+
+        Raytracer::ui();
 
         glDrawPixels(app_desc.width, app_desc.height, GL_RGBA, GL_UNSIGNED_BYTE, render_buffer);
 
