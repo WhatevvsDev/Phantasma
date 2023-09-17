@@ -179,7 +179,10 @@ namespace Raytracer
 			std::string file_extension = file_name_with_extension.substr(file_name_with_extension.find_last_of(".") + 1);
 			std::string file_name = file_name_with_extension.substr(0, file_name_with_extension.length() - file_extension.length() - 1);
 
-			if(file_extension != "cl")
+			bool wrong_file_extension = (file_extension != "cl");
+			bool already_exists = Compute::kernel_exists(file_name);
+
+			if(wrong_file_extension || already_exists)
 				continue;
 			
 			Compute::create_kernel(file_path, file_name);

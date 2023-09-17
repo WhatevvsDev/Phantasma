@@ -392,3 +392,8 @@ void Compute::recompile_kernels(ComputeKernelRecompilationCondition condition)
         }
     }
 }
+
+bool Compute::kernel_exists(const std::string& kernel_name)
+{
+    return compute.kernels.find(kernel_name) != compute.kernels.end();
+}
