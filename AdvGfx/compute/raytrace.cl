@@ -21,7 +21,6 @@ struct Ray
     float3 O;
     float3 D; 
     float t;
-	int bvh_hits;
 	int tri_hit;
 };
 
@@ -104,9 +103,6 @@ void intersect_bvh( struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct
 		}
 		else
 		{
-			ray->bvh_hits++;
-			// Optimization potential: move these variables outside the while loop?
-			// Optimization potential: we create children next to each other, maybe delete right_child?
 			struct BVHNode* left_child = &nodes[node->left_first];
 			struct BVHNode* right_child = &nodes[node->left_first + 1];
 			float left_dist = intersect_aabb(ray, left_child);
@@ -117,7 +113,6 @@ void intersect_bvh( struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct
 				// Swap around dist and node
 				float d = left_dist; left_dist = right_dist; right_dist = d;
 				
-				// Optimization potential, we might not need current node anymore, so this is might be extra?
 				struct BVHNode* n = left_child; left_child = right_child; right_child = n;
 			}
 
@@ -206,8 +201,6 @@ float3 trace(struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* t
 				current_ray.O = hit_pos;
 				reflect(&current_ray, normal);
 				current_ray.t = 1e30f;
-				current_ray.bvh_hits = 0;
-				current_ray.tri_hit = 0;
 
 				diffuse += (float3)(dot(normal, sun_dir)) * d * shadowt * current_light_left;
 				current_light_left *= s;
@@ -225,8 +218,6 @@ float3 trace(struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* t
 				current_ray.O = hit_pos;
 				current_ray.D = refract(current_ray.D, normal, ior);
 				current_ray.t = 1e30f;
-				current_ray.bvh_hits = 0;
-				current_ray.tri_hit = 0;
 			}
 		}
 		else
@@ -255,7 +246,7 @@ void kernel raytrace(global uint* buffer, global struct Tri* tris, global struct
 	int height = sceneData->resolution_y;
 
 	int x = get_global_id(0);
-	int y = height - get_global_id(1);
+	int y = get_global_id(1);
 	uint pixel_dest = (x + y * width);
 
 	float x_t = ((x / (float)width) - 0.5f) * 2.0f;
@@ -263,7 +254,7 @@ void kernel raytrace(global uint* buffer, global struct Tri* tris, global struct
 
 	float aspect_ratio = (float)(sceneData->resolution_x) / (float)(sceneData->resolution_y);
 
-	float3 pixelPos = sceneData->cam_forward + sceneData->cam_right * x_t * aspect_ratio + sceneData->cam_up * y_t;
+	float3 pixelPos = sceneData->cam_forward + sceneData->cam_right * x_t * aspect_ratio - sceneData->cam_up * y_t;
 
 	// Actual raytracing
 
@@ -272,7 +263,6 @@ void kernel raytrace(global uint* buffer, global struct Tri* tris, global struct
     ray.D = normalize( pixelPos );
     ray.t = 1e30f;
 	ray.tri_hit = 0;
-	ray.bvh_hits = 0;
 
 	float3 color = trace(&ray, 0, nodes, tris, trisIdx, DEPTH);
 

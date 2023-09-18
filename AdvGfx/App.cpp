@@ -108,13 +108,11 @@ namespace App
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
         ImGuizmo::BeginFrame();
-
         ImGuizmo::SetRect(0, 0, app_desc.width, app_desc.height);
 		//ImGuizmo::SetDrawlist(ImGui::GetForegroundDrawList());
 
         // We need total delta time
         Raytracer::update(last_update_time + last_render_time);
-        
         // Only get the render time
         last_update_time =  fps_timer.lap_delta();
         Raytracer::raytrace(app_desc.width, app_desc.height);
@@ -122,9 +120,11 @@ namespace App
         if(sleep_time < 0) sleep_time = 0;
         Sleep((DWORD)sleep_time);
         last_render_time = fps_timer.lap_delta();
-
         Raytracer::ui();
 
+        // Flipping the buffer so its proper
+        glRasterPos2f(-1,1);
+        glPixelZoom( 1, -1 );
         glDrawPixels(app_desc.width, app_desc.height, GL_RGBA, GL_UNSIGNED_BYTE, render_buffer);
 
         ImGui::Render();

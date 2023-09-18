@@ -370,11 +370,10 @@ namespace Raytracer
 			if(ImGui::GetIO().MouseDown[0] && !ImGuizmo::IsOver())
 			{
 				auto cursor_pos = ImGui::GetIO().MousePos;
-				cursor_pos.y = height - cursor_pos.y; // Account for flipped coords;
 				cursor_pos.x = glm::clamp((int)cursor_pos.x, 0, width);
 				cursor_pos.y = glm::clamp((int)cursor_pos.y, 0, height);
 
-				unsigned int a = (internal.	buffer[(int)cursor_pos.x + (int)cursor_pos.y * width] & 0xff000000) >> 24;
+				unsigned int a = (internal.buffer[(int)cursor_pos.x + (int)cursor_pos.y * width] & 0xff000000) >> 24;
 
 				mouse_click_tri = a;
 			}
