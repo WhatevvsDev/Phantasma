@@ -110,7 +110,7 @@ namespace App
         ImGuizmo::BeginFrame();
 
         ImGuizmo::SetRect(0, 0, app_desc.width, app_desc.height);
-		ImGuizmo::SetDrawlist(ImGui::GetForegroundDrawList());
+		//ImGuizmo::SetDrawlist(ImGui::GetForegroundDrawList());
 
         // We need total delta time
         Raytracer::update(last_update_time + last_render_time);

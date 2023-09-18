@@ -25,6 +25,14 @@ struct Ray
 	int tri_hit;
 };
 
+float3 refract(const float3 ray_dir, const float3 normal, float index_of_refraction_ratio) 
+{
+    float cos_theta = fmin(dot(-ray_dir, normal), 1.0f);
+    float3 ray_out_perpendicular = index_of_refraction_ratio * (ray_dir + cos_theta * normal);
+    float3 ray_out_parallel = -sqrt(fabs(1.0f - dot(ray_out_perpendicular, ray_out_perpendicular))) * normal;
+    return ray_out_perpendicular + ray_out_parallel;
+}
+
 void reflect(struct Ray* ray, float3 normal)
 {
 	ray->D = reflected(normal, ray->D);
@@ -175,13 +183,15 @@ float3 trace(struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* t
 			float3 hit_pos = current_ray.O + (current_ray.D * current_ray.t) * 0.999999f;
 			float3 normal = cross(tris[current_ray.tri_hit].vertex0 - tris[current_ray.tri_hit].vertex1,tris[current_ray.tri_hit].vertex0 - tris[current_ray.tri_hit].vertex2);
 			normal = normalize(normal);
+			float3 old_normal;
 			normal *= -sign(dot(normal,current_ray.D)); // Flip if inner normal
+			bool inner_normal = dot(old_normal - normal,old_normal - normal) < 0.001f;
 
 			float d = 0.5f;
 			float s = 1.0f - d;
 			float ambient_light = 0.6f;
 
-			if(true)//if(current_ray.tri_hit % 2 == 0)
+			if(current_ray.tri_hit == 0)//if(current_ray.tri_hit % 2 == 0)
 			{
 				struct Ray shadow_ray;
 				shadow_ray.O = hit_pos;
@@ -202,6 +212,21 @@ float3 trace(struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* t
 				diffuse += (float3)(dot(normal, sun_dir)) * d * shadowt * current_light_left;
 				current_light_left *= s;
 				depth--;
+			}
+			else
+			{
+				float ior = 1.5f;
+
+				if(!inner_normal)
+				{
+					ior = 1.0f / ior;
+				}
+
+				current_ray.O = hit_pos;
+				current_ray.D = refract(current_ray.D, normal, ior);
+				current_ray.t = 1e30f;
+				current_ray.bvh_hits = 0;
+				current_ray.tri_hit = 0;
 			}
 		}
 		else

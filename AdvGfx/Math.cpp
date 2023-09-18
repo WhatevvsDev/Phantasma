@@ -33,3 +33,21 @@ uint RandomUInt( uint& customSeed )
 	return customSeed;
 }
 float RandomFloat( uint& customSeed ) { return RandomUInt( customSeed ) * 2.3283064365387e-10f; }
+
+namespace glm
+{
+	void to_json(json& j, const glm::vec3& v)
+	{
+		j["x"] = v.x;
+		j["y"] = v.y;
+		j["z"] = v.z;
+
+	}
+
+	void from_json(const json& j, glm::vec3& v)
+	{
+		j.at("x").get_to(v.x);
+		j.at("y").get_to(v.y);
+		j.at("z").get_to(v.z);
+	}
+}

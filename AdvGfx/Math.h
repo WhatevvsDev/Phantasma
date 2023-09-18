@@ -33,3 +33,12 @@ int sgn(T val) {
 }
 #define SGN_TEMPLATED_FUNC
 #endif
+
+#include "json.hpp"
+using json = nlohmann::json;
+
+namespace glm
+{
+    void to_json(json& j, const vec3& v);
+    void from_json(const json& j, vec3& v);
+}

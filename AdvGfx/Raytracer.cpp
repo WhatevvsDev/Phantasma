@@ -37,7 +37,6 @@ enum class TonemappingType
 
 // TODO: Swap triangle to bouding box centroid, instead of vertex centroid :)
 
-
 namespace Raytracer
 {	
 	struct
@@ -49,6 +48,12 @@ namespace Raytracer
 		float camera_speed_t {0.5f};
 		float camera_rotation_smoothing = { 0.1f };
 		float camera_position_smoothing = { 0.1f };
+
+		bool orbit_camera_enabled { false };
+		glm::vec3 orbit_camera_position { 0.0f };
+		float orbit_camera_distance { 10.0f };
+		float orbit_camera_height { 5.0f };
+		float orbit_camera_rotations_per_second { 0.1f };
 
 		TonemappingType active_tonemapping { TonemappingType::None };
 	} settings;
@@ -102,10 +107,14 @@ namespace Raytracer
 		uint resolution[2]	{ 0, 0 };
 		uint tri_count		{ 0 };
 		uint dummy			{ 0 };
-		glm::vec4 cam_pos	{ 0.0f };
-		glm::vec4 cam_forward { 0.0f };
-		glm::vec4 cam_right { 0.0f };
-		glm::vec4 cam_up { 0.0f };
+		glm::vec3 cam_pos	{ 0.0f };
+		float pad_0;
+		glm::vec3 cam_forward { 0.0f };
+		float pad_1;
+		glm::vec3 cam_right { 0.0f };
+		float pad_2;
+		glm::vec3 cam_up { 0.0f };
+		float pad_3;
 	} sceneData;
 
 	float camera_speed_t_to_m_per_second()
@@ -168,6 +177,12 @@ namespace Raytracer
 			TryFromJSONVal(settings_data, settings, recompile_changed_shaders_automatically);
 			TryFromJSONVal(settings_data, settings, camera_position_smoothing);
 			TryFromJSONVal(settings_data, settings, camera_rotation_smoothing);
+
+			TryFromJSONVal(settings_data, settings, orbit_camera_enabled);
+			TryFromJSONVal(settings_data, settings, orbit_camera_position);
+			TryFromJSONVal(settings_data, settings, orbit_camera_distance);
+			TryFromJSONVal(settings_data, settings, orbit_camera_height);
+			TryFromJSONVal(settings_data, settings, orbit_camera_rotations_per_second);
 		}
 
 		// Search for, and automatically compile compute shaders
@@ -206,6 +221,12 @@ namespace Raytracer
 		settings_data["settings"]["camera_position_smoothing"] = settings.camera_position_smoothing;
 		settings_data["settings"]["camera_rotation_smoothing"] = settings.camera_rotation_smoothing;
 
+		settings_data["settings"]["orbit_camera_enabled"] = settings.orbit_camera_enabled;
+		settings_data["settings"]["orbit_camera_position"] = settings.orbit_camera_position;
+		settings_data["settings"]["orbit_camera_distance"] = settings.orbit_camera_distance;
+		settings_data["settings"]["orbit_camera_height"] = settings.orbit_camera_height;
+		settings_data["settings"]["orbit_camera_rotations_per_second"] = settings.orbit_camera_rotations_per_second;
+
 		std::ofstream o("phantasma.settings.json");
 		o << settings_data << std::endl;
 	}
@@ -217,36 +238,60 @@ namespace Raytracer
 		int moveVer =	(ImGui::IsKeyDown(ImGuiKey_Space))	- (ImGui::IsKeyDown(ImGuiKey_LeftCtrl));
 		int moveWard =	(ImGui::IsKeyDown(ImGuiKey_W))		- (ImGui::IsKeyDown(ImGuiKey_S));
 		
-		glm::mat4 rotation = glm::eulerAngleXYZ(glm::radians(Input::cam_rotation.x), glm::radians(Input::cam_rotation.y), glm::radians(Input::cam_rotation.z));
-
-		sceneData.cam_forward = glm::vec4(0, 0, 1.0f, 0) * rotation;
-		sceneData.cam_right = glm::vec4(-1.0f, 0, 0, 0) * rotation;
-		sceneData.cam_up = glm::vec4(0, 1.0f, 0, 0) * rotation;
-
-		glm::vec3 dir = 
-			sceneData.cam_forward * moveWard + 
-			sceneData.cam_up * moveVer + 
-			sceneData.cam_right * moveHor;
-
-		glm::normalize(dir);
-
-		static glm::vec4 target_cam_pos;
-		float position_t = (settings.camera_position_smoothing != 0 ? (1.0f - settings.camera_position_smoothing * 0.75f) * (delta_time_ms / 200.0f) : 1.0f);
-		target_cam_pos += glm::vec4(dir * delta_time_ms * 0.01f, 0.0f) * camera_speed_t_to_m_per_second();
-		sceneData.cam_pos = glm::lerp(sceneData.cam_pos, target_cam_pos, position_t);
-
-		if(!Input::mouse_active)
+		if(settings.orbit_camera_enabled)
 		{
-			auto mouse_delta = ImGui::GetIO().MouseDelta;
+			static float orbit_cam_t = 0.0f;
+			orbit_cam_t += (delta_time_ms / 1000.0f) * settings.orbit_camera_rotations_per_second;
 
-			static glm::vec3 target_rotation;
-			float rotation_t = (settings.camera_rotation_smoothing != 0 ? (1.0f - settings.camera_rotation_smoothing * 0.75f) * (delta_time_ms / 50.0f) : 1.0f);
-			target_rotation += glm::vec3(-mouse_delta.y, mouse_delta.x, 0) * 0.1f;
-			Input::cam_rotation = glm::lerp(Input::cam_rotation, target_rotation, rotation_t);
+			glm::vec3 offset =	glm::vec3(0.0f, 0.0f, 1.0f) * settings.orbit_camera_distance +
+								glm::vec3(0.0f, 1.0f, 0.0f) * settings.orbit_camera_height;
 
-			// limit pitch
-			if(fabs(Input::cam_rotation.x) > 89.9f)
-				Input::cam_rotation.x = 89.9f * sgn(Input::cam_rotation.x);
+			glm::mat4 rotation = glm::eulerAngleY(glm::radians(orbit_cam_t * 360.0f));
+
+			offset = (glm::vec4(offset, 0.0f) * rotation); // Rotate it
+			offset += settings.orbit_camera_position; // Position it
+
+			glm::vec3 to_center = settings.orbit_camera_position - offset;
+
+			sceneData.cam_forward = glm::normalize(to_center);
+			sceneData.cam_right = glm::cross(sceneData.cam_forward, glm::vec3(0.0f, 1.0f, 0.0f));
+			sceneData.cam_up = glm::cross(sceneData.cam_right, sceneData.cam_forward);
+			sceneData.cam_pos = offset;
+			
+		}
+		else
+		{
+			glm::mat3 rotation = glm::eulerAngleXYZ(glm::radians(Input::cam_rotation.x), glm::radians(Input::cam_rotation.y), glm::radians(Input::cam_rotation.z));
+
+			sceneData.cam_forward = glm::vec3(0, 0, 1.0f) * rotation;
+			sceneData.cam_right = glm::vec3(-1.0f, 0, 0) * rotation;
+			sceneData.cam_up = glm::vec3(0, 1.0f, 0) * rotation;
+
+			glm::vec3 dir = 
+				sceneData.cam_forward * moveWard + 
+				sceneData.cam_up * moveVer + 
+				sceneData.cam_right * moveHor;
+
+			glm::normalize(dir);
+
+			static glm::vec3 target_cam_pos;
+			float position_t = (settings.camera_position_smoothing != 0 ? (1.0f - settings.camera_position_smoothing * 0.75f) * (delta_time_ms / 200.0f) : 1.0f);
+			target_cam_pos += glm::vec3(dir * delta_time_ms * 0.01f) * camera_speed_t_to_m_per_second();
+			sceneData.cam_pos = glm::lerp(sceneData.cam_pos, target_cam_pos, position_t);
+
+			if(!Input::mouse_active)
+			{
+				auto mouse_delta = ImGui::GetIO().MouseDelta;
+
+				static glm::vec3 target_rotation;
+				float rotation_t = (settings.camera_rotation_smoothing != 0 ? (1.0f - settings.camera_rotation_smoothing * 0.75f) * (delta_time_ms / 50.0f) : 1.0f);
+				target_rotation += glm::vec3(-mouse_delta.y, mouse_delta.x, 0) * 0.1f;
+				Input::cam_rotation = glm::lerp(Input::cam_rotation, target_rotation, rotation_t);
+
+				// limit pitch
+				if(fabs(Input::cam_rotation.x) > 89.9f)
+					Input::cam_rotation.x = 89.9f * sgn(Input::cam_rotation.x);
+			}
 		}
 
 		if(settings.recompile_changed_shaders_automatically)
@@ -431,6 +476,18 @@ namespace Raytracer
 		ImGui::GetForegroundDrawList()->AddText(ImVec2(10, 10), message_color,latest_msg.first.data() ,latest_msg.first.data() + latest_msg.first.length());
 
 		ImGui::Begin("Debug");
+		
+		ImGui::Checkbox("Orbit camera enabled?", &settings.orbit_camera_enabled);
+		if(!settings.orbit_camera_enabled)
+			ImGui::BeginDisabled();
+
+		ImGui::DragFloat3("Orbit position", glm::value_ptr(settings.orbit_camera_position));
+		ImGui::DragFloat("Orbit distance", &settings.orbit_camera_distance, 0.1f);
+		ImGui::DragFloat("Orbit height", &settings.orbit_camera_height, 0.1f);
+		ImGui::DragFloat("Orbit rotations per second", &settings.orbit_camera_rotations_per_second, 0.01f, -1.0f, 1.0f);
+
+		if(!settings.orbit_camera_enabled)
+			ImGui::EndDisabled();
 
 		if (ImGui::Button("Recompile Shaders"))
 			Compute::recompile_kernels(ComputeKernelRecompilationCondition::Force);
