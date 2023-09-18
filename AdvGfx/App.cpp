@@ -55,7 +55,6 @@ namespace App
         glfwMakeContextCurrent(window);
         
         glfwSetKeyCallback(window, Raytracer::Input::key_callback);
-        glfwSetCursorPosCallback(window, Raytracer::Input::cursor_callback);
 
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();

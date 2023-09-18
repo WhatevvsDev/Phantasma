@@ -47,6 +47,8 @@ namespace Raytracer
 		int fps_limit_value { 80 };
 
 		float camera_speed_t {0.5f};
+		float camera_rotation_smoothing = { 0.1f };
+		float camera_position_smoothing = { 0.1f };
 
 		TonemappingType active_tonemapping { TonemappingType::None };
 	} settings;
@@ -79,6 +81,7 @@ namespace Raytracer
 						screenshot = true;
 					break;
 					case GLFW_KEY_ESCAPE:
+						Raytracer::terminate();
 						exit(0);
 					break;
 					case GLFW_KEY_F1:
@@ -92,30 +95,6 @@ namespace Raytracer
 			else
 				glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 		}	
-
-		void cursor_callback(GLFWwindow* window, double xpos, double ypos)
-		{
-			// Unused parameters
-			(void)window;
-
-			if(mouse_active)
-				return;
-
-			static double last_xpos = 0.0;
-			static double last_ypos = 0.0;
-
-			mouse_x = (float)(xpos - last_xpos);
-			mouse_y = (float)(ypos - last_ypos);
-
-			cam_rotation += glm::vec3(-mouse_y, mouse_x, 0) * 0.1f;
-
-			// limit pitch
-			if(fabs(cam_rotation.x) > 89.9f)
-				cam_rotation.x = 89.9f * sgn(cam_rotation.x);
-
-			last_xpos = xpos;
-			last_ypos = ypos;
-		}
 	}
 
 	struct SceneData
@@ -158,22 +137,37 @@ namespace Raytracer
 	glm::mat4 object_matrix;
 	bool world_dirty { false };
 
+	#ifndef TryFromJSONValPtr
+	// For values that might not exist (text attribute, but NOT for stuff like node_id)
+	#define TryFromJSONVal(lookIn, saveTo, varName) \
+	if(lookIn.find(#varName) != lookIn.end()) \
+	{\
+		lookIn.at(#varName).get_to(saveTo.varName);\
+	} \
+	else \
+	{\
+		LOGMSG(Log::MessageType::Debug,("Couldn't load json attribute " #varName));\
+	}
+	#endif
+
 	void init()
 	{
 		loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\simple_test.gltf");
-
 
 		// Load raytracer settings
 		std::ifstream f("phantasma.settings.json");
 		if(f.good())
 		{
-			json settings_data = json::parse(f);
+			json settings_data = json::parse(f)["settings"];
+			//if(settings_data.find("active_tonemapping"))
 
-			settings.active_tonemapping = settings_data["settings"]["active_tonemapping"];
-			settings.camera_speed_t = settings_data["settings"]["camera_speed_t"];
-			settings.fps_limit_enabled = settings_data["settings"]["fps_limit_enabled"];
-			settings.fps_limit_value = settings_data["settings"]["fps_limit_value"];
-			settings.recompile_changed_shaders_automatically = settings_data["settings"]["recompile_changed_shaders_automatically"];
+			TryFromJSONVal(settings_data, settings, active_tonemapping);
+			TryFromJSONVal(settings_data, settings, camera_speed_t);
+			TryFromJSONVal(settings_data, settings, fps_limit_enabled);
+			TryFromJSONVal(settings_data, settings, fps_limit_value);
+			TryFromJSONVal(settings_data, settings, recompile_changed_shaders_automatically);
+			TryFromJSONVal(settings_data, settings, camera_position_smoothing);
+			TryFromJSONVal(settings_data, settings, camera_rotation_smoothing);
 		}
 
 		// Search for, and automatically compile compute shaders
@@ -209,6 +203,8 @@ namespace Raytracer
 		settings_data["settings"]["fps_limit_enabled"] = settings.fps_limit_enabled;
 		settings_data["settings"]["fps_limit_value"] = settings.fps_limit_value;
 		settings_data["settings"]["recompile_changed_shaders_automatically"] = settings.recompile_changed_shaders_automatically;
+		settings_data["settings"]["camera_position_smoothing"] = settings.camera_position_smoothing;
+		settings_data["settings"]["camera_rotation_smoothing"] = settings.camera_rotation_smoothing;
 
 		std::ofstream o("phantasma.settings.json");
 		o << settings_data << std::endl;
@@ -234,7 +230,24 @@ namespace Raytracer
 
 		glm::normalize(dir);
 
-		sceneData.cam_pos += glm::vec4(dir * delta_time_ms * 0.01f, 0.0f) * camera_speed_t_to_m_per_second();
+		static glm::vec4 target_cam_pos;
+		float position_t = (settings.camera_position_smoothing != 0 ? (1.0f - settings.camera_position_smoothing * 0.75f) * (delta_time_ms / 200.0f) : 1.0f);
+		target_cam_pos += glm::vec4(dir * delta_time_ms * 0.01f, 0.0f) * camera_speed_t_to_m_per_second();
+		sceneData.cam_pos = glm::lerp(sceneData.cam_pos, target_cam_pos, position_t);
+
+		if(!Input::mouse_active)
+		{
+			auto mouse_delta = ImGui::GetIO().MouseDelta;
+
+			static glm::vec3 target_rotation;
+			float rotation_t = (settings.camera_rotation_smoothing != 0 ? (1.0f - settings.camera_rotation_smoothing * 0.75f) * (delta_time_ms / 50.0f) : 1.0f);
+			target_rotation += glm::vec3(-mouse_delta.y, mouse_delta.x, 0) * 0.1f;
+			Input::cam_rotation = glm::lerp(Input::cam_rotation, target_rotation, rotation_t);
+
+			// limit pitch
+			if(fabs(Input::cam_rotation.x) > 89.9f)
+				Input::cam_rotation.x = 89.9f * sgn(Input::cam_rotation.x);
+		}
 
 		if(settings.recompile_changed_shaders_automatically)
 			Compute::recompile_kernels(ComputeKernelRecompilationCondition::SourceChanged);
@@ -439,6 +452,9 @@ namespace Raytracer
 			{TonemappingType::ApproximateACES, "Approximate ACES"},
 			{TonemappingType::Reinhard, "Reinhard"},
 		};
+
+		ImGui::DragFloat("Camera rotation smoothing", &settings.camera_rotation_smoothing, 0.01f, 0.0f, 1.0f);
+		ImGui::DragFloat("Camera position smoothing", &settings.camera_position_smoothing, 0.01f, 0.0f, 1.0f);
 
 
 		if(ImGui::BeginCombo("Tonemapping", tonemapping_text[(int)settings.active_tonemapping].second.c_str()))
