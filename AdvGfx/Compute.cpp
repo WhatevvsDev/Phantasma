@@ -223,7 +223,7 @@ ComputeOperation& ComputeOperation::write(const ComputeDataHandle& data)
 
 ComputeOperation& ComputeOperation::write(const ComputeWriteBuffer& buffer)
 {    
-    kernel->cl_kernel.setArg(arg_count, buffer);
+    kernel->cl_kernel.setArg(arg_count, buffer.internal_buffer);
 
     arg_count++;
     return *this;
