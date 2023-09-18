@@ -48,13 +48,14 @@ Mesh::Mesh(const std::string& path)
 	// Indices
 
 	auto& index_accessor = model.accessors[primitive.indices];
-	auto& index_buffer = model.bufferViews[index_accessor.bufferView];
+	auto& index_buffer_view = model.bufferViews[index_accessor.bufferView];
+	auto& index_buffer = model.buffers[index_buffer_view.buffer];
 
 	int index_data_size = tinygltf::GetNumComponentsInType(index_accessor.type) * tinygltf::GetComponentSizeInBytes(index_accessor.componentType);
-	int index_count = index_buffer.byteLength / index_data_size;
+	int index_count = index_buffer_view.byteLength / index_data_size;
 
 	// TODO: Do this properly
-	bool indices_exist = (index_buffer.byteStride == 0);
+	bool indices_exist = (index_buffer_view.byteLength != 0);
 
 	if(!indices_exist)
 		index_count = vertex_count;
@@ -66,28 +67,31 @@ Mesh::Mesh(const std::string& path)
 		// Indices into the vertex buffer for each vertex of a triangle
 		int tri_indices[3] {};
 
+
 		if(indices_exist)
 		{
-			memcpy(&tri_indices[0], &model.buffers[index_buffer.buffer].data[(i + 0) * index_data_size + index_buffer.byteOffset], index_data_size);
-			memcpy(&tri_indices[1], &model.buffers[index_buffer.buffer].data[(i + 1) * index_data_size + index_buffer.byteOffset], index_data_size);
-			memcpy(&tri_indices[2], &model.buffers[index_buffer.buffer].data[(i + 2) * index_data_size + index_buffer.byteOffset], index_data_size);
-
-			/*
+			void* index_ptr = (void*)&index_buffer.data[(i + 0) * index_data_size + index_buffer_view.byteOffset];
+			
 			switch(index_accessor.componentType)
 			{
-			default:
-				LOGMSG(Log::MessageType::Error, std::format("Unhandled index type {}", index_type));
-				break;
-			case 5123:
-				for(int v = 0; v < 3; v++)
-					tri_indices[v] = (unsigned int)*(unsigned short*)model.buffers[index_buffer.buffer].data[(i + v) * index_buffer.byteStride];
-				break;
-			case 5125:
-				for(int v = 0; v < 3; v++)
-					tri_indices[v] = *(unsigned int*)model.buffers[index_buffer.buffer].data[(i + v) * index_buffer.byteStride];
-				break;
+				default:
+					LOGMSG(Log::MessageType::Error, std::format("Unsupported index type {}", index_accessor.componentType));
+					break;
+				case 5123: // Unsigned short
+				{
+					unsigned short* casted = (unsigned short*)index_ptr;
+					for(int c = 0; c < 3; c++)
+						tri_indices[c] = casted[c];
+					break;
+				}
+				case 5125: // Unsigned int
+				{
+					unsigned int* casted = (unsigned int*)index_ptr;
+					for(int c = 0; c < 3; c++)
+						tri_indices[c] = casted[c];
+					break;
+				}
 			}
-			*/
 		}
 		else
 		{
