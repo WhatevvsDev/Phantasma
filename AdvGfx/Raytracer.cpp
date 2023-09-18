@@ -58,6 +58,11 @@ namespace Raytracer
 		TonemappingType active_tonemapping { TonemappingType::None };
 	} settings;
 
+	struct
+	{
+		uint32_t* buffer { nullptr };
+	} internal;
+
 	namespace Input
 	{
 		// Temporary scuffed input
@@ -104,16 +109,16 @@ namespace Raytracer
 
 	struct SceneData
 	{
-		uint resolution[2]	{ 0, 0 };
-		uint tri_count		{ 0 };
-		uint dummy			{ 0 };
-		glm::vec3 cam_pos	{ 0.0f };
+		uint resolution[2]		{ 0, 0 };
+		uint tri_count			{ 0 };
+		uint dummy				{ 0 };
+		glm::vec3 cam_pos		{ 0.0f };
 		float pad_0;
-		glm::vec3 cam_forward { 0.0f };
+		glm::vec3 cam_forward	{ 0.0f };
 		float pad_1;
-		glm::vec3 cam_right { 0.0f };
+		glm::vec3 cam_right		{ 0.0f };
 		float pad_2;
-		glm::vec3 cam_up { 0.0f };
+		glm::vec3 cam_up		{ 0.0f };
 		float pad_3;
 	} sceneData;
 
@@ -142,7 +147,7 @@ namespace Raytracer
 	ComputeWriteBuffer* bvh_compute_buffer;
 	ComputeWriteBuffer* tri_idx_compute_buffer;
 
-	Mesh* loaded_model;
+	Mesh* loaded_model { nullptr };
 	glm::mat4 object_matrix;
 	bool world_dirty { false };
 
@@ -159,8 +164,13 @@ namespace Raytracer
 	}
 	#endif
 
-	void init()
+	void init(uint32_t* screen_buffer_ptr)
 	{
+		internal.buffer = screen_buffer_ptr;
+
+		if(!screen_buffer_ptr)
+			LOGMSG(Log::MessageType::Error, "Got passed no screen buffer?");
+
 		loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\simple_test.gltf");
 
 		// Load raytracer settings
@@ -317,16 +327,16 @@ namespace Raytracer
 
 	unsigned int mouse_click_tri = 0;
 
-	void raytrace(int width, int height, uint32_t* buffer)
+	void raytrace(int width, int height)
 	{
 		sceneData.resolution[0] = width;
 		sceneData.resolution[1] = height;
 		sceneData.tri_count = loaded_model->tris.size();
 
-		ComputeReadWriteBuffer screen_buffer({buffer, (size_t)(width * height)});
+		ComputeReadWriteBuffer screen_buffer({internal.buffer, (size_t)(width * height)});
 
 		ComputeOperation("raytrace.cl")
-			.read(ComputeReadBuffer({buffer, (size_t)(width * height)}))
+			.read(ComputeReadBuffer({internal.buffer, (size_t)(width * height)}))
 			.write(*tris_compute_buffer)
 			.write(*bvh_compute_buffer)
 			.write(*tri_idx_compute_buffer)
@@ -364,7 +374,7 @@ namespace Raytracer
 				cursor_pos.x = glm::clamp((int)cursor_pos.x, 0, width);
 				cursor_pos.y = glm::clamp((int)cursor_pos.y, 0, height);
 
-				unsigned int a = (buffer[(int)cursor_pos.x + (int)cursor_pos.y * width] & 0xff000000) >> 24;
+				unsigned int a = (internal.	buffer[(int)cursor_pos.x + (int)cursor_pos.y * width] & 0xff000000) >> 24;
 
 				mouse_click_tri = a;
 			}
@@ -374,7 +384,7 @@ namespace Raytracer
 		if(Input::screenshot)
 		{
 			stbi_flip_vertically_on_write(true);
-			stbi_write_jpg("render.jpg", width, height, 4, buffer, width * 4 );
+			stbi_write_jpg("render.jpg", width, height, 4, internal.buffer, width * 4 );
 			stbi_flip_vertically_on_write(false);
 			LOGMSG(Log::MessageType::Debug, "Saved screenshot.");
 			Input::screenshot = false;

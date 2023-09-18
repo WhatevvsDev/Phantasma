@@ -187,7 +187,7 @@ float3 trace(struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* t
 			normal *= -sign(dot(normal,current_ray.D)); // Flip if inner normal
 			bool inner_normal = dot(old_normal - normal,old_normal - normal) < 0.001f;
 
-			float d = 0.5f;
+			float d = 1.0f;
 			float s = 1.0f - d;
 			float ambient_light = 0.6f;
 
