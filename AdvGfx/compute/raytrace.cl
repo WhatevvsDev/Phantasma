@@ -25,6 +25,11 @@ struct Ray
 	int tri_hit;
 };
 
+void reflect(struct Ray* ray, float3 normal)
+{
+	ray->D = reflected(normal, ray->D);
+}
+
 struct BVHNode
 {
     float minx, miny, minz;
@@ -150,12 +155,13 @@ float3 trace(struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* t
 	// Keeping track of current ray in the stack
 	struct Ray current_ray = *ray;
 
-	float3 diffuse = (float3)(1.0f);
+	float3 diffuse = (float3)(0.0f);
+	float current_light_left = 1.0f;
 
 	while(1)
 	{
-		if(depth <= 0)
-			return (float3)(1.0f, 1.0f, 0.0f);
+		if(depth <= 0 || current_light_left < 0.01f)
+			return diffuse;
 
 		intersect_bvh(&current_ray, 0, nodes, tris, trisIdx);
 
@@ -171,25 +177,35 @@ float3 trace(struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* t
 			normal = normalize(normal);
 			normal *= -sign(dot(normal,current_ray.D)); // Flip if inner normal
 
+			float d = 0.9f;
+			float s = 1.0f - d;
+			float ambient_light = 0.6f;
+
 			if(true)//if(current_ray.tri_hit % 2 == 0)
 			{
 				struct Ray shadow_ray;
 				shadow_ray.O = hit_pos;
 				shadow_ray.D = sun_dir;
 				shadow_ray.t = 1e30f;
-				shadow_ray.bvh_hits = 0;
 
 				intersect_bvh(&shadow_ray, 0, nodes, tris, trisIdx);
 
 				bool shadow = shadow_ray.t < 1e30;
+				float shadowt = clamp((1.0f - shadow) + ambient_light, 0.0f, 1.0f);
 
-				diffuse = (float3)(dot(normal, sun_dir)) * (1.0f - shadow);
-				return diffuse;
+				current_ray.O = hit_pos;
+				reflect(&current_ray, normal);
+				current_ray.t = 1e30f;
+				current_ray.bvh_hits = 0;
+				current_ray.tri_hit = 0;
+
+				diffuse += (float3)(dot(normal, sun_dir)) * d * shadowt * current_light_left;
+				current_light_left *= s;
 			}
-			else
+			else // Perfect mirror
 			{
 				current_ray.O = hit_pos;
-				current_ray.D = reflected(normal, current_ray.D);;
+				reflect(&current_ray, normal);
 				current_ray.t = 1e30f;
 				current_ray.bvh_hits = 0;
 				current_ray.tri_hit = 0;
@@ -199,7 +215,8 @@ float3 trace(struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* t
 		}
 		else
 		{
-			return sky_color(&current_ray, &sun_dir);
+		 	diffuse += sky_color(&current_ray, &sun_dir) * current_light_left;
+			return diffuse;
 		}
 	}
 }
