@@ -192,6 +192,12 @@ ComputeWriteBuffer::ComputeWriteBuffer(const ComputeDataHandle& data)
     compute.queue.finish();
 }
 
+void ComputeWriteBuffer::update(const ComputeDataHandle& data)
+{
+    CHECKCL(compute.queue.enqueueWriteBuffer(internal_buffer, CL_TRUE, 0, data.data_byte_size, data.data_ptr));
+    compute.queue.finish();
+}
+
 ComputeReadWriteBuffer::ComputeReadWriteBuffer(const ComputeDataHandle& data)
     : internal_buffer(cl::Buffer(compute.context, CL_MEM_READ_WRITE, data.data_byte_size))
     , data_handle(data)

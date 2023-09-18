@@ -141,6 +141,8 @@ float3 sky_color(struct Ray* ray, float3* sun_dir)
 	return lerp(sky, (float3)(1.0f, 1.0f, 1.0f), sun);
 }
 
+#define DEPTH 32
+
 float3 trace(struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* tris, uint* trisIdx, uint depth)
 {
 	float3 sun_dir = normalize((float3)(0.0f, 1.0f, 0.7f));
@@ -157,6 +159,9 @@ float3 trace(struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* t
 
 		intersect_bvh(&current_ray, 0, nodes, tris, trisIdx);
 
+		if(depth == DEPTH)
+			ray->tri_hit = current_ray.tri_hit;
+
 		bool hit_anything = current_ray.t < 1e30;
 
 		if(hit_anything)
@@ -166,7 +171,7 @@ float3 trace(struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* t
 			normal = normalize(normal);
 			normal *= -sign(dot(normal,current_ray.D)); // Flip if inner normal
 
-			if(current_ray.tri_hit % 2 == 0)
+			if(true)//if(current_ray.tri_hit % 2 == 0)
 			{
 				struct Ray shadow_ray;
 				shadow_ray.O = hit_pos;
@@ -236,11 +241,13 @@ void kernel raytrace(global uint* buffer, global struct Tri* tris, global struct
 	ray.tri_hit = 0;
 	ray.bvh_hits = 0;
 
-	float3 color = trace(&ray, 0, nodes, tris, trisIdx, 32);
+	float3 color = trace(&ray, 0, nodes, tris, trisIdx, DEPTH);
 
 	int r = clamp((int)(color.x * 255.0f), 0, 255);
 	int g = clamp((int)(color.y * 255.0f), 0, 255);
 	int b = clamp((int)(color.z * 255.0f), 0, 255);
 
-	buffer[pixel_dest] = 0x00010000 * b + 0x00000100 * g + 0x00000001 * r;
+	int hit_tri_idx = clamp(ray.tri_hit, 0, 255);
+
+	buffer[pixel_dest] = 0x00010000 * b + 0x00000100 * g + 0x00000001 * r + 0x01000000 * hit_tri_idx;
 }

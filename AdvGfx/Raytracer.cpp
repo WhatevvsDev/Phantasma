@@ -156,12 +156,12 @@ namespace Raytracer
 
 	Mesh* loaded_model;
 	glm::mat4 object_matrix;
+	bool world_dirty { false };
 
 	void init()
 	{
 		loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\simple_test.gltf");
 
-		object_matrix = glm::mat4(1.0f);
 
 		// Load raytracer settings
 		std::ifstream f("phantasma.settings.json");
@@ -244,7 +244,20 @@ namespace Raytracer
 		settings.camera_speed_t = glm::fclamp(settings.camera_speed_t, 0.0f, 1.0f);
 		if(settings.camera_speed_t != old_camera_speed_t)
 			Input::show_move_speed_timer = 2.0f;
+
+		if(world_dirty)
+		{
+			loaded_model->reconstruct_bvh();
+
+			tris_compute_buffer->update(loaded_model->tris);
+			bvh_compute_buffer->update(loaded_model->bvh->bvhNodes);
+			tri_idx_compute_buffer->update(loaded_model->bvh->triIdx);
+
+			world_dirty = false;
+		}
 	}
+
+	unsigned int mouse_click_tri = 0;
 
 	void raytrace(int width, int height, uint32_t* buffer)
 	{
@@ -283,6 +296,21 @@ namespace Raytracer
 				.execute();
 			delete op;
 		}
+
+		if(Input::mouse_active)
+		{
+			if(ImGui::GetIO().MouseDown[0] && !ImGuizmo::IsOver())
+			{
+				auto cursor_pos = ImGui::GetIO().MousePos;
+				cursor_pos.y = height - cursor_pos.y; // Account for flipped coords;
+				cursor_pos.x = glm::clamp((int)cursor_pos.x, 0, width);
+				cursor_pos.y = glm::clamp((int)cursor_pos.y, 0, height);
+
+				unsigned int a = (buffer[(int)cursor_pos.x + (int)cursor_pos.y * width] & 0xff000000) >> 24;
+
+				mouse_click_tri = a;
+			}
+		}
 		
 
 		if(Input::screenshot)
@@ -294,8 +322,6 @@ namespace Raytracer
 			Input::screenshot = false;
 		}
     }
-
-	
 
 	void ui()
 	{
@@ -367,10 +393,26 @@ namespace Raytracer
 
 		glm::mat4 projection = glm::perspectiveRH(glm::radians(90.0f), 1200.0f / 800.0f, 0.1f, 1000.0f);
 
-		ImGuizmo::Manipulate((float*)&view, (float*)&projection, ImGuizmo::TRANSLATE, ImGuizmo::WORLD, (float*)&object_matrix);
+		Tri& ref = loaded_model->get_tri_ref(mouse_click_tri);
+		glm::vec3 tri_pos = (ref.vertex0 + ref.vertex1 + ref.vertex2) * 0.3333f;
+
+		object_matrix = glm::mat4(1.0f);
+		object_matrix = glm::translate(tri_pos);
+
+		if (ImGuizmo::Manipulate((float*)&view, (float*)&projection, ImGuizmo::TRANSLATE, ImGuizmo::WORLD, (float*)&object_matrix))
+		{
+			world_dirty = true;
+		}
+
+		float matrixTranslation[3], matrixRotation[3], matrixScale[3];
+		ImGuizmo::DecomposeMatrixToComponents((float*)&object_matrix, matrixTranslation, matrixRotation, matrixScale);
+		glm::vec3 move = glm::vec3(matrixTranslation[0], matrixTranslation[1], matrixTranslation[2]) - tri_pos;
+
+		ref.vertex0 += move;
+		ref.vertex1 += move;
+		ref.vertex2 += move;
 
 		auto latest_msg = Log::get_latest_msg();
-
 		auto message_color = (latest_msg.second == Log::MessageType::Error) ? IM_COL32(255, 0, 0, 255) : IM_COL32(255, 255, 255, 255);
 
 		ImGui::GetForegroundDrawList()->AddText(ImVec2(10, 10), message_color,latest_msg.first.data() ,latest_msg.first.data() + latest_msg.first.length());

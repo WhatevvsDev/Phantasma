@@ -112,3 +112,14 @@ Mesh::Mesh(const std::string& path)
 
 	bvh = new BVH(tris);
 }
+
+void Mesh::reconstruct_bvh()
+{
+	delete bvh;
+	bvh = new BVH(tris);
+}
+
+Tri& Mesh::get_tri_ref(int idx)
+{
+	return tris[idx];
+}

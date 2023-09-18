@@ -20,4 +20,7 @@ struct Mesh
 	Mesh(const std::string& path);
 	std::vector<Tri> tris;
 	BVH* bvh;
+
+	Tri& get_tri_ref(int idx);
+	void reconstruct_bvh();
 };

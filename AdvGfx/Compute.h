@@ -90,6 +90,7 @@ private:
 struct ComputeWriteBuffer
 {
     ComputeWriteBuffer(const ComputeDataHandle& data);
+    void update(const ComputeDataHandle& data);
 
     friend struct ComputeOperation;
 private:
