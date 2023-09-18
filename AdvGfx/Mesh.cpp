@@ -39,7 +39,7 @@ Mesh::Mesh(const std::string& path)
 	auto primitive = model.meshes[0].primitives[0];
 
 	// Vertices
-	auto vertex_accessor = model.accessors[primitive.attributes["POSITION"]];
+	auto& vertex_accessor = model.accessors[primitive.attributes["POSITION"]];
 	auto& vertex_buffer = model.bufferViews[vertex_accessor.bufferView];
 
 	int vertex_data_size = tinygltf::GetNumComponentsInType(vertex_accessor.type) * tinygltf::GetComponentSizeInBytes(vertex_accessor.componentType);
@@ -47,14 +47,14 @@ Mesh::Mesh(const std::string& path)
 
 	// Indices
 
-	auto index_accessor = model.accessors[primitive.indices];
+	auto& index_accessor = model.accessors[primitive.indices];
 	auto& index_buffer = model.bufferViews[index_accessor.bufferView];
 
 	int index_data_size = tinygltf::GetNumComponentsInType(index_accessor.type) * tinygltf::GetComponentSizeInBytes(index_accessor.componentType);
 	int index_count = index_buffer.byteLength / index_data_size;
 
 	// TODO: Do this properly
-	bool indices_exist = (index_count != vertex_count);
+	bool indices_exist = (index_buffer.byteStride == 0);
 
 	if(!indices_exist)
 		index_count = vertex_count;
@@ -68,9 +68,26 @@ Mesh::Mesh(const std::string& path)
 
 		if(indices_exist)
 		{
-			memcpy(&tri_indices[0], &model.buffers[index_buffer.buffer].data[(i + 0) * index_data_size], index_data_size);
-			memcpy(&tri_indices[1], &model.buffers[index_buffer.buffer].data[(i + 1) * index_data_size], index_data_size);
-			memcpy(&tri_indices[2], &model.buffers[index_buffer.buffer].data[(i + 2) * index_data_size], index_data_size);
+			memcpy(&tri_indices[0], &model.buffers[index_buffer.buffer].data[(i + 0) * index_data_size + index_buffer.byteOffset], index_data_size);
+			memcpy(&tri_indices[1], &model.buffers[index_buffer.buffer].data[(i + 1) * index_data_size + index_buffer.byteOffset], index_data_size);
+			memcpy(&tri_indices[2], &model.buffers[index_buffer.buffer].data[(i + 2) * index_data_size + index_buffer.byteOffset], index_data_size);
+
+			/*
+			switch(index_accessor.componentType)
+			{
+			default:
+				LOGMSG(Log::MessageType::Error, std::format("Unhandled index type {}", index_type));
+				break;
+			case 5123:
+				for(int v = 0; v < 3; v++)
+					tri_indices[v] = (unsigned int)*(unsigned short*)model.buffers[index_buffer.buffer].data[(i + v) * index_buffer.byteStride];
+				break;
+			case 5125:
+				for(int v = 0; v < 3; v++)
+					tri_indices[v] = *(unsigned int*)model.buffers[index_buffer.buffer].data[(i + v) * index_buffer.byteStride];
+				break;
+			}
+			*/
 		}
 		else
 		{

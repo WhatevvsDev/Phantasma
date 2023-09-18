@@ -21,18 +21,78 @@ void update_node_bounds( uint nodeIdx, BVH& bvh, const std::vector<Tri>& tris)
 	}
 }
 
+float aabb_area(const glm::vec3& extent)
+{
+	return extent.x * extent.y + extent.y * extent.z + extent.x * extent.z;
+}
+
+float evaluate_sah( BVHNode& node, int axis, float pos, BVH& bvh, const std::vector<Tri>& tris )
+{
+    // determine triangle counts and bounds for this split candidate
+	glm::vec3 left_min;
+	glm::vec3 left_max;	
+	glm::vec3 right_min;
+	glm::vec3 right_max;
+
+    int leftCount = 0, rightCount = 0;
+    for( uint i = 0; i < node.tri_count; i++ )
+    {
+        const Tri& triangle = tris[bvh.triIdx[node.left_first + i]];
+        if (bvh.centroids[bvh.triIdx[node.left_first + i]][axis] < pos)
+        {
+            leftCount++;
+            left_min = glm::min(left_min, triangle.vertex0);
+            left_min = glm::min(left_min, triangle.vertex1);
+            left_min = glm::min(left_min, triangle.vertex2);
+			left_max = glm::max(left_max, triangle.vertex0);
+            left_max = glm::max(left_max, triangle.vertex1);
+            left_max = glm::max(left_max, triangle.vertex2);
+        }
+        else
+        {
+            rightCount++;
+            right_min = glm::min(right_min, triangle.vertex0);
+            right_min = glm::min(right_min, triangle.vertex1);
+            right_min = glm::min(right_min, triangle.vertex2);
+			right_max = glm::max(right_max, triangle.vertex0);
+            right_max = glm::max(right_max, triangle.vertex1);
+            right_max = glm::max(right_max, triangle.vertex2);
+        }
+    }
+	glm::vec3 left_extent = left_max - left_min;
+	glm::vec3 right_extent = right_max - right_min;
+
+    float cost = leftCount * (aabb_area(left_extent)) + rightCount * aabb_area(right_extent);
+    return cost > 0 ? cost : 1e30f;
+}
+
 void subdivide( uint nodeIdx, BVH& bvh, const std::vector<Tri>& tris)
 {
-	// terminate recursion
-
 	BVHNode& node = bvh.bvhNodes[nodeIdx];
-	if (node.tri_count <= 2) return;
+
 	// determine split axis and position
 	glm::vec3 extent = node.max - node.min;
-	int axis = 0;
-	if (extent.y > extent.x) axis = 1;
-	if (extent.z > extent[axis]) axis = 2;
-	float splitPos = node.min[axis] + extent[axis] * 0.5f;
+	
+	// determine split axis using SAH
+	int bestAxis = -1;
+	float bestPos = 0, bestCost = 1e30f;
+	for( int axis = 0; axis < 3; axis++ ) for( uint i = 0; i < node.tri_count; i++ )
+	{
+		const Tri& triangle = tris[bvh.triIdx[node.left_first + i]];
+		float candidatePos = bvh.centroids[bvh.triIdx[node.left_first + i]][axis];
+		float cost = evaluate_sah( node, axis, candidatePos , bvh, tris);
+		if (cost < bestCost) 
+			bestPos = candidatePos, bestAxis = axis, bestCost = cost;
+	}
+	int axis = bestAxis;
+	float splitPos = bestPos;
+
+	glm::vec3 parent_aabb_extent = bvh.bvhNodes[nodeIdx].max - bvh.bvhNodes[nodeIdx].min; // extent of parent
+	float parentArea = aabb_area(parent_aabb_extent);
+	float parentCost = node.tri_count * parentArea;
+	
+	if (bestCost >= parentCost) return;
+
 	// in-place partition
 	int i = node.left_first;
 	int j = i + node.tri_count - 1;
