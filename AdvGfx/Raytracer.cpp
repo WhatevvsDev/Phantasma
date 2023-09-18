@@ -1,41 +1,30 @@
 #include "Raytracer.h"
+
 #include "Math.h"
 #include "Common.h"
+#include "Compute.h"
+#include "BVH.h"
+#include "Mesh.h"
 #include "LogUtility.h"
 #include "IOUtility.h"
-#include "Compute.h"
-
-#define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-
-#include <stb_image.h>
-#include <stb_image_write.h>
 
 #include <fstream>
 #include <ostream>
-#include "json.hpp"
-using json = nlohmann::json;
-
-#include <GLFW/glfw3.h>
-
-#include <ImGuizmo.h>
-#include "Math.h"
-
 #include <format>
 #include <filesystem>
-
-#include "BVH.h"
-#include "Mesh.h"
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image.h>
+#include <stb_image_write.h>
+#include <GLFW/glfw3.h>
+#include <ImGuizmo.h>
 
 enum class TonemappingType
 {
 	None,
 	ApproximateACES,
-	//Filmic,
 	Reinhard
 };
-
-// TODO: Swap triangle to bouding box centroid, instead of vertex centroid :)
 
 namespace Raytracer
 {	
@@ -43,7 +32,7 @@ namespace Raytracer
 	{
 		bool recompile_changed_shaders_automatically { true };
 		bool fps_limit_enabled { true };
-		int fps_limit_value { 80 };
+		int fps_limit_value { 80 }; // TODO: this is sometimes very inaccurate in practice?
 
 		float camera_speed_t {0.5f};
 		float camera_rotation_smoothing = { 0.1f };
@@ -58,20 +47,36 @@ namespace Raytracer
 		TonemappingType active_tonemapping { TonemappingType::None };
 	} settings;
 
+	struct SceneData
+	{
+		uint resolution[2]		{ 0, 0 };
+		uint tri_count			{ 0 };
+		uint dummy				{ 0 };
+		glm::vec3 cam_pos		{ 0.0f };
+		float pad_0				{ 0.0f };
+		glm::vec3 cam_forward	{ 0.0f };
+		float pad_1				{ 0.0f };
+		glm::vec3 cam_right		{ 0.0f };
+		float pad_2				{ 0.0f };
+		glm::vec3 cam_up		{ 0.0f };
+		float pad_3				{ 0.0f };
+	} sceneData;
+
 	struct
 	{
+		uint32_t  mouse_click_tri = 0; // TODO: Purely for testing ImGuizmo, backing code should be changed later
 		uint32_t* buffer { nullptr };
+		float show_move_speed_bar_time { 0.0f };
+		bool show_debug_ui { false };
+		bool screenshot { false };
+
+		bool world_dirty { false };
 	} internal;
 
 	namespace Input
 	{
 		// Temporary scuffed input
-		float mouse_x = 0.0f;
-		float mouse_y = 0.0f;
 		glm::vec3 cam_rotation;
-		bool mouse_active = false;
-		bool screenshot = false;
-		float show_move_speed_timer = 0;
 
 		void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 		{
@@ -81,67 +86,45 @@ namespace Raytracer
 			(void)action;
 			(void)mods;
 
-			bool is_pressed = (action == GLFW_PRESS);
+			bool key_is_pressed = (action == GLFW_PRESS);
 
-			if(is_pressed)
+			if(!key_is_pressed)
+				return;
+
+			switch(key)
 			{
-				switch(key)
-				{
-					case GLFW_KEY_P:
-						screenshot = true;
-					break;
-					case GLFW_KEY_ESCAPE:
-						Raytracer::terminate();
-						exit(0);
-					break;
-					case GLFW_KEY_F1:
-						mouse_active = !mouse_active;
-					break;
-				}
+				case GLFW_KEY_P:
+					internal.screenshot = true;
+				break;
+				case GLFW_KEY_ESCAPE:
+					Raytracer::terminate();
+					exit(0);
+				break;
+				case GLFW_KEY_F1:
+					internal.show_debug_ui = !internal.show_debug_ui;
+					glfwSetInputMode(window, GLFW_CURSOR, internal.show_debug_ui ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
+				break;
 			}
-
-			if(mouse_active)
-				glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-			else
-				glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 		}	
 	}
 
-	struct SceneData
-	{
-		uint resolution[2]		{ 0, 0 };
-		uint tri_count			{ 0 };
-		uint dummy				{ 0 };
-		glm::vec3 cam_pos		{ 0.0f };
-		float pad_0;
-		glm::vec3 cam_forward	{ 0.0f };
-		float pad_1;
-		glm::vec3 cam_right		{ 0.0f };
-		float pad_2;
-		glm::vec3 cam_up		{ 0.0f };
-		float pad_3;
-	} sceneData;
-
 	float camera_speed_t_to_m_per_second()
 	{
-		float speed = 0;
 		float adjusted_t = settings.camera_speed_t * 2.0f - 1.0f;
-
 		float value = pow(adjusted_t * 9.95f, 2.0f) * sgn(adjusted_t);
 
 		if(settings.camera_speed_t > 0.5f)
 		{
-			speed = value + 1.0f;
+			return glm::clamp(value + 1.0f, 0.01f, 100.0f);
 		}
 		else
 		{
-			speed = 1.0f / fabsf(value - 1.0f);
+			return glm::clamp(1.0f / fabsf(value - 1.0f), 0.01f, 100.0f);
 		}
-
-		return glm::clamp(speed, 0.01f, 100.0f);
 	}
 	#pragma warning(disable:4996)
 
+	// TODO: Temporary variables, will be consolidated into one system later
 	ComputeReadBuffer* screen_compute_buffer;
 	ComputeWriteBuffer* tris_compute_buffer;
 	ComputeWriteBuffer* bvh_compute_buffer;
@@ -149,36 +132,19 @@ namespace Raytracer
 
 	Mesh* loaded_model { nullptr };
 	glm::mat4 object_matrix;
-	bool world_dirty { false };
-
-	#ifndef TryFromJSONValPtr
-	// For values that might not exist (text attribute, but NOT for stuff like node_id)
-	#define TryFromJSONVal(lookIn, saveTo, varName) \
-	if(lookIn.find(#varName) != lookIn.end()) \
-	{\
-		lookIn.at(#varName).get_to(saveTo.varName);\
-	} \
-	else \
-	{\
-		LOGMSG(Log::MessageType::Debug,("Couldn't load json attribute " #varName));\
-	}
-	#endif
 
 	void init(uint32_t* screen_buffer_ptr)
 	{
 		internal.buffer = screen_buffer_ptr;
 
-		if(!screen_buffer_ptr)
-			LOGMSG(Log::MessageType::Error, "Got passed no screen buffer?");
-
+		// TODO: Temporary, will probably be replaced with asset browser?
 		loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\simple_test.gltf");
 
-		// Load raytracer settings
+		// Load settings
 		std::ifstream f("phantasma.settings.json");
 		if(f.good())
 		{
 			json settings_data = json::parse(f)["settings"];
-			//if(settings_data.find("active_tonemapping"))
 
 			TryFromJSONVal(settings_data, settings, active_tonemapping);
 			TryFromJSONVal(settings_data, settings, camera_speed_t);
@@ -213,7 +179,7 @@ namespace Raytracer
 			Compute::create_kernel(file_path, file_name);
 		}
 
-		//screen_compute_buffer = {buffer, (size_t)(sceneData.resolution[0] * sceneData.resolution[1])};
+		// TODO: temporary, will be consolidated into one system later
 		tris_compute_buffer		= new ComputeWriteBuffer({loaded_model->tris});
 		bvh_compute_buffer		= new ComputeWriteBuffer({loaded_model->bvh->bvhNodes});
 		tri_idx_compute_buffer	= new ComputeWriteBuffer({loaded_model->bvh->triIdx});
@@ -243,7 +209,7 @@ namespace Raytracer
 
 	void update(const float delta_time_ms)
 	{
-		Input::show_move_speed_timer -= (delta_time_ms / 1000.0f);
+		internal.show_move_speed_bar_time -= (delta_time_ms / 1000.0f);
 		int moveHor =	(ImGui::IsKeyDown(ImGuiKey_D))		- (ImGui::IsKeyDown(ImGuiKey_A));
 		int moveVer =	(ImGui::IsKeyDown(ImGuiKey_Space))	- (ImGui::IsKeyDown(ImGuiKey_LeftCtrl));
 		int moveWard =	(ImGui::IsKeyDown(ImGuiKey_W))		- (ImGui::IsKeyDown(ImGuiKey_S));
@@ -253,26 +219,24 @@ namespace Raytracer
 			static float orbit_cam_t = 0.0f;
 			orbit_cam_t += (delta_time_ms / 1000.0f) * settings.orbit_camera_rotations_per_second;
 
-			glm::vec3 offset =	glm::vec3(0.0f, 0.0f, 1.0f) * settings.orbit_camera_distance +
-								glm::vec3(0.0f, 1.0f, 0.0f) * settings.orbit_camera_height;
+			glm::vec3 offset = glm::vec3(0.0f, settings.orbit_camera_height, settings.orbit_camera_distance);
+			glm::mat3 rotation = glm::eulerAngleY(glm::radians(orbit_cam_t * 360.0f));
 
-			glm::mat4 rotation = glm::eulerAngleY(glm::radians(orbit_cam_t * 360.0f));
-
-			offset = (glm::vec4(offset, 0.0f) * rotation); // Rotate it
+			offset = offset * rotation; // Rotate it
 			offset += settings.orbit_camera_position; // Position it
 
-			glm::vec3 to_center = settings.orbit_camera_position - offset;
+			glm::vec3 to_center = glm::normalize(settings.orbit_camera_position - offset);
 
-			sceneData.cam_forward = glm::normalize(to_center);
+			sceneData.cam_forward = to_center;
 			sceneData.cam_right = glm::cross(sceneData.cam_forward, glm::vec3(0.0f, 1.0f, 0.0f));
 			sceneData.cam_up = glm::cross(sceneData.cam_right, sceneData.cam_forward);
 			sceneData.cam_pos = offset;
-			
 		}
 		else
 		{
 			glm::mat3 rotation = glm::eulerAngleXYZ(glm::radians(Input::cam_rotation.x), glm::radians(Input::cam_rotation.y), glm::radians(Input::cam_rotation.z));
 
+			// TODO: could decompose from the rotation matrix?
 			sceneData.cam_forward = glm::vec3(0, 0, 1.0f) * rotation;
 			sceneData.cam_right = glm::vec3(-1.0f, 0, 0) * rotation;
 			sceneData.cam_up = glm::vec3(0, 1.0f, 0) * rotation;
@@ -289,7 +253,9 @@ namespace Raytracer
 			target_cam_pos += glm::vec3(dir * delta_time_ms * 0.01f) * camera_speed_t_to_m_per_second();
 			sceneData.cam_pos = glm::lerp(sceneData.cam_pos, target_cam_pos, position_t);
 
-			if(!Input::mouse_active)
+			bool allow_camera_rotation = !internal.show_debug_ui;
+
+			if(allow_camera_rotation)
 			{
 				auto mouse_delta = ImGui::GetIO().MouseDelta;
 
@@ -311,9 +277,9 @@ namespace Raytracer
 		settings.camera_speed_t += ImGui::GetIO().MouseWheel * 0.01f;
 		settings.camera_speed_t = glm::fclamp(settings.camera_speed_t, 0.0f, 1.0f);
 		if(settings.camera_speed_t != old_camera_speed_t)
-			Input::show_move_speed_timer = 2.0f;
+			internal.show_move_speed_bar_time = 2.0f;
 
-		if(world_dirty)
+		if(internal.world_dirty)
 		{
 			loaded_model->reconstruct_bvh();
 
@@ -321,11 +287,9 @@ namespace Raytracer
 			bvh_compute_buffer->update(loaded_model->bvh->bvhNodes);
 			tri_idx_compute_buffer->update(loaded_model->bvh->triIdx);
 
-			world_dirty = false;
+			internal.world_dirty = false;
 		}
 	}
-
-	unsigned int mouse_click_tri = 0;
 
 	void raytrace(int width, int height)
 	{
@@ -365,36 +329,36 @@ namespace Raytracer
 			delete op;
 		}
 
-		if(Input::mouse_active)
+		if(internal.show_debug_ui)
 		{
-			if(ImGui::GetIO().MouseDown[0] && !ImGuizmo::IsOver())
+			bool clicked_on_non_gizmo = (ImGui::GetIO().MouseDown[0] && !ImGuizmo::IsOver());
+
+			if(clicked_on_non_gizmo)
 			{
 				auto cursor_pos = ImGui::GetIO().MousePos;
 				cursor_pos.x = glm::clamp((int)cursor_pos.x, 0, width);
 				cursor_pos.y = glm::clamp((int)cursor_pos.y, 0, height);
 
-				unsigned int a = (internal.buffer[(int)cursor_pos.x + (int)cursor_pos.y * width] & 0xff000000) >> 24;
-
-				mouse_click_tri = a;
+				internal.mouse_click_tri = (internal.buffer[(int)cursor_pos.x + (int)cursor_pos.y * width] & 0xff000000) >> 24;
 			}
 		}
-		
 
-		if(Input::screenshot)
+		if(internal.screenshot)
 		{
 			stbi_flip_vertically_on_write(true);
 			stbi_write_jpg("render.jpg", width, height, 4, internal.buffer, width * 4 );
 			stbi_flip_vertically_on_write(false);
 			LOGMSG(Log::MessageType::Debug, "Saved screenshot.");
-			Input::screenshot = false;
+			internal.screenshot = false;
 		}
     }
 
 	void ui()
 	{
+		// Bless this mess
 		auto& draw_list = *ImGui::GetForegroundDrawList();
 
-		if(Input::show_move_speed_timer > 0 || Input::mouse_active)
+		if(internal.show_move_speed_bar_time > 0 || internal.	show_debug_ui)
 		{
 			{ // Movement speed bar
 
@@ -453,14 +417,14 @@ namespace Raytracer
 			}
 		}
 
-		if(!Input::mouse_active)
+		if(!internal.show_debug_ui)
 			return;
 
 		auto view = glm::lookAtRH(glm::vec3(sceneData.cam_pos), glm::vec3(sceneData.cam_pos) + glm::vec3(sceneData.cam_forward), glm::vec3(0.0f, 1.0f, 0.0f));
 
 		glm::mat4 projection = glm::perspectiveRH(glm::radians(90.0f), 1200.0f / 800.0f, 0.1f, 1000.0f);
 
-		Tri& ref = loaded_model->get_tri_ref(mouse_click_tri);
+		Tri& ref = loaded_model->get_tri_ref(internal.mouse_click_tri);
 		glm::vec3 tri_pos = (ref.vertex0 + ref.vertex1 + ref.vertex2) * 0.3333f;
 
 		object_matrix = glm::mat4(1.0f);
@@ -468,7 +432,7 @@ namespace Raytracer
 
 		if (ImGuizmo::Manipulate((float*)&view, (float*)&projection, ImGuizmo::TRANSLATE, ImGuizmo::WORLD, (float*)&object_matrix))
 		{
-			world_dirty = true;
+			internal.world_dirty = true;
 		}
 
 		float matrixTranslation[3], matrixRotation[3], matrixScale[3];
@@ -484,7 +448,10 @@ namespace Raytracer
 
 		ImGui::GetForegroundDrawList()->AddText(ImVec2(10, 10), message_color,latest_msg.first.data() ,latest_msg.first.data() + latest_msg.first.length());
 
-		ImGui::Begin("Debug");
+		// Debug settings window
+		// TODO: Remake this as not just a standard debug window, but something more user friendly
+
+		ImGui::Begin(" Debug settings window");
 		
 		ImGui::Checkbox("Orbit camera enabled?", &settings.orbit_camera_enabled);
 		if(!settings.orbit_camera_enabled)

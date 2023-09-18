@@ -32,13 +32,9 @@ namespace App
         memset(render_buffer, 0, app_desc.width * app_desc.height * sizeof(uint32_t));
 
         if (!glfwInit())
-        {
             return -1;
-        }
-        else
-        {
-            LOGMSG(Log::MessageType::Default, "Initialized GLFW.");
-        }
+
+        LOGMSG(Log::MessageType::Default, "Initialized GLFW.");
 
         glfwWindowHint(GLFW_RESIZABLE, false);
         window = glfwCreateWindow(desc.width, desc.height, desc.title.c_str(), NULL, NULL);
@@ -47,14 +43,13 @@ namespace App
             glfwTerminate();
             return -1;
         }
-        else
-        {
-            LOGMSG(Log::MessageType::Default, "Created Window.");
-        }
+
+        LOGMSG(Log::MessageType::Default, "Created Window.");
         
         glfwMakeContextCurrent(window);
         
         glfwSetKeyCallback(window, Raytracer::Input::key_callback);
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
@@ -103,7 +98,7 @@ namespace App
             (int)last_update_time);
 
         glfwSetWindowTitle(window, title.c_str());
-        
+
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
@@ -129,7 +124,7 @@ namespace App
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
+        
         glfwSwapBuffers(window);
         glfwPollEvents();
     }

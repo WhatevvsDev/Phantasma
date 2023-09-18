@@ -34,8 +34,7 @@ int sgn(T val) {
 #define SGN_TEMPLATED_FUNC
 #endif
 
-#include "json.hpp"
-using json = nlohmann::json;
+#include "JSONUtility.h"
 
 namespace glm
 {

@@ -191,6 +191,7 @@
     <ClInclude Include="Common.h" />
     <ClInclude Include="Compute.h" />
     <ClInclude Include="IOUtility.h" />
+    <ClInclude Include="JSONUtility.h" />
     <ClInclude Include="LogUtility.h" />
     <ClInclude Include="Math.h" />
     <ClInclude Include="Mesh.h" />
