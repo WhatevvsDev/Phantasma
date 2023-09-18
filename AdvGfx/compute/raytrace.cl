@@ -177,7 +177,7 @@ float3 trace(struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* t
 			normal = normalize(normal);
 			normal *= -sign(dot(normal,current_ray.D)); // Flip if inner normal
 
-			float d = 0.9f;
+			float d = 0.5f;
 			float s = 1.0f - d;
 			float ambient_light = 0.6f;
 
@@ -201,15 +201,6 @@ float3 trace(struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* t
 
 				diffuse += (float3)(dot(normal, sun_dir)) * d * shadowt * current_light_left;
 				current_light_left *= s;
-			}
-			else // Perfect mirror
-			{
-				current_ray.O = hit_pos;
-				reflect(&current_ray, normal);
-				current_ray.t = 1e30f;
-				current_ray.bvh_hits = 0;
-				current_ray.tri_hit = 0;
-
 				depth--;
 			}
 		}
