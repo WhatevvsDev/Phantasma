@@ -52,7 +52,7 @@ Mesh::Mesh(const std::string& path)
 	auto& index_buffer = model.buffers[index_buffer_view.buffer];
 
 	int index_data_size = tinygltf::GetNumComponentsInType(index_accessor.type) * tinygltf::GetComponentSizeInBytes(index_accessor.componentType);
-	int index_count = index_buffer_view.byteLength / index_data_size;
+	size_t index_count = index_buffer_view.byteLength / index_data_size;
 
 	// TODO: Do this properly
 	bool indices_exist = (index_buffer_view.byteLength != 0);
@@ -62,43 +62,19 @@ Mesh::Mesh(const std::string& path)
 		
 	tris.resize(index_count / 3);
 
+	std::vector<int> indices;
+	
+	if(indices_exist)
+		indices = reinterpret_gltf_primitive_buffer_as_vector<int>(index_accessor, model);
+
 	for(int i = 0, t = 0; i < index_count; i += 3, t++)
 	{
+		int tri_indices[3] = { i + 0, i + 1, i + 2};
 		// Indices into the vertex buffer for each vertex of a triangle
-		int tri_indices[3] {};
-
 
 		if(indices_exist)
-		{
-			void* index_ptr = (void*)&index_buffer.data[(i + 0) * index_data_size + index_buffer_view.byteOffset];
-			
-			switch(index_accessor.componentType)
-			{
-				default:
-					LOGMSG(Log::MessageType::Error, std::format("Unsupported index type {}", index_accessor.componentType));
-					break;
-				case 5123: // Unsigned short
-				{
-					unsigned short* casted = (unsigned short*)index_ptr;
-					for(int c = 0; c < 3; c++)
-						tri_indices[c] = casted[c];
-					break;
-				}
-				case 5125: // Unsigned int
-				{
-					unsigned int* casted = (unsigned int*)index_ptr;
-					for(int c = 0; c < 3; c++)
-						tri_indices[c] = casted[c];
-					break;
-				}
-			}
-		}
-		else
-		{
-			tri_indices[0] = i + 0;
-			tri_indices[1] = i + 1;
-			tri_indices[2] = i + 2;
-		}
+			for(int t = 0; t < 3; t++)
+				tri_indices[t] = indices[i + t];
 
 		auto vert_buf = model.buffers[vertex_buffer.buffer].data.data();
 
@@ -107,7 +83,6 @@ Mesh::Mesh(const std::string& path)
 		tris[t].vertex0 = float_buf[tri_indices[0]];
 		tris[t].vertex1 = float_buf[tri_indices[1]];
 		tris[t].vertex2 = float_buf[tri_indices[2]];
-
 	}
 
 	bvh = new BVH(tris);
