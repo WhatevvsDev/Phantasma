@@ -93,7 +93,7 @@ namespace App
             app_desc.width, 
             app_desc.height, 
             (int)last_render_time, 
-            (int)(1000.0f / last_render_time),  
+            (int)ceil(1000.0f / last_render_time),  
             (Raytracer::get_target_fps() == 1000) ? "FPS" : "Limited FPS",
             (int)last_update_time);
 
@@ -111,10 +111,6 @@ namespace App
         // Only get the render time
         last_update_time =  fps_timer.lap_delta();
         Raytracer::raytrace(app_desc.width, app_desc.height);
-        float sleep_time = (1000.0f / Raytracer::get_target_fps() - fps_timer.peek_delta() - last_update_time);
-        if(sleep_time < 0) sleep_time = 0;
-        Sleep((DWORD)sleep_time);
-        last_render_time = fps_timer.lap_delta();
         Raytracer::ui();
 
         // Flipping the buffer so its proper
@@ -126,6 +122,13 @@ namespace App
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         
         glfwSwapBuffers(window);
+
+        float actual_time = fps_timer.peek_delta();
+        float sleep_time = (1000.0f / Raytracer::get_target_fps() - actual_time);
+        if(sleep_time < 0) sleep_time = 0;
+        Sleep((DWORD)sleep_time);
+        last_render_time = fps_timer.lap_delta();
+
         glfwPollEvents();
     }
 }

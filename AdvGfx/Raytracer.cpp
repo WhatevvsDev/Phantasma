@@ -236,7 +236,6 @@ namespace Raytracer
 		{
 			glm::mat3 rotation = glm::eulerAngleXYZ(glm::radians(Input::cam_rotation.x), glm::radians(Input::cam_rotation.y), glm::radians(Input::cam_rotation.z));
 
-			// TODO: could decompose from the rotation matrix?
 			sceneData.cam_forward = glm::vec3(0, 0, 1.0f) * rotation;
 			sceneData.cam_right = glm::vec3(-1.0f, 0, 0) * rotation;
 			sceneData.cam_up = glm::vec3(0, 1.0f, 0) * rotation;

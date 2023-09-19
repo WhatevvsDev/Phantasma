@@ -46,7 +46,6 @@ Mesh::Mesh(const std::string& path)
 	int vertex_count = vertex_buffer.byteLength / vertex_data_size;
 
 	// Indices
-
 	auto& index_accessor = model.accessors[primitive.indices];
 	auto& index_buffer_view = model.bufferViews[index_accessor.bufferView];
 	auto& index_buffer = model.buffers[index_buffer_view.buffer];
