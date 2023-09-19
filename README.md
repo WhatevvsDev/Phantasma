@@ -27,3 +27,4 @@ Latest Render
 - [TinyGLTF](https://github.com/syoyo/tinygltf)
 - [Nlohmann JSON](https://github.com/nlohmann/json)
 - [STB](https://github.com/nothings/stb)
+- [ImGuizmo](https://github.com/CedricGuillemet/ImGuizmo)
