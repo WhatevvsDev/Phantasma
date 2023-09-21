@@ -18,6 +18,7 @@
 #include <stb_image_write.h>
 #include <GLFW/glfw3.h>
 #include <ImGuizmo.h>
+#include <IconsFontAwesome6.h>
 
 enum class TonemappingType
 {
@@ -43,6 +44,8 @@ namespace Raytracer
 		float orbit_camera_distance { 10.0f };
 		float orbit_camera_height { 5.0f };
 		float orbit_camera_rotations_per_second { 0.1f };
+
+		bool show_onscreen_log { false };
 
 		TonemappingType active_tonemapping { TonemappingType::None };
 	} settings;
@@ -72,6 +75,8 @@ namespace Raytracer
 
 		bool world_dirty { false };
 		int mouse_over_idx;
+
+		ImGuizmo::OPERATION current_gizmo_operation { ImGuizmo::TRANSLATE };
 	} internal;
 
 	namespace Input
@@ -340,7 +345,7 @@ namespace Raytracer
 
 		if(internal.show_debug_ui)
 		{
-			bool clicked_on_non_gizmo = (ImGui::GetIO().MouseReleased[0] && !ImGuizmo::IsOver());
+			bool clicked_on_non_gizmo = (ImGui::GetIO().MouseReleased[0] && !ImGuizmo::IsOver() && !ImGui::IsAnyItemHovered());
 
 			auto cursor_pos = ImGui::GetIO().MousePos;
 
@@ -365,11 +370,32 @@ namespace Raytracer
 
 	void ui()
 	{
+		ImGui::SetNextWindowPos({});
+		ImGui::Begin("Transform tools", 0, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
+
+		float icon_font_size = 50.0f;
+
+		ImGui::SetWindowFontScale(0.9f);
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {0, 0});
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 1));
+
+		if (ImGui::Button(ICON_FA_ARROWS_UP_DOWN_LEFT_RIGHT, {icon_font_size, icon_font_size}))
+			internal.current_gizmo_operation = ImGuizmo::TRANSLATE;
+		ImGui::SameLine();
+		if (ImGui::Button(ICON_FA_ARROWS_ROTATE, {icon_font_size, icon_font_size}))
+			internal.current_gizmo_operation = ImGuizmo::ROTATE;
+		ImGui::SameLine();
+		if (ImGui::Button(ICON_FA_EXPAND, {icon_font_size, icon_font_size}))
+			internal.current_gizmo_operation = ImGuizmo::SCALE;
+		
+		ImGui::PopStyleColor();
+		ImGui::PopStyleVar();
+		ImGui::SetWindowFontScale(1.0f);
+
+		ImGui::End();
+
 		// Bless this mess
 		auto& draw_list = *ImGui::GetForegroundDrawList();
-
-		draw_list.AddText(ImVec2(1, 1), IM_COL32(25, 25, 25, 255), std::format("Position: {} {} {}", sceneData.cam_pos.x,sceneData.cam_pos.y,sceneData.cam_pos.z).c_str());
-		draw_list.AddText(ImVec2(0, 0), IM_COL32(223, 223, 223, 255), std::format("Position: {} {} {}", sceneData.cam_pos.x,sceneData.cam_pos.y,sceneData.cam_pos.z).c_str());
 
 		if(internal.show_move_speed_bar_time > 0 || internal.show_debug_ui)
 		{
@@ -439,7 +465,7 @@ namespace Raytracer
 
 		if(internal.mouse_click_tri != -1)
 		{
-			if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection), ImGuizmo::ROTATE, ImGuizmo::WORLD, glm::value_ptr(object_transform)))
+			if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection), internal.current_gizmo_operation, ImGuizmo::WORLD, glm::value_ptr(object_transform)))
 			{
 				internal.world_dirty = true;
 			}
@@ -447,10 +473,13 @@ namespace Raytracer
 			sceneData.object_inverse_transform = glm::inverse(object_transform);
 		}
 
-		auto latest_msg = Log::get_latest_msg();
-		auto message_color = (latest_msg.second == Log::MessageType::Error) ? IM_COL32(255, 0, 0, 255) : IM_COL32(255, 255, 255, 255);
+		if(settings.show_onscreen_log)
+		{
+			auto latest_msg = Log::get_latest_msg();
+			auto message_color = (latest_msg.second == Log::MessageType::Error) ? IM_COL32(255, 0, 0, 255) : IM_COL32(255, 255, 255, 255);
 
-		ImGui::GetForegroundDrawList()->AddText(ImVec2(10, 10), message_color,latest_msg.first.data() ,latest_msg.first.data() + latest_msg.first.length());
+			ImGui::GetForegroundDrawList()->AddText(ImVec2(10, 10), message_color,latest_msg.first.data() ,latest_msg.first.data() + latest_msg.first.length());
+		}
 
 		// Debug settings window
 		// TODO: Remake this as not just a standard debug window, but something more user friendly
@@ -481,7 +510,9 @@ namespace Raytracer
 		ImGui::Text("Framerate Limit");	
 		ImGui::InputInt("## Framerate Limit Value Input Int", &settings.fps_limit_value, 0, 0);
 		ImGui::Checkbox("Limit framerate?", &settings.fps_limit_enabled);
-		
+
+		ImGui::Checkbox("Show onscreen log?", &settings.show_onscreen_log);
+
 		// Has to be in order!
 		static std::pair<TonemappingType, std::string> tonemapping_text[] =
 		{

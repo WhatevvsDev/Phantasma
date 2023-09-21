@@ -12,6 +12,7 @@
 
 #include <cmath>
 #include <format>
+#include <IconsFontAwesome6.h>
 
 namespace App
 {
@@ -56,6 +57,19 @@ namespace App
         ImGuiIO& io = ImGui::GetIO(); (void)io;
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+        // Merge icons into  font
+        float text_font_size = 18.0f;
+        float icon_font_size = 50.0f;
+        io.Fonts->AddFontFromFileTTF("Roboto.ttf", text_font_size);
+
+        // Add in Icon font
+        ImFontConfig config;
+        config.MergeMode = true;
+        config.GlyphMinAdvanceX = icon_font_size;
+        config.GlyphOffset.y += (icon_font_size - text_font_size) * 0.5f- 2.0f;
+        static const ImWchar icon_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
+        io.Fonts->AddFontFromFileTTF("FontAwesome.otf", icon_font_size, &config, icon_ranges);
 
         // Setup Dear ImGui style
         ImGui::StyleColorsDark();
