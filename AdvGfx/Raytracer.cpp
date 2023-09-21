@@ -133,6 +133,7 @@ namespace Raytracer
 
 	Mesh* loaded_model { nullptr };
 	glm::mat4 object_matrix;
+	glm::mat4 object_transform = glm::mat4(1);
 
 	void init(uint32_t* screen_buffer_ptr)
 	{
@@ -186,6 +187,9 @@ namespace Raytracer
 		tris_compute_buffer		= new ComputeWriteBuffer({loaded_model->tris});
 		bvh_compute_buffer		= new ComputeWriteBuffer({loaded_model->bvh->bvhNodes});
 		tri_idx_compute_buffer	= new ComputeWriteBuffer({loaded_model->bvh->triIdx});
+
+		// TODO: this should be created on new mesh instance (DOESNT EXIST YET);
+		sceneData.object_inverse_transform = glm::inverse(object_transform);
 	}
 
 	void terminate()
@@ -359,12 +363,13 @@ namespace Raytracer
 		}
     }
 
-	glm::mat4 object_transform = glm::mat4(1);
-
 	void ui()
 	{
 		// Bless this mess
 		auto& draw_list = *ImGui::GetForegroundDrawList();
+
+		draw_list.AddText(ImVec2(1, 1), IM_COL32(25, 25, 25, 255), std::format("Position: {} {} {}", sceneData.cam_pos.x,sceneData.cam_pos.y,sceneData.cam_pos.z).c_str());
+		draw_list.AddText(ImVec2(0, 0), IM_COL32(223, 223, 223, 255), std::format("Position: {} {} {}", sceneData.cam_pos.x,sceneData.cam_pos.y,sceneData.cam_pos.z).c_str());
 
 		if(internal.show_move_speed_bar_time > 0 || internal.show_debug_ui)
 		{
@@ -386,7 +391,7 @@ namespace Raytracer
 							
 					std::string text = std::format("Camera speed: {} m/s", camera_speed_t_to_m_per_second());
 					auto text_size = ImGui::CalcTextSize(text.c_str());
-					ImGui::GetForegroundDrawList()->AddText(ImVec2(minpos.x + move_bar_width * 0.5f - text_size.x * 0.5f, minpos.y - 32 - text_size.y), IM_COL32(223, 223, 223, 255), text.data() ,text.data() + text.length());
+					draw_list.AddText(ImVec2(minpos.x + move_bar_width * 0.5f - text_size.x * 0.5f, minpos.y - 32 - text_size.y), IM_COL32(223, 223, 223, 255), text.data() ,text.data() + text.length());
 				}
 				// Movement speed bar, divisions
 				int divisior_count = 5;
