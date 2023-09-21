@@ -27,41 +27,28 @@ struct Ray
 
 float3 refracted(float3 in, float3 n, float ior) 
 {
+	float cosi = clamp(dot(in, n), -1.0f, 1.0f);
+    float etai = 1, etat = ior;
+
+    if (cosi < 0) 
+	{ 
+		cosi = -cosi; 
+	} else 
+	{ 
+		float swap = etai; etai = etat; etat = swap;
+		n = -n; 
+		}
+    float eta = etai / etat;
+    float k = 1 - eta * eta * (1 - cosi * cosi);
+    return k < 0 ? 0 : eta * in + (eta * cosi - sqrt(k)) * n;
+
+	/*
 	//float cos_theta = fmin(dot(-in, n), 1.0f);
 	float cos_theta = fmin(dot(-in, n), 1.0f);
     float3 r_out_perp =  ior * (in + cos_theta*n);
     float3 r_out_parallel = -sqrt(fabs(1.0f - dot(r_out_perp, r_out_perp))) * n;
     return r_out_perp + r_out_parallel;
-
-	// float theta = dot(in, normal);
-	// float n1 = 1.0f;
-	// float n2 = ior;
-	// float3 norm = normal;
-
-	// // Account for being inside of the 2nd medium. If so we need to flip the normal
-	// // Otherwise, we only have to flip the theta.
-	// if (theta < 0.0f)
-	// {
-	// 	theta = -theta;
-	// }
-	// else
-	// {
-	// 	float t = n1;
-	// 	n1 = n2;
-	// 	n2 = t;
-	// 	norm = norm * -1.0f;
-	// }
-
-	// float n = n1 / n2;
-	// float k = 1.0f - n * n * (1.0f - theta * theta);
-	// if (k < 0.0f)
-	// {
-	// 	return reflected(in, norm);
-	// }
-
-	// float3 a = (in + (norm * theta)) * n;
-	// float3 b = sqrt(k) * (norm * -1.0f);
-	// return a + b;
+	*/
 }
 
 // Taken from https://www.scratchapixel.com/lessons/3d-basic-rendering/introduction-to-shading/reflection-refraction-fresnel.html
@@ -293,7 +280,7 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struc
 
 			float reflectance = fresnel(current_ray.D, -normal, ior);
 			float transmittance = 1.0f - reflectance;
-			float3 bias = normal * 0.001f * (inner_normal ? 1.0f : -1.0f);
+			float3 bias = normal * 0.01f * (inner_normal ? 1.0f : -1.0f);
 
 			{
 				struct Ray reflection_ray;
