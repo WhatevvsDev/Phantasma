@@ -434,26 +434,12 @@ namespace Raytracer
 
 		if(internal.mouse_click_tri != -1)
 		{
-			//Tri& ref = loaded_model->get_tri_ref(internal.mouse_click_tri);
-			//glm::vec3 tri_pos = (ref.vertex0 + ref.vertex1 + ref.vertex2) * 0.3333f;
-
-			//object_matrix = glm::mat4(1.0f);
-			//object_matrix = glm::translate(tri_pos);
-
 			if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection), ImGuizmo::ROTATE, ImGuizmo::WORLD, glm::value_ptr(object_transform)))
 			{
 				internal.world_dirty = true;
 			}
 
 			sceneData.object_inverse_transform = glm::inverse(object_transform);
-
-			//float matrixTranslation[3], matrixRotation[3], matrixScale[3];
-			//ImGuizmo::DecomposeMatrixToComponents((float*)&object_matrix, matrixTranslation, matrixRotation, matrixScale);
-			//glm::vec3 move = glm::vec3(matrixTranslation[0], matrixTranslation[1], matrixTranslation[2]) - tri_pos;
-
-			//ref.vertex0 += move;
-			//ref.vertex1 += move;
-			//ref.vertex2 += move;
 		}
 
 		auto latest_msg = Log::get_latest_msg();
