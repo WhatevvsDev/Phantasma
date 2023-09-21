@@ -322,9 +322,6 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struc
 
 				ray_stack[ray_stack_idx++] = reflection_ray;
 			}
-			
-			//return transmittance;
-			//return reflectance;
 
 			if(reflectance < 1.0f)
 			{
@@ -356,6 +353,23 @@ struct SceneData
 	float object_inverse_transform[16];
 };
 
+float3 transform(float3 vector, float* transform)
+{
+	float3 result;
+
+	result.x = 	transform[0] * vector.x + 
+				transform[4] * vector.y + 
+				transform[8] * vector.z;
+	result.y = 	transform[1] * vector.x + 
+	 			transform[5] * vector.y + 
+	 			transform[9] * vector.z;
+	result.z = 	transform[2] * vector.x + 
+	 			transform[6] * vector.y + 
+	 			transform[10] * vector.z;
+
+	return result;
+}
+
 void kernel raytrace(global uint* buffer, global int* mouse, global struct Tri* tris, global struct BVHNode* nodes, global uint* trisIdx, global struct SceneData* sceneData)
 {     
 	int width = sceneData->resolution_x;
@@ -382,29 +396,8 @@ void kernel raytrace(global uint* buffer, global int* mouse, global struct Tri* 
 	ray.light = 1.0f;
 	ray.depth = DEPTH;
 
-	float3 new_dir = 1;
-
-	new_dir.x = sceneData->object_inverse_transform[0] * ray.D.x + 
-				sceneData->object_inverse_transform[4] * ray.D.y + 
-				sceneData->object_inverse_transform[8] * ray.D.z;
-	new_dir.y = sceneData->object_inverse_transform[1] * ray.D.x + 
-	 			sceneData->object_inverse_transform[5] * ray.D.y + 
-	 			sceneData->object_inverse_transform[9] * ray.D.z;
-	new_dir.z = sceneData->object_inverse_transform[2] * ray.D.x + 
-	 			sceneData->object_inverse_transform[6] * ray.D.y + 
-	 			sceneData->object_inverse_transform[10] * ray.D.z;
-
-	float3 new_pos = 1;
-
-	new_pos.x = sceneData->object_inverse_transform[0] * ray.O.x + 
-				sceneData->object_inverse_transform[4] * ray.O.y + 
-				sceneData->object_inverse_transform[8] * ray.O.z;
-	new_pos.y = sceneData->object_inverse_transform[1] * ray.O.x + 
-	 			sceneData->object_inverse_transform[5] * ray.O.y + 
-	 			sceneData->object_inverse_transform[9] * ray.O.z;
-	new_pos.z = sceneData->object_inverse_transform[2] * ray.O.x + 
-	 			sceneData->object_inverse_transform[6] * ray.O.y + 
-	 			sceneData->object_inverse_transform[10] * ray.O.z;
+	float3 new_dir = transform(ray.D, sceneData->object_inverse_transform);
+	float3 new_pos = transform(ray.O, sceneData->object_inverse_transform);
 
 	float3 color = trace(&ray, 0, nodes, tris, trisIdx, DEPTH, new_dir, new_pos);
 
@@ -413,14 +406,9 @@ void kernel raytrace(global uint* buffer, global int* mouse, global struct Tri* 
 
 	if(is_mouse_ray)
 	{
-		if(ray_hit_anything)
-		{
-			*mouse = ray.tri_hit;
-		}
-		else
-		{
-			*mouse = -1;
-		}
+		*mouse = ray_hit_anything ?
+					ray.tri_hit :
+					-1;
 	}
 
 	int r = clamp((int)(color.x * 255.0f), 0, 255);
