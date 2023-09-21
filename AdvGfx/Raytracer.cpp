@@ -138,7 +138,7 @@ namespace Raytracer
 		internal.buffer = screen_buffer_ptr;
 
 		// TODO: Temporary, will probably be replaced with asset browser?
-		loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\only_sphere.gltf");
+		loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\not_fractal.gltf");
 
 		// Load settings
 		std::ifstream f("phantasma.settings.json");

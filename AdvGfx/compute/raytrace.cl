@@ -196,6 +196,7 @@ float3 sky_color(struct Ray* ray, float3* sun_dir)
 }
 
 #define DEPTH 32
+#define EULER 2.71828f
 
 float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* tris, uint* trisIdx, uint depth)
 {
@@ -274,18 +275,23 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struc
 		}
 		else
 		{
+			if(inner_normal)
+			{
+				current_ray.light *= pow(EULER, -0.5f * current_ray.t) * (float3)(1.0f, 0.0f, 0.0f);
+			}
+
 			float ior = 1.33f; // water is 1.33
 
 			float refraction_ratio = (!inner_normal ? (1.0f / ior) : ior);
 
-			float reflectance = fresnel(current_ray.D, -normal, ior);
+			float reflectance = clamp(fresnel(current_ray.D, -normal, ior), 0.0f, 1.0f);
 			float transmittance = 1.0f - reflectance;
 			float3 bias = normal * 0.01f * (inner_normal ? 1.0f : -1.0f);
 
 			{
 				struct Ray reflection_ray;
 				reflection_ray.O = hit_pos + bias;
-				reflection_ray.D = reflected(current_ray.D, normal);
+				reflection_ray.D = normalize(reflected(current_ray.D, normal));
 				reflection_ray.t = 1e30f;
 				reflection_ray.light = current_ray.light * reflectance;
 				reflection_ray.depth = current_ray.depth - 2;
@@ -296,11 +302,11 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struc
 			//return transmittance;
 			//return reflectance;
 
-			if(transmittance > 0.0f)
+			if(reflectance < 1.0f)
 			{
 				struct Ray transmittance_ray;
 				transmittance_ray.O = hit_pos - bias;
-				transmittance_ray.D = refracted(current_ray.D, normal, refraction_ratio);
+				transmittance_ray.D = normalize(refracted(current_ray.D, normal, refraction_ratio));
 				transmittance_ray.t = 1e30f;
 				transmittance_ray.light = current_ray.light * transmittance;
 				transmittance_ray.depth = current_ray.depth - 2;
