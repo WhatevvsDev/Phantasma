@@ -59,9 +59,7 @@ namespace Raytracer
 		float pad_2				{ 0.0f };
 		glm::vec3 cam_up		{ 0.0f };
 		float pad_3				{ 0.0f };
-		uint dummy_1;
-		uint dummy_2;
-		//glm::mat4 object_tran;
+		glm::mat4 object_inverse_transform;
 	} sceneData;
 
 	struct
@@ -141,7 +139,7 @@ namespace Raytracer
 		internal.buffer = screen_buffer_ptr;
 
 		// TODO: Temporary, will probably be replaced with asset browser?
-		loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\only_sphere.gltf");
+		loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\not_fractal.gltf");
 
 		// Load settings
 		std::ifstream f("phantasma.settings.json");
@@ -361,6 +359,8 @@ namespace Raytracer
 		}
     }
 
+	glm::mat4 object_transform = glm::mat4(1);
+
 	void ui()
 	{
 		// Bless this mess
@@ -434,24 +434,26 @@ namespace Raytracer
 
 		if(internal.mouse_click_tri != -1)
 		{
-			Tri& ref = loaded_model->get_tri_ref(internal.mouse_click_tri);
-			glm::vec3 tri_pos = (ref.vertex0 + ref.vertex1 + ref.vertex2) * 0.3333f;
+			//Tri& ref = loaded_model->get_tri_ref(internal.mouse_click_tri);
+			//glm::vec3 tri_pos = (ref.vertex0 + ref.vertex1 + ref.vertex2) * 0.3333f;
 
-			object_matrix = glm::mat4(1.0f);
-			object_matrix = glm::translate(tri_pos);
+			//object_matrix = glm::mat4(1.0f);
+			//object_matrix = glm::translate(tri_pos);
 
-			if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection), ImGuizmo::TRANSLATE, ImGuizmo::WORLD, glm::value_ptr(object_matrix)))
+			if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection), ImGuizmo::ROTATE, ImGuizmo::WORLD, glm::value_ptr(object_transform)))
 			{
 				internal.world_dirty = true;
 			}
 
-			float matrixTranslation[3], matrixRotation[3], matrixScale[3];
-			ImGuizmo::DecomposeMatrixToComponents((float*)&object_matrix, matrixTranslation, matrixRotation, matrixScale);
-			glm::vec3 move = glm::vec3(matrixTranslation[0], matrixTranslation[1], matrixTranslation[2]) - tri_pos;
+			sceneData.object_inverse_transform = glm::inverse(object_transform);
 
-			ref.vertex0 += move;
-			ref.vertex1 += move;
-			ref.vertex2 += move;
+			//float matrixTranslation[3], matrixRotation[3], matrixScale[3];
+			//ImGuizmo::DecomposeMatrixToComponents((float*)&object_matrix, matrixTranslation, matrixRotation, matrixScale);
+			//glm::vec3 move = glm::vec3(matrixTranslation[0], matrixTranslation[1], matrixTranslation[2]) - tri_pos;
+
+			//ref.vertex0 += move;
+			//ref.vertex1 += move;
+			//ref.vertex2 += move;
 		}
 
 		auto latest_msg = Log::get_latest_msg();

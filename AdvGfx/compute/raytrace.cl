@@ -198,7 +198,7 @@ float3 sky_color(struct Ray* ray, float3* sun_dir)
 #define DEPTH 32
 #define EULER 2.71828f
 
-float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* tris, uint* trisIdx, uint depth)
+float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* tris, uint* trisIdx, uint depth, float3 transformed_dir, float3 transformed_o)
 {
 	float3 sun_dir = normalize((float3)(0.5f, 1.0f, -0.7f));
 
@@ -225,13 +225,19 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struc
 			continue;
 		}
 
+		if(current_ray.depth == DEPTH)
+		{
+			current_ray.D = transformed_dir;
+			current_ray.O = transformed_o;
+		}
 		intersect_bvh(&current_ray, 0, nodes, tris, trisIdx);
 
 		if(current_ray.depth == DEPTH)
 		{
-			primary_ray->tri_hit = current_ray.tri_hit;
-			primary_ray->t = current_ray.t;
+			current_ray.D = primary_ray->D;
+			current_ray.O = primary_ray->O;
 		}
+		
 
 		//if(depth == DEPTH)
 		//	ray->tri_hit = current_ray.tri_hit;
@@ -242,6 +248,16 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struc
 		{
 		 	diffuse += sky_color(&current_ray, &sun_dir) * current_ray.light;
 			continue;
+		}
+		else
+		{
+			if(current_ray.depth == DEPTH)
+			{
+				primary_ray->tri_hit = current_ray.tri_hit;
+				primary_ray->t = current_ray.t;
+				current_ray.D = transformed_dir;
+				current_ray.O = transformed_o;
+			}
 		}
 		
 		float3 hit_pos = current_ray.O + (current_ray.D * current_ray.t);
@@ -337,7 +353,7 @@ struct SceneData
 	float3 cam_forward;
 	float3 cam_right;
 	float3 cam_up;
-	uint dummy[2];
+	float object_inverse_transform[16];
 };
 
 void kernel raytrace(global uint* buffer, global int* mouse, global struct Tri* tris, global struct BVHNode* nodes, global uint* trisIdx, global struct SceneData* sceneData)
@@ -365,8 +381,32 @@ void kernel raytrace(global uint* buffer, global int* mouse, global struct Tri* 
 	ray.tri_hit = 0;
 	ray.light = 1.0f;
 	ray.depth = DEPTH;
-	
-	float3 color = trace(&ray, 0, nodes, tris, trisIdx, DEPTH);
+
+	float3 new_dir = 1;
+
+	new_dir.x = sceneData->object_inverse_transform[0] * ray.D.x + 
+				sceneData->object_inverse_transform[4] * ray.D.y + 
+				sceneData->object_inverse_transform[8] * ray.D.z;
+	new_dir.y = sceneData->object_inverse_transform[1] * ray.D.x + 
+	 			sceneData->object_inverse_transform[5] * ray.D.y + 
+	 			sceneData->object_inverse_transform[9] * ray.D.z;
+	new_dir.z = sceneData->object_inverse_transform[2] * ray.D.x + 
+	 			sceneData->object_inverse_transform[6] * ray.D.y + 
+	 			sceneData->object_inverse_transform[10] * ray.D.z;
+
+	float3 new_pos = 1;
+
+	new_pos.x = sceneData->object_inverse_transform[0] * ray.O.x + 
+				sceneData->object_inverse_transform[4] * ray.O.y + 
+				sceneData->object_inverse_transform[8] * ray.O.z;
+	new_pos.y = sceneData->object_inverse_transform[1] * ray.O.x + 
+	 			sceneData->object_inverse_transform[5] * ray.O.y + 
+	 			sceneData->object_inverse_transform[9] * ray.O.z;
+	new_pos.z = sceneData->object_inverse_transform[2] * ray.O.x + 
+	 			sceneData->object_inverse_transform[6] * ray.O.y + 
+	 			sceneData->object_inverse_transform[10] * ray.O.z;
+
+	float3 color = trace(&ray, 0, nodes, tris, trisIdx, DEPTH, new_dir, new_pos);
 
 	bool is_mouse_ray = (x == sceneData->mouse_x) && (y == sceneData->mouse_y);
 	bool ray_hit_anything = ray.t < 1e30f;
