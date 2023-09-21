@@ -3,17 +3,16 @@ float3 lerp(float3 a, float3 b, float t)
     return a + t*(b-a);
 }
 
-float3 reflected(float3 normal, float3 direction)
+float3 reflected(float3 direction, float3 normal)
 {
-	float projected = dot(-normal, direction);
-	return (direction + normal * projected * 2);
+	return direction - 2 * dot(direction, normal) * normal;
 }
 
 struct Tri 
 { 
     float3 vertex0;
 	float3 vertex1;
-	float3 vertex2; 
+	float3 vertex2;
 };
 
 struct Ray 
@@ -22,19 +21,79 @@ struct Ray
     float3 D; 
     float t;
 	int tri_hit;
+	float3 light;
+	int depth;
 };
 
-float3 refract(const float3 ray_dir, const float3 normal, float index_of_refraction_ratio) 
+float3 refracted(float3 in, float3 n, float ior) 
 {
-    float cos_theta = fmin(dot(-ray_dir, normal), 1.0f);
-    float3 ray_out_perpendicular = index_of_refraction_ratio * (ray_dir + cos_theta * normal);
-    float3 ray_out_parallel = -sqrt(fabs(1.0f - dot(ray_out_perpendicular, ray_out_perpendicular))) * normal;
-    return ray_out_perpendicular + ray_out_parallel;
+	//float cos_theta = fmin(dot(-in, n), 1.0f);
+	float cos_theta = fmin(dot(-in, n), 1.0f);
+    float3 r_out_perp =  ior * (in + cos_theta*n);
+    float3 r_out_parallel = -sqrt(fabs(1.0f - dot(r_out_perp, r_out_perp))) * n;
+    return r_out_perp + r_out_parallel;
+
+	// float theta = dot(in, normal);
+	// float n1 = 1.0f;
+	// float n2 = ior;
+	// float3 norm = normal;
+
+	// // Account for being inside of the 2nd medium. If so we need to flip the normal
+	// // Otherwise, we only have to flip the theta.
+	// if (theta < 0.0f)
+	// {
+	// 	theta = -theta;
+	// }
+	// else
+	// {
+	// 	float t = n1;
+	// 	n1 = n2;
+	// 	n2 = t;
+	// 	norm = norm * -1.0f;
+	// }
+
+	// float n = n1 / n2;
+	// float k = 1.0f - n * n * (1.0f - theta * theta);
+	// if (k < 0.0f)
+	// {
+	// 	return reflected(in, norm);
+	// }
+
+	// float3 a = (in + (norm * theta)) * n;
+	// float3 b = sqrt(k) * (norm * -1.0f);
+	// return a + b;
 }
 
-void reflect(struct Ray* ray, float3 normal)
+// Taken from https://www.scratchapixel.com/lessons/3d-basic-rendering/introduction-to-shading/reflection-refraction-fresnel.html
+// returns reflection
+float fresnel(float3 ray_dir, float3 normal, float ior)
 {
-	ray->D = reflected(normal, ray->D);
+	float reflection;
+    float cosi = clamp(dot(ray_dir, normal), -1.0f, 1.0f);
+    float etai = 1;
+	float etat = ior;
+    if (cosi > 0) 
+	{ 
+		float swap = etai; etai = etat; etat = swap;
+		normal = -normal;
+	}
+    // Compute sini using Snell's law
+    float sint = etai / etat * sqrt(max(0.0f, 1.0f - cosi * cosi));
+    // Total internal reflection
+    if (sint >= 1) 
+	{
+        reflection = 1.0f;
+    }
+    else 
+	{
+        float cost = sqrt(max(0.0f, 1.0f - sint * sint));
+        cosi = fabs(cosi);
+        float Rs = ((etat * cosi) - (etai * cost)) / ((etat * cosi) + (etai * cost));
+        float Rp = ((etai * cosi) - (etat * cost)) / ((etai * cosi) + (etat * cost));
+        reflection = (Rs * Rs + Rp * Rp) / 2;
+    }
+
+	return reflection;
 }
 
 struct BVHNode
@@ -45,13 +104,13 @@ struct BVHNode
 	int tri_count;
 };
 
-void intersect_tri( struct Ray* ray, struct Tri* tris, uint triIdx)
+void intersect_tri(struct Ray* ray, struct Tri* tris, uint triIdx)
 {
 	const float3 edge1 = tris[triIdx].vertex1 - tris[triIdx].vertex0;
 	const float3 edge2 = tris[triIdx].vertex2 - tris[triIdx].vertex0;
 	const float3 h = cross( ray->D, edge2 );
 	const float a = dot( edge1, h );
-	if (a > -0.0001f && a < 0.0001f) return; // ray parallel to triangle
+	if (a > -0.000001f && a < 0.000001f) return; // ray parallel to triangle
 	const float f = 1 / a;
 	const float3 s = ray->O - tris[triIdx].vertex0;
 	const float u = f * dot( s, h );
@@ -151,81 +210,119 @@ float3 sky_color(struct Ray* ray, float3* sun_dir)
 
 #define DEPTH 32
 
-float3 trace(struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* tris, uint* trisIdx, uint depth)
+float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* tris, uint* trisIdx, uint depth)
 {
-	float3 sun_dir = normalize((float3)(0.0f, 1.0f, 0.7f));
+	float3 sun_dir = normalize((float3)(0.5f, 1.0f, -0.7f));
+
+	const int ray_stack_size = 32;
 
 	// Keeping track of current ray in the stack
-	struct Ray current_ray = *ray;
+	struct Ray ray_stack[ray_stack_size];
+	int ray_stack_idx = 1;
+
+	ray_stack[0] = *primary_ray;
 
 	float3 diffuse = (float3)(0.0f);
-	float current_light_left = 1.0f;
 
-	while(1)
+	while(ray_stack_idx > 0)
 	{
-		if(depth <= 0 || current_light_left < 0.01f)
-			return diffuse;
+		ray_stack_idx--;
+		struct Ray current_ray = ray_stack[ray_stack_idx];
+		if(ray_stack_idx < 0)
+			return 1;
+
+		if(dot(current_ray.light, current_ray.light) < 0.00001f || 
+		( current_ray.depth <= 0 ))
+		{
+			continue;
+		}
 
 		intersect_bvh(&current_ray, 0, nodes, tris, trisIdx);
 
-		if(depth == DEPTH)
-			ray->tri_hit = current_ray.tri_hit;
+		//if(depth == DEPTH)
+		//	ray->tri_hit = current_ray.tri_hit;
 
 		bool hit_anything = current_ray.t < 1e30;
 
-		if(hit_anything)
+		if(!hit_anything)
 		{
-			float3 hit_pos = current_ray.O + (current_ray.D * current_ray.t) * 0.999999f;
-			float3 normal = cross(tris[current_ray.tri_hit].vertex0 - tris[current_ray.tri_hit].vertex1,tris[current_ray.tri_hit].vertex0 - tris[current_ray.tri_hit].vertex2);
-			normal = normalize(normal);
-			float3 old_normal;
-			normal *= -sign(dot(normal,current_ray.D)); // Flip if inner normal
-			bool inner_normal = dot(old_normal - normal,old_normal - normal) < 0.001f;
+		 	diffuse += sky_color(&current_ray, &sun_dir) * current_ray.light;
+			continue;
+		}
+		
+		float3 hit_pos = current_ray.O + (current_ray.D * current_ray.t);
+		float3 a = tris[current_ray.tri_hit].vertex0;
+		float3 b = tris[current_ray.tri_hit].vertex1;
+		float3 c = tris[current_ray.tri_hit].vertex2;
 
-			float d = 1.0f;
-			float s = 1.0f - d;
-			float ambient_light = 0.6f;
+		float3 normal = normalize(cross(a - c, a - b));
+		bool inner_normal = (dot(normal, current_ray.D) < 0.0f);
+		
+		float d = 1.0f;
+		float s = 1.0f - d;
 
-			if(current_ray.tri_hit == 0)//if(current_ray.tri_hit % 2 == 0)
-			{
-				struct Ray shadow_ray;
-				shadow_ray.O = hit_pos;
-				shadow_ray.D = sun_dir;
-				shadow_ray.t = 1e30f;
+		if(false)//(current_ray.tri_hit > 20479)//if(current_ray.tri_hit % 2 == 0)
+		{
+			struct Ray shadow_ray;
+			shadow_ray.O = hit_pos;
+			shadow_ray.D = sun_dir;
+			shadow_ray.t = 1e30f;
+			
+			// We force intersect for diffuse ray
+			intersect_bvh(&shadow_ray, 0, nodes, tris, trisIdx);
+				
+			bool shadow = shadow_ray.t < 1e30;
+			float shadowt = (clamp((1.0f - shadow), 0.0f, 1.0f));
 
-				intersect_bvh(&shadow_ray, 0, nodes, tris, trisIdx);
+			diffuse += (float3)(current_ray.light * d * shadowt) * dot(-normal, sun_dir);
 
-				bool shadow = shadow_ray.t < 1e30;
-				float shadowt = clamp((1.0f - shadow) + ambient_light, 0.0f, 1.0f);
+			struct Ray specular_ray;
+			specular_ray.O = hit_pos;
+			specular_ray.D = reflected(current_ray.D, normal);
+			specular_ray.t = 1e30f;
+			specular_ray.light = current_ray.light * s * shadowt;
+			specular_ray.depth = current_ray.depth - 1;
 
-				current_ray.O = hit_pos;
-				reflect(&current_ray, normal);
-				current_ray.t = 1e30f;
-
-				diffuse += (float3)(dot(normal, sun_dir)) * d * shadowt * current_light_left;
-				current_light_left *= s;
-				depth--;
-			}
-			else
-			{
-				float ior = 1.5f;
-
-				if(!inner_normal)
-				{
-					ior = 1.0f / ior;
-				}
-
-				current_ray.O = hit_pos;
-				current_ray.D = refract(current_ray.D, normal, ior);
-				current_ray.t = 1e30f;
-			}
+			ray_stack[ray_stack_idx++] = specular_ray;
 		}
 		else
 		{
-		 	diffuse += sky_color(&current_ray, &sun_dir) * current_light_left;
-			return diffuse;
-		}
+			float ior = 1.33f; // water is 1.33
+
+			float refraction_ratio = (!inner_normal ? (1.0f / ior) : ior);
+
+			float reflectance = fresnel(current_ray.D, -normal, ior);
+			float transmittance = 1.0f - reflectance;
+			float3 bias = normal * 0.001f * (inner_normal ? 1.0f : -1.0f);
+
+			{
+				struct Ray reflection_ray;
+				reflection_ray.O = hit_pos + bias;
+				reflection_ray.D = reflected(current_ray.D, normal);
+				reflection_ray.t = 1e30f;
+				reflection_ray.light = current_ray.light * reflectance;
+				reflection_ray.depth = current_ray.depth - 2;
+
+				ray_stack[ray_stack_idx++] = reflection_ray;
+			}
+			
+			//return transmittance;
+			//return reflectance;
+
+			if(transmittance > 0.0f)
+			{
+				struct Ray transmittance_ray;
+				transmittance_ray.O = hit_pos - bias;
+				transmittance_ray.D = refracted(current_ray.D, normal, refraction_ratio);
+				transmittance_ray.t = 1e30f;
+				transmittance_ray.light = current_ray.light * transmittance;
+				transmittance_ray.depth = current_ray.depth - 2;
+
+				ray_stack[ray_stack_idx++] = transmittance_ray;
+			}
+		}	
 	}
+	return diffuse;
 }
 
 struct SceneData
@@ -263,6 +360,8 @@ void kernel raytrace(global uint* buffer, global struct Tri* tris, global struct
     ray.D = normalize( pixelPos );
     ray.t = 1e30f;
 	ray.tri_hit = 0;
+	ray.light = 1.0f;
+	ray.depth = DEPTH;
 
 	float3 color = trace(&ray, 0, nodes, tris, trisIdx, DEPTH);
 

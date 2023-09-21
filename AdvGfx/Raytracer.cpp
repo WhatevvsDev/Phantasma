@@ -52,7 +52,7 @@ namespace Raytracer
 		uint resolution[2]		{ 0, 0 };
 		uint tri_count			{ 0 };
 		uint dummy				{ 0 };
-		glm::vec3 cam_pos		{ 0.0f };
+		glm::vec3 cam_pos		{ 0.0f, 10.0f, 0.0f };
 		float pad_0				{ 0.0f };
 		glm::vec3 cam_forward	{ 0.0f };
 		float pad_1				{ 0.0f };
@@ -138,7 +138,7 @@ namespace Raytracer
 		internal.buffer = screen_buffer_ptr;
 
 		// TODO: Temporary, will probably be replaced with asset browser?
-		loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\simple_test.gltf");
+		loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\only_sphere.gltf");
 
 		// Load settings
 		std::ifstream f("phantasma.settings.json");
@@ -159,6 +159,8 @@ namespace Raytracer
 			TryFromJSONVal(settings_data, settings, orbit_camera_distance);
 			TryFromJSONVal(settings_data, settings, orbit_camera_height);
 			TryFromJSONVal(settings_data, settings, orbit_camera_rotations_per_second);
+
+			TryFromJSONVal(settings_data, sceneData, cam_pos);
 		}
 
 		// Search for, and automatically compile compute shaders
@@ -202,6 +204,8 @@ namespace Raytracer
 		settings_data["settings"]["orbit_camera_distance"] = settings.orbit_camera_distance;
 		settings_data["settings"]["orbit_camera_height"] = settings.orbit_camera_height;
 		settings_data["settings"]["orbit_camera_rotations_per_second"] = settings.orbit_camera_rotations_per_second;
+		
+		settings_data["sceneData"]["cam_pos"] = sceneData.cam_pos;
 
 		std::ofstream o("phantasma.settings.json");
 		o << settings_data << std::endl;

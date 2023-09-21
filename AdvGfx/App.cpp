@@ -111,6 +111,12 @@ namespace App
         // Only get the render time
         last_update_time =  fps_timer.lap_delta();
         Raytracer::raytrace(app_desc.width, app_desc.height);
+
+        float actual_time = fps_timer.peek_delta();
+        float sleep_time = (1000.0f / Raytracer::get_target_fps() - actual_time);
+        if(sleep_time < 0) sleep_time = 0;
+        Sleep((DWORD)sleep_time);
+        last_render_time = fps_timer.lap_delta();
         Raytracer::ui();
 
         // Flipping the buffer so its proper
@@ -123,11 +129,6 @@ namespace App
         
         glfwSwapBuffers(window);
 
-        float actual_time = fps_timer.peek_delta();
-        float sleep_time = (1000.0f / Raytracer::get_target_fps() - actual_time);
-        if(sleep_time < 0) sleep_time = 0;
-        Sleep((DWORD)sleep_time);
-        last_render_time = fps_timer.lap_delta();
 
         glfwPollEvents();
     }
