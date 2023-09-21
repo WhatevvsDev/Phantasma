@@ -353,19 +353,26 @@ struct SceneData
 	float object_inverse_transform[16];
 };
 
-float3 transform(float3 vector, float* transform)
+float4 transform(float4 vector, float* transform)
 {
-	float3 result;
+	float4 result;
 
 	result.x = 	transform[0] * vector.x + 
 				transform[4] * vector.y + 
-				transform[8] * vector.z;
+				transform[8] * vector.z +
+				transform[12] * vector.w;
 	result.y = 	transform[1] * vector.x + 
 	 			transform[5] * vector.y + 
-	 			transform[9] * vector.z;
+	 			transform[9] * vector.z +
+	 			transform[13] * vector.w;
 	result.z = 	transform[2] * vector.x + 
 	 			transform[6] * vector.y + 
-	 			transform[10] * vector.z;
+	 			transform[10] * vector.z +
+	 			transform[14] * vector.w;
+	result.w = 	transform[3] * vector.x + 
+	 			transform[7] * vector.y + 
+	 			transform[11] * vector.z +
+	 			transform[15] * vector.w;
 
 	return result;
 }
@@ -396,8 +403,8 @@ void kernel raytrace(global uint* buffer, global int* mouse, global struct Tri* 
 	ray.light = 1.0f;
 	ray.depth = DEPTH;
 
-	float3 new_dir = transform(ray.D, sceneData->object_inverse_transform);
-	float3 new_pos = transform(ray.O, sceneData->object_inverse_transform);
+	float3 new_dir = transform((float4)(ray.D, 0), sceneData->object_inverse_transform).xyz;
+	float3 new_pos = transform((float4)(ray.O, 1), sceneData->object_inverse_transform).xyz;
 
 	float3 color = trace(&ray, 0, nodes, tris, trisIdx, DEPTH, new_dir, new_pos);
 

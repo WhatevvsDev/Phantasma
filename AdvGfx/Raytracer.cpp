@@ -465,7 +465,7 @@ namespace Raytracer
 
 		if(internal.mouse_click_tri != -1)
 		{
-			if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection), internal.current_gizmo_operation, ImGuizmo::WORLD, glm::value_ptr(object_transform)))
+			if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection), internal.current_gizmo_operation, ImGuizmo::LOCAL, glm::value_ptr(object_transform)))
 			{
 				internal.world_dirty = true;
 			}
