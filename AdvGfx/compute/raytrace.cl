@@ -227,6 +227,12 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struc
 
 		intersect_bvh(&current_ray, 0, nodes, tris, trisIdx);
 
+		if(current_ray.depth == DEPTH)
+		{
+			primary_ray->tri_hit = current_ray.tri_hit;
+			primary_ray->t = current_ray.t;
+		}
+
 		//if(depth == DEPTH)
 		//	ray->tri_hit = current_ray.tri_hit;
 
@@ -277,7 +283,9 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struc
 		{
 			if(inner_normal)
 			{
-				current_ray.light *= pow(EULER, -0.5f * current_ray.t) * (float3)(1.0f, 0.0f, 0.0f);
+				float absorbtion_coefficient = 0.1f;
+
+				current_ray.light *= pow(EULER, -absorbtion_coefficient * current_ray.t) * (float3)(1.0f, 0.0f, 0.0f);
 			}
 
 			float ior = 1.33f; // water is 1.33
@@ -322,15 +330,17 @@ struct SceneData
 {
 	uint resolution_x;
 	uint resolution_y;
+	uint mouse_x;
+	uint mouse_y;
+	float cam_pos_x, cam_pos_y, cam_pos_z;
 	uint tri_count;
-	uint dummy;
-	float3 cam_pos;
 	float3 cam_forward;
 	float3 cam_right;
 	float3 cam_up;
+	uint dummy[2];
 };
 
-void kernel raytrace(global uint* buffer, global struct Tri* tris, global struct BVHNode* nodes, global uint* trisIdx, global struct SceneData* sceneData)
+void kernel raytrace(global uint* buffer, global int* mouse, global struct Tri* tris, global struct BVHNode* nodes, global uint* trisIdx, global struct SceneData* sceneData)
 {     
 	int width = sceneData->resolution_x;
 	int height = sceneData->resolution_y;
@@ -349,20 +359,33 @@ void kernel raytrace(global uint* buffer, global struct Tri* tris, global struct
 	// Actual raytracing
 
 	struct Ray ray;
-	ray.O = sceneData->cam_pos;
+	ray.O = (float3)(sceneData->cam_pos_x, sceneData->cam_pos_y, sceneData->cam_pos_z);
     ray.D = normalize( pixelPos );
     ray.t = 1e30f;
 	ray.tri_hit = 0;
 	ray.light = 1.0f;
 	ray.depth = DEPTH;
-
+	
 	float3 color = trace(&ray, 0, nodes, tris, trisIdx, DEPTH);
+
+	bool is_mouse_ray = (x == sceneData->mouse_x) && (y == sceneData->mouse_y);
+	bool ray_hit_anything = ray.t < 1e30f;
+
+	if(is_mouse_ray)
+	{
+		if(ray_hit_anything)
+		{
+			*mouse = ray.tri_hit;
+		}
+		else
+		{
+			*mouse = -1;
+		}
+	}
 
 	int r = clamp((int)(color.x * 255.0f), 0, 255);
 	int g = clamp((int)(color.y * 255.0f), 0, 255);
 	int b = clamp((int)(color.z * 255.0f), 0, 255);
 
-	int hit_tri_idx = clamp(ray.tri_hit, 0, 255);
-
-	buffer[pixel_dest] = 0x00010000 * b + 0x00000100 * g + 0x00000001 * r + 0x01000000 * hit_tri_idx;
+	buffer[pixel_dest] = 0x00010000 * b + 0x00000100 * g + 0x00000001 * r;
 }

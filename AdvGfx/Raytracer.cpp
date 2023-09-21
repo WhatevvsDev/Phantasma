@@ -50,16 +50,18 @@ namespace Raytracer
 	struct SceneData
 	{
 		uint resolution[2]		{ 0, 0 };
-		uint tri_count			{ 0 };
-		uint dummy				{ 0 };
+		uint mouse_pos[2] {};
 		glm::vec3 cam_pos		{ 0.0f, 10.0f, 0.0f };
-		float pad_0				{ 0.0f };
+		uint tri_count			{ 0 };
 		glm::vec3 cam_forward	{ 0.0f };
 		float pad_1				{ 0.0f };
 		glm::vec3 cam_right		{ 0.0f };
 		float pad_2				{ 0.0f };
 		glm::vec3 cam_up		{ 0.0f };
 		float pad_3				{ 0.0f };
+		uint dummy_1;
+		uint dummy_2;
+		//glm::mat4 object_tran;
 	} sceneData;
 
 	struct
@@ -71,6 +73,7 @@ namespace Raytracer
 		bool screenshot { false };
 
 		bool world_dirty { false };
+		int mouse_over_idx;
 	} internal;
 
 	namespace Input
@@ -138,7 +141,7 @@ namespace Raytracer
 		internal.buffer = screen_buffer_ptr;
 
 		// TODO: Temporary, will probably be replaced with asset browser?
-		loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\not_fractal.gltf");
+		loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\only_sphere.gltf");
 
 		// Load settings
 		std::ifstream f("phantasma.settings.json");
@@ -304,6 +307,7 @@ namespace Raytracer
 
 		ComputeOperation("raytrace.cl")
 			.read(ComputeReadBuffer({internal.buffer, (size_t)(width * height)}))
+			.read(ComputeReadBuffer({&internal.mouse_over_idx, 1}))
 			.write(*tris_compute_buffer)
 			.write(*bvh_compute_buffer)
 			.write(*tri_idx_compute_buffer)
@@ -334,15 +338,16 @@ namespace Raytracer
 
 		if(internal.show_debug_ui)
 		{
-			bool clicked_on_non_gizmo = (ImGui::GetIO().MouseDown[0] && !ImGuizmo::IsOver());
+			bool clicked_on_non_gizmo = (ImGui::GetIO().MouseReleased[0] && !ImGuizmo::IsOver());
+
+			auto cursor_pos = ImGui::GetIO().MousePos;
+
+			sceneData.mouse_pos[0] = glm::clamp((int)cursor_pos.x, 0, width);
+			sceneData.mouse_pos[1] = glm::clamp((int)cursor_pos.y, 0, height);
 
 			if(clicked_on_non_gizmo)
 			{
-				auto cursor_pos = ImGui::GetIO().MousePos;
-				cursor_pos.x = glm::clamp((int)cursor_pos.x, 0, width);
-				cursor_pos.y = glm::clamp((int)cursor_pos.y, 0, height);
-
-				internal.mouse_click_tri = (internal.buffer[(int)cursor_pos.x + (int)cursor_pos.y * width] & 0xff000000) >> 24;
+				internal.mouse_click_tri = internal.mouse_over_idx;
 			}
 		}
 
@@ -361,7 +366,7 @@ namespace Raytracer
 		// Bless this mess
 		auto& draw_list = *ImGui::GetForegroundDrawList();
 
-		if(internal.show_move_speed_bar_time > 0 || internal.	show_debug_ui)
+		if(internal.show_move_speed_bar_time > 0 || internal.show_debug_ui)
 		{
 			{ // Movement speed bar
 
@@ -427,24 +432,27 @@ namespace Raytracer
 
 		glm::mat4 projection = glm::perspectiveRH(glm::radians(90.0f), 1200.0f / 800.0f, 0.1f, 1000.0f);
 
-		Tri& ref = loaded_model->get_tri_ref(internal.mouse_click_tri);
-		glm::vec3 tri_pos = (ref.vertex0 + ref.vertex1 + ref.vertex2) * 0.3333f;
-
-		object_matrix = glm::mat4(1.0f);
-		object_matrix = glm::translate(tri_pos);
-
-		if (ImGuizmo::Manipulate((float*)&view, (float*)&projection, ImGuizmo::TRANSLATE, ImGuizmo::WORLD, (float*)&object_matrix))
+		if(internal.mouse_click_tri != -1)
 		{
-			internal.world_dirty = true;
+			Tri& ref = loaded_model->get_tri_ref(internal.mouse_click_tri);
+			glm::vec3 tri_pos = (ref.vertex0 + ref.vertex1 + ref.vertex2) * 0.3333f;
+
+			object_matrix = glm::mat4(1.0f);
+			object_matrix = glm::translate(tri_pos);
+
+			if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection), ImGuizmo::TRANSLATE, ImGuizmo::WORLD, glm::value_ptr(object_matrix)))
+			{
+				internal.world_dirty = true;
+			}
+
+			float matrixTranslation[3], matrixRotation[3], matrixScale[3];
+			ImGuizmo::DecomposeMatrixToComponents((float*)&object_matrix, matrixTranslation, matrixRotation, matrixScale);
+			glm::vec3 move = glm::vec3(matrixTranslation[0], matrixTranslation[1], matrixTranslation[2]) - tri_pos;
+
+			ref.vertex0 += move;
+			ref.vertex1 += move;
+			ref.vertex2 += move;
 		}
-
-		float matrixTranslation[3], matrixRotation[3], matrixScale[3];
-		ImGuizmo::DecomposeMatrixToComponents((float*)&object_matrix, matrixTranslation, matrixRotation, matrixScale);
-		glm::vec3 move = glm::vec3(matrixTranslation[0], matrixTranslation[1], matrixTranslation[2]) - tri_pos;
-
-		ref.vertex0 += move;
-		ref.vertex1 += move;
-		ref.vertex2 += move;
 
 		auto latest_msg = Log::get_latest_msg();
 		auto message_color = (latest_msg.second == Log::MessageType::Error) ? IM_COL32(255, 0, 0, 255) : IM_COL32(255, 255, 255, 255);
