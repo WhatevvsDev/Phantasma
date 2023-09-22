@@ -206,6 +206,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="compute\approximate_aces_tonemapping.cl" />
+    <None Include="compute\average_accumulated.cl" />
     <None Include="compute\example.cl" />
     <None Include="compute\reinhard_tonemapping.cl" />
   </ItemGroup>

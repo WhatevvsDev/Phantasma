@@ -8,6 +8,30 @@ float3 reflected(float3 direction, float3 normal)
 	return direction - 2 * dot(direction, normal) * normal;
 }
 
+float4 transform(float4 vector, float* transform)
+{
+	float4 result;
+
+	result.x = 	transform[0] * vector.x + 
+				transform[4] * vector.y + 
+				transform[8] * vector.z +
+				transform[12] * vector.w;
+	result.y = 	transform[1] * vector.x + 
+	 			transform[5] * vector.y + 
+	 			transform[9] * vector.z +
+	 			transform[13] * vector.w;
+	result.z = 	transform[2] * vector.x + 
+	 			transform[6] * vector.y + 
+	 			transform[10] * vector.z +
+	 			transform[14] * vector.w;
+	result.w = 	transform[3] * vector.x + 
+	 			transform[7] * vector.y + 
+	 			transform[11] * vector.z +
+	 			transform[15] * vector.w;
+
+	return result;
+}
+
 struct Tri 
 { 
     float3 vertex0;
@@ -198,9 +222,12 @@ float3 sky_color(struct Ray* ray, float3* sun_dir)
 #define DEPTH 32
 #define EULER 2.71828f
 
-float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* tris, uint* trisIdx, uint depth, float3 transformed_dir, float3 transformed_o)
+float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* tris, uint* trisIdx, uint depth, float* inverse_transform)
 {
 	float3 sun_dir = normalize((float3)(0.5f, 1.0f, -0.7f));
+
+	float3 transformed_dir = transform((float4)(primary_ray->D, 0), inverse_transform).xyz;
+	float3 transformed_o = transform((float4)(primary_ray->O, 1), inverse_transform).xyz;
 
 	const int ray_stack_size = 32;
 
@@ -353,31 +380,7 @@ struct SceneData
 	float object_inverse_transform[16];
 };
 
-float4 transform(float4 vector, float* transform)
-{
-	float4 result;
-
-	result.x = 	transform[0] * vector.x + 
-				transform[4] * vector.y + 
-				transform[8] * vector.z +
-				transform[12] * vector.w;
-	result.y = 	transform[1] * vector.x + 
-	 			transform[5] * vector.y + 
-	 			transform[9] * vector.z +
-	 			transform[13] * vector.w;
-	result.z = 	transform[2] * vector.x + 
-	 			transform[6] * vector.y + 
-	 			transform[10] * vector.z +
-	 			transform[14] * vector.w;
-	result.w = 	transform[3] * vector.x + 
-	 			transform[7] * vector.y + 
-	 			transform[11] * vector.z +
-	 			transform[15] * vector.w;
-
-	return result;
-}
-
-void kernel raytrace(global uint* buffer, global int* mouse, global struct Tri* tris, global struct BVHNode* nodes, global uint* trisIdx, global struct SceneData* sceneData)
+void kernel raytrace(global float* accumulation_buffer, global uint* buffer, global int* mouse, global struct Tri* tris, global struct BVHNode* nodes, global uint* trisIdx, global struct SceneData* sceneData)
 {     
 	int width = sceneData->resolution_x;
 	int height = sceneData->resolution_y;
@@ -403,10 +406,7 @@ void kernel raytrace(global uint* buffer, global int* mouse, global struct Tri* 
 	ray.light = 1.0f;
 	ray.depth = DEPTH;
 
-	float3 new_dir = transform((float4)(ray.D, 0), sceneData->object_inverse_transform).xyz;
-	float3 new_pos = transform((float4)(ray.O, 1), sceneData->object_inverse_transform).xyz;
-
-	float3 color = trace(&ray, 0, nodes, tris, trisIdx, DEPTH, new_dir, new_pos);
+	float3 color = trace(&ray, 0, nodes, tris, trisIdx, DEPTH, sceneData->object_inverse_transform);
 
 	bool is_mouse_ray = (x == sceneData->mouse_x) && (y == sceneData->mouse_y);
 	bool ray_hit_anything = ray.t < 1e30f;
@@ -417,6 +417,10 @@ void kernel raytrace(global uint* buffer, global int* mouse, global struct Tri* 
 					ray.tri_hit :
 					-1;
 	}
+	
+	accumulation_buffer[pixel_dest * 4 + 0] += color.x;
+	accumulation_buffer[pixel_dest * 4 + 1] += color.y;
+	accumulation_buffer[pixel_dest * 4 + 2] += color.z;
 
 	int r = clamp((int)(color.x * 255.0f), 0, 255);
 	int g = clamp((int)(color.y * 255.0f), 0, 255);

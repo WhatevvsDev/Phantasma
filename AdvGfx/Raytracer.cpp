@@ -69,12 +69,16 @@ namespace Raytracer
 	{
 		uint32_t  mouse_click_tri = 0; // TODO: Purely for testing ImGuizmo, backing code should be changed later
 		uint32_t* buffer { nullptr };
+		float* accumulation_buffer { nullptr};
 		float show_move_speed_bar_time { 0.0f };
 		bool show_debug_ui { false };
 		bool screenshot { false };
 
 		bool world_dirty { false };
+		bool camera_dirty { false };
 		int mouse_over_idx;
+
+		int accumulated_samples { 0 };
 
 		ImGuizmo::OPERATION current_gizmo_operation { ImGuizmo::TRANSLATE };
 	} internal;
@@ -231,20 +235,25 @@ namespace Raytracer
 		if(settings.orbit_camera_enabled)
 		{
 			static float orbit_cam_t = 0.0f;
-			orbit_cam_t += (delta_time_ms / 1000.0f) * settings.orbit_camera_rotations_per_second;
 
-			glm::vec3 offset = glm::vec3(0.0f, settings.orbit_camera_height, settings.orbit_camera_distance);
-			glm::mat3 rotation = glm::eulerAngleY(glm::radians(orbit_cam_t * 360.0f));
+			if(settings.orbit_camera_rotations_per_second != 0.0f)
+			{
+				orbit_cam_t += (delta_time_ms / 1000.0f) * settings.orbit_camera_rotations_per_second;
 
-			offset = offset * rotation; // Rotate it
-			offset += settings.orbit_camera_position; // Position it
+				glm::vec3 offset = glm::vec3(0.0f, settings.orbit_camera_height, settings.orbit_camera_distance);
+				glm::mat3 rotation = glm::eulerAngleY(glm::radians(orbit_cam_t * 360.0f));
 
-			glm::vec3 to_center = glm::normalize(settings.orbit_camera_position - offset);
+				offset = offset * rotation; // Rotate it
+				offset += settings.orbit_camera_position; // Position it
 
-			sceneData.cam_forward = to_center;
-			sceneData.cam_right = glm::cross(sceneData.cam_forward, glm::vec3(0.0f, 1.0f, 0.0f));
-			sceneData.cam_up = glm::cross(sceneData.cam_right, sceneData.cam_forward);
-			sceneData.cam_pos = offset;
+				glm::vec3 to_center = glm::normalize(settings.orbit_camera_position - offset);
+
+				sceneData.cam_forward = to_center;
+				sceneData.cam_right = glm::cross(sceneData.cam_forward, glm::vec3(0.0f, 1.0f, 0.0f));
+				sceneData.cam_up = glm::cross(sceneData.cam_right, sceneData.cam_forward);
+				sceneData.cam_pos = offset;
+				internal.camera_dirty = true;
+			}
 		}
 		else
 		{
@@ -260,11 +269,19 @@ namespace Raytracer
 				sceneData.cam_right * moveHor;
 
 			glm::normalize(dir);
+			glm::vec3 camera_move_delta = glm::vec3(dir * delta_time_ms * 0.01f) * camera_speed_t_to_m_per_second();
 
-			static glm::vec3 target_cam_pos;
-			float position_t = (settings.camera_position_smoothing != 0 ? (1.0f - settings.camera_position_smoothing * 0.75f) * (delta_time_ms / 200.0f) : 1.0f);
-			target_cam_pos += glm::vec3(dir * delta_time_ms * 0.01f) * camera_speed_t_to_m_per_second();
-			sceneData.cam_pos = glm::lerp(sceneData.cam_pos, target_cam_pos, position_t);
+			// We are actually moving the camera
+			if(glm::dot(camera_move_delta, camera_move_delta) != 0.0f)
+			{
+				internal.camera_dirty = true;
+				
+				//static glm::vec3 target_cam_pos;
+				//float position_t = (settings.camera_position_smoothing != 0 ? (1.0f - settings.camera_position_smoothing * 0.75f) * (delta_time_ms / 200.0f) : 1.0f);
+				//target_cam_pos += move_velocity;
+				//sceneData.cam_pos = glm::lerp(sceneData.cam_pos, target_cam_pos, position_t);
+				sceneData.cam_pos += camera_move_delta;
+			}
 
 			bool allow_camera_rotation = !internal.show_debug_ui;
 
@@ -272,14 +289,22 @@ namespace Raytracer
 			{
 				auto mouse_delta = ImGui::GetIO().MouseDelta;
 
-				static glm::vec3 target_rotation;
-				float rotation_t = (settings.camera_rotation_smoothing != 0 ? (1.0f - settings.camera_rotation_smoothing * 0.75f) * (delta_time_ms / 50.0f) : 1.0f);
-				target_rotation += glm::vec3(-mouse_delta.y, mouse_delta.x, 0) * 0.1f;
-				Input::cam_rotation = glm::lerp(Input::cam_rotation, target_rotation, rotation_t);
+				//static glm::vec3 target_rotation;
+				//float rotation_t = (settings.camera_rotation_smoothing != 0 ? (1.0f - settings.camera_rotation_smoothing * 0.75f) * (delta_time_ms / 50.0f) : 1.0f);
+				//target_rotation += glm::vec3(-mouse_delta.y, mouse_delta.x, 0) * 0.1f;
+				//Input::cam_rotation = glm::lerp(Input::cam_rotation, target_rotation, rotation_t);
+				glm::vec3 camera_angular_delta = glm::vec3(-mouse_delta.y, mouse_delta.x, 0) * 0.1f;
 
-				// limit pitch
-				if(fabs(Input::cam_rotation.x) > 89.9f)
-					Input::cam_rotation.x = 89.9f * sgn(Input::cam_rotation.x);
+				if(glm::dot(camera_angular_delta, camera_angular_delta) != 0.0f)
+				{
+					Input::cam_rotation += camera_angular_delta;
+
+					// limit pitch
+					if(fabs(Input::cam_rotation.x) > 89.9f)
+						Input::cam_rotation.x = 89.9f * sgn(Input::cam_rotation.x);
+
+					internal.camera_dirty = true;
+				}
 			}
 		}
 
@@ -310,15 +335,43 @@ namespace Raytracer
 		sceneData.resolution[1] = height;
 		sceneData.tri_count = loaded_model->tris.size();
 
+		int channel_count = 4;
+
+		if(internal.accumulation_buffer == nullptr)
+		{
+			internal.accumulation_buffer = new float[width * height * channel_count];
+		}
+
+		// TODO: we currently don't take into account world changes!
+		if(internal.camera_dirty)
+		{
+			internal.camera_dirty = false;
+			internal.accumulated_samples = 0;
+			memset(internal.accumulation_buffer, 0, sizeof(float) * width * height * channel_count);
+		}
+
 		ComputeReadWriteBuffer screen_buffer({internal.buffer, (size_t)(width * height)});
+		ComputeReadWriteBuffer accumulation_buffer({internal.accumulation_buffer, (size_t)(width * height * 4)});
+
+		internal.accumulated_samples++;
 
 		ComputeOperation("raytrace.cl")
+			.read_write(accumulation_buffer)
 			.read(ComputeReadBuffer({internal.buffer, (size_t)(width * height)}))
 			.read(ComputeReadBuffer({&internal.mouse_over_idx, 1}))
 			.write(*tris_compute_buffer)
 			.write(*bvh_compute_buffer)
 			.write(*tri_idx_compute_buffer)
 			.write({&sceneData, 1})
+			.global_dispatch({width, height, 1})
+			.execute();
+
+		float samples_reciprocal = 1.0f / (float)internal.accumulated_samples;
+
+		ComputeOperation("average_accumulated.cl")
+			.read_write(accumulation_buffer)
+			.read_write(screen_buffer)
+			.write({&samples_reciprocal, 1})
 			.global_dispatch({width, height, 1})
 			.execute();
 
