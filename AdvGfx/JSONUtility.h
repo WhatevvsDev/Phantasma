@@ -5,9 +5,9 @@ using json = nlohmann::json;
 #ifndef TryFromJSONValPtr
 // For values that might not exist (text attribute, but NOT for stuff like node_id)
 #define TryFromJSONVal(lookIn, saveTo, varName) \
-if(lookIn.find(#varName) != lookIn.end()) \
+if(lookIn[#saveTo].find(#varName) != lookIn[#saveTo].end()) \
 {\
-	lookIn.at(#varName).get_to(saveTo.varName);\
+	lookIn[#saveTo].at(#varName).get_to(saveTo.varName);\
 } \
 else \
 {\

@@ -32,9 +32,12 @@ namespace Log
 		}
 	}
 
-	void print(Log::MessageType type, const char* file, int line_number, const std::string& message);
+	void print(Log::MessageType type, const char* file, int line_number, const char* func, const std::string& message);
 	
 	std::pair<std::string, MessageType> get_latest_msg();
 }
 
-#define LOGMSG(type, message) Log::print(type, __FILE__, __LINE__, message);
+#define LOGMSG(type, message) Log::print(type, __FILE__, __LINE__, __func__,  message);
+#define LOGDEBUG(message) Log::print(Log::MessageType::Debug, __FILE__, __LINE__, __func__, message);
+#define LOGDEFAULT(message) Log::print(Log::MessageType::Default, __FILE__, __LINE__, __func__, message);
+#define LOGERROR(message) Log::print(Log::MessageType::Error, __FILE__, __LINE__, __func__, message);

@@ -17,7 +17,7 @@ std::string get_current_directory_path()
 std::string latest_msg;
 Log::MessageType latest_msg_type;
 
-void Log::print(Log::MessageType type, const char* file, int line_number, const std::string& message)
+void Log::print(Log::MessageType type, const char* file, int line_number, const char* func, const std::string& message)
 {
 	HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
 
@@ -33,7 +33,7 @@ void Log::print(Log::MessageType type, const char* file, int line_number, const 
 	latest_msg_type = type;
 
 	// Print and reset color
-	printf("[%s: %i] - %s\n", fileName.c_str(), line_number, message.c_str());
+	printf("[%s: %i | %s] - %s\n", fileName.c_str(), line_number, func, message.c_str());
 	SetConsoleTextAttribute(handle, 15);
 }
 

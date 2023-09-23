@@ -27,6 +27,46 @@ enum class TonemappingType
 	Reinhard
 };
 
+bool RaytracerInitDesc::validate() const
+{
+	bool valid { true };
+
+	assert((screen_buffer_ptr != nullptr) && "RaytracerInitDesc did not have screen_buffer_ptr set properly");
+	
+	if(width_px == 0)
+	{
+		LOGERROR("RaytracerInitDesc has an invalid width");
+		return false;
+	}
+
+	if (height_px == 0)
+	{
+		LOGERROR("RaytracerInitDesc has an invalid height");
+		return false;
+	}
+
+	return valid;
+}
+
+bool RaytracerResizeDesc::validate() const
+{
+	bool valid { true };
+	
+	if(width_px == 0)
+	{
+		LOGERROR("RaytracerResizeDesc has an invalid width");
+		return false;
+	}
+
+	if (height_px == 0)
+	{
+		LOGERROR("RaytracerResizeDesc has an invalid height");
+		return false;
+	}
+
+	return valid;
+}
+
 namespace Raytracer
 {	
 	struct
@@ -44,6 +84,8 @@ namespace Raytracer
 		float orbit_camera_distance { 10.0f };
 		float orbit_camera_height { 5.0f };
 		float orbit_camera_rotations_per_second { 0.1f };
+
+		glm::vec3 saved_camera_position { 0.0f };
 
 		bool show_onscreen_log { false };
 
@@ -75,11 +117,14 @@ namespace Raytracer
 		bool screenshot { false };
 
 		bool world_dirty { false };
-		bool camera_dirty { false };
+		bool camera_dirty { true };
 		int mouse_over_idx;
 
 		int accumulated_samples { 0 };
-
+		int render_width { 0 };
+		int render_height { 0 };
+		const int render_channel_count { 4 };
+		
 		ImGuizmo::OPERATION current_gizmo_operation { ImGuizmo::TRANSLATE };
 	} internal;
 
@@ -135,46 +180,75 @@ namespace Raytracer
 	#pragma warning(disable:4996)
 
 	// TODO: Temporary variables, will be consolidated into one system later
-	ComputeReadBuffer* screen_compute_buffer;
-	ComputeWriteBuffer* tris_compute_buffer;
-	ComputeWriteBuffer* bvh_compute_buffer;
-	ComputeWriteBuffer* tri_idx_compute_buffer;
+	ComputeReadBuffer* screen_compute_buffer	{ nullptr };
+	ComputeWriteBuffer* tris_compute_buffer		{ nullptr };
+	ComputeWriteBuffer* bvh_compute_buffer		{ nullptr };
+	ComputeWriteBuffer* tri_idx_compute_buffer	{ nullptr };
 
 	Mesh* loaded_model { nullptr };
-	glm::mat4 object_matrix;
 	glm::mat4 object_transform = glm::mat4(1);
 
-	void init(uint32_t* screen_buffer_ptr)
+	// Resizes buffers and sets internal state
+	void resize(const RaytracerResizeDesc& desc)
 	{
-		internal.buffer = screen_buffer_ptr;
-
-		// TODO: Temporary, will probably be replaced with asset browser?
-		loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\not_fractal.gltf");
-
-		// Load settings
-		std::ifstream f("phantasma.settings.json");
-		if(f.good())
+		if(desc.new_buffer_ptr != nullptr)
 		{
-			json settings_data = json::parse(f)["settings"];
-
-			TryFromJSONVal(settings_data, settings, active_tonemapping);
-			TryFromJSONVal(settings_data, settings, camera_speed_t);
-			TryFromJSONVal(settings_data, settings, fps_limit_enabled);
-			TryFromJSONVal(settings_data, settings, fps_limit_value);
-			TryFromJSONVal(settings_data, settings, recompile_changed_shaders_automatically);
-			TryFromJSONVal(settings_data, settings, camera_position_smoothing);
-			TryFromJSONVal(settings_data, settings, camera_rotation_smoothing);
-
-			TryFromJSONVal(settings_data, settings, orbit_camera_enabled);
-			TryFromJSONVal(settings_data, settings, orbit_camera_position);
-			TryFromJSONVal(settings_data, settings, orbit_camera_distance);
-			TryFromJSONVal(settings_data, settings, orbit_camera_height);
-			TryFromJSONVal(settings_data, settings, orbit_camera_rotations_per_second);
-
-			TryFromJSONVal(settings_data, sceneData, cam_pos);
+			internal.buffer = desc.new_buffer_ptr;
 		}
 
-		// Search for, and automatically compile compute shaders
+		internal.render_width = desc.width_px;
+		internal.render_height = desc.height_px;
+
+		delete[] internal.accumulation_buffer;
+		internal.accumulation_buffer = new float[desc.width_px * desc.height_px * internal.render_channel_count];
+	}
+
+	// Creates the necessary buffers and sets internal state
+	void init_internal(const RaytracerInitDesc& desc)
+	{
+		desc.validate();
+
+		internal.buffer = desc.screen_buffer_ptr;
+		internal.render_width = desc.width_px;
+		internal.render_height = desc.height_px;
+
+		RaytracerResizeDesc resize_desc;
+		resize_desc.width_px = desc.width_px;
+		resize_desc.height_px = desc.height_px;
+
+		resize(resize_desc);
+	}
+
+	// Deserialize data from phantasma.data.json
+	void init_load_saved_data()
+	{
+		// Load settings
+		std::ifstream f("phantasma.data.json");
+		if(f.good())
+		{
+			json save_data = json::parse(f);
+
+			TryFromJSONVal(save_data, settings, active_tonemapping);
+			TryFromJSONVal(save_data, settings, camera_speed_t);
+			TryFromJSONVal(save_data, settings, fps_limit_enabled);
+			TryFromJSONVal(save_data, settings, fps_limit_value);
+			TryFromJSONVal(save_data, settings, recompile_changed_shaders_automatically);
+			TryFromJSONVal(save_data, settings, camera_position_smoothing);
+			TryFromJSONVal(save_data, settings, camera_rotation_smoothing);
+
+			TryFromJSONVal(save_data, settings, orbit_camera_enabled);
+			TryFromJSONVal(save_data, settings, orbit_camera_position);
+			TryFromJSONVal(save_data, settings, orbit_camera_distance);
+			TryFromJSONVal(save_data, settings, orbit_camera_height);
+			TryFromJSONVal(save_data, settings, orbit_camera_rotations_per_second);
+			
+			TryFromJSONVal(save_data, sceneData, cam_pos);
+		}
+	}
+
+	// Search for, and automatically compile compute shaders
+	void init_load_shaders()
+	{
 		std::string compute_directory = get_current_directory_path() + "\\..\\..\\AdvGfx\\compute\\";
 		for (const auto & possible_compute_shader : std::filesystem::directory_iterator(compute_directory))
 		{
@@ -191,6 +265,16 @@ namespace Raytracer
 			
 			Compute::create_kernel(file_path, file_name);
 		}
+	}
+
+	void init(const RaytracerInitDesc& desc)
+	{
+		init_internal(desc);
+		init_load_saved_data();
+		init_load_shaders();
+
+		// TODO: Temporary, will probably be replaced with asset browser?
+		loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\not_fractal.gltf");
 
 		// TODO: temporary, will be consolidated into one system later
 		tris_compute_buffer		= new ComputeWriteBuffer({loaded_model->tris});
@@ -201,28 +285,34 @@ namespace Raytracer
 		sceneData.object_inverse_transform = glm::inverse(object_transform);
 	}
 
+	// Saves data such as settings, or world state to phantasma.data.json
+	void terminate_save_data()
+	{
+		json save_data;
+
+		save_data["settings"]["active_tonemapping"] = settings.active_tonemapping;
+		save_data["settings"]["camera_speed_t"] = settings.camera_speed_t;
+		save_data["settings"]["fps_limit_enabled"] = settings.fps_limit_enabled;
+		save_data["settings"]["fps_limit_value"] = settings.fps_limit_value;
+		save_data["settings"]["recompile_changed_shaders_automatically"] = settings.recompile_changed_shaders_automatically;
+		save_data["settings"]["camera_position_smoothing"] = settings.camera_position_smoothing;
+		save_data["settings"]["camera_rotation_smoothing"] = settings.camera_rotation_smoothing;
+
+		save_data["settings"]["orbit_camera_enabled"] = settings.orbit_camera_enabled;
+		save_data["settings"]["orbit_camera_position"] = settings.orbit_camera_position;
+		save_data["settings"]["orbit_camera_distance"] = settings.orbit_camera_distance;
+		save_data["settings"]["orbit_camera_height"] = settings.orbit_camera_height;
+		save_data["settings"]["orbit_camera_rotations_per_second"] = settings.orbit_camera_rotations_per_second;
+
+		save_data["sceneData"]["cam_pos"] = sceneData.cam_pos;
+
+		std::ofstream o("phantasma.data.json");
+		o << save_data << std::endl;
+	}
+
 	void terminate()
 	{
-		json settings_data;
-
-		settings_data["settings"]["active_tonemapping"] = settings.active_tonemapping;
-		settings_data["settings"]["camera_speed_t"] = settings.camera_speed_t;
-		settings_data["settings"]["fps_limit_enabled"] = settings.fps_limit_enabled;
-		settings_data["settings"]["fps_limit_value"] = settings.fps_limit_value;
-		settings_data["settings"]["recompile_changed_shaders_automatically"] = settings.recompile_changed_shaders_automatically;
-		settings_data["settings"]["camera_position_smoothing"] = settings.camera_position_smoothing;
-		settings_data["settings"]["camera_rotation_smoothing"] = settings.camera_rotation_smoothing;
-
-		settings_data["settings"]["orbit_camera_enabled"] = settings.orbit_camera_enabled;
-		settings_data["settings"]["orbit_camera_position"] = settings.orbit_camera_position;
-		settings_data["settings"]["orbit_camera_distance"] = settings.orbit_camera_distance;
-		settings_data["settings"]["orbit_camera_height"] = settings.orbit_camera_height;
-		settings_data["settings"]["orbit_camera_rotations_per_second"] = settings.orbit_camera_rotations_per_second;
-		
-		settings_data["sceneData"]["cam_pos"] = sceneData.cam_pos;
-
-		std::ofstream o("phantasma.settings.json");
-		o << settings_data << std::endl;
+		terminate_save_data();
 	}
 
 	void orbit_camera_behavior(float delta_time_ms)
@@ -327,52 +417,22 @@ namespace Raytracer
 		}
 	}
 
-	void raytrace(int width, int height)
+	// Averages out acquired samples, and renders them to the screen
+	void raytrace_average_samples(const ComputeReadWriteBuffer& screen_buffer, const ComputeReadWriteBuffer& accumulated_samples)
 	{
-		sceneData.resolution[0] = width;
-		sceneData.resolution[1] = height;
-		sceneData.tri_count = loaded_model->tris.size();
-
-		int channel_count = 4;
-
-		if(internal.accumulation_buffer == nullptr)
-		{
-			internal.accumulation_buffer = new float[width * height * channel_count];
-		}
-
-		// TODO: we currently don't take into account world changes!
-		if(internal.camera_dirty)
-		{
-			internal.camera_dirty = false;
-			internal.accumulated_samples = 0;
-			memset(internal.accumulation_buffer, 0, sizeof(float) * width * height * channel_count);
-		}
-
-		ComputeReadWriteBuffer screen_buffer({internal.buffer, (size_t)(width * height)});
-		ComputeReadWriteBuffer accumulation_buffer({internal.accumulation_buffer, (size_t)(width * height * 4)});
-
-		internal.accumulated_samples++;
-
-		ComputeOperation("raytrace.cl")
-			.read_write(accumulation_buffer)
-			.read(ComputeReadBuffer({internal.buffer, (size_t)(width * height)}))
-			.read(ComputeReadBuffer({&internal.mouse_over_idx, 1}))
-			.write(*tris_compute_buffer)
-			.write(*bvh_compute_buffer)
-			.write(*tri_idx_compute_buffer)
-			.write({&sceneData, 1})
-			.global_dispatch({width, height, 1})
-			.execute();
-
 		float samples_reciprocal = 1.0f / (float)internal.accumulated_samples;
 
 		ComputeOperation("average_accumulated.cl")
-			.read_write(accumulation_buffer)
+			.read_write(accumulated_samples)
 			.read_write(screen_buffer)
 			.write({&samples_reciprocal, 1})
-			.global_dispatch({width, height, 1})
+			.global_dispatch({internal.render_width, internal.render_height, 1})
 			.execute();
+	}
 
+	// Applies tonemapping (if a type is selected)
+	void raytrace_apply_post_process(const ComputeReadWriteBuffer& screen_buffer)
+	{
 		if(settings.active_tonemapping != TonemappingType::None)
 		{
 			ComputeOperation* op { nullptr};
@@ -389,10 +449,47 @@ namespace Raytracer
 
 			op->read_write(screen_buffer)
 				.write({&sceneData, 1})
-				.global_dispatch({width, height, 1})
+				.global_dispatch({internal.render_width, internal.render_height, 1})
 				.execute();
 			delete op;
 		}
+	}
+
+	void raytrace()
+	{
+		sceneData.resolution[0] = internal.render_width;
+		sceneData.resolution[1] = internal.render_height;
+		sceneData.tri_count = loaded_model->tris.size();
+
+		// TODO: we currently don't take into account world changes!
+
+		unsigned int render_area = internal.render_width * internal.render_height;
+
+		if(internal.camera_dirty)
+		{
+			internal.camera_dirty = false;
+			internal.accumulated_samples = 0;
+			memset(internal.accumulation_buffer, 0, sizeof(float) * render_area * internal.render_channel_count);
+		}
+
+		ComputeReadWriteBuffer screen_buffer({internal.buffer, (size_t)(render_area)});
+		ComputeReadWriteBuffer accumulation_buffer({internal.accumulation_buffer, (size_t)(render_area * 4)});
+
+		internal.accumulated_samples++;
+
+		ComputeOperation("raytrace.cl")
+			.read_write(accumulation_buffer)
+			.read(ComputeReadBuffer({internal.buffer, (size_t)(render_area)}))
+			.read(ComputeReadBuffer({&internal.mouse_over_idx, 1}))
+			.write(*tris_compute_buffer)
+			.write(*bvh_compute_buffer)
+			.write(*tri_idx_compute_buffer)
+			.write({&sceneData, 1})
+			.global_dispatch({internal.render_width, internal.render_height, 1})
+			.execute();
+
+		raytrace_average_samples(screen_buffer, accumulation_buffer);
+		raytrace_apply_post_process(screen_buffer);
 
 		if(internal.show_debug_ui)
 		{
@@ -400,8 +497,8 @@ namespace Raytracer
 
 			auto cursor_pos = ImGui::GetIO().MousePos;
 
-			sceneData.mouse_pos[0] = glm::clamp((int)cursor_pos.x, 0, width);
-			sceneData.mouse_pos[1] = glm::clamp((int)cursor_pos.y, 0, height);
+			sceneData.mouse_pos[0] = glm::clamp((int)cursor_pos.x, 0, internal.render_width);
+			sceneData.mouse_pos[1] = glm::clamp((int)cursor_pos.y, 0, internal.render_height);
 
 			if(clicked_on_non_gizmo)
 			{
@@ -411,9 +508,7 @@ namespace Raytracer
 
 		if(internal.screenshot)
 		{
-			stbi_flip_vertically_on_write(true);
-			stbi_write_jpg("render.jpg", width, height, 4, internal.buffer, width * 4 );
-			stbi_flip_vertically_on_write(false);
+			stbi_write_jpg("render.jpg", internal.render_width, internal.render_height, internal.render_channel_count, internal.buffer, 100);
 			LOGMSG(Log::MessageType::Debug, "Saved screenshot.");
 			internal.screenshot = false;
 		}
@@ -519,9 +614,8 @@ namespace Raytracer
 			if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection), internal.current_gizmo_operation, ImGuizmo::LOCAL, glm::value_ptr(object_transform)))
 			{
 				internal.world_dirty = true;
+				sceneData.object_inverse_transform = glm::inverse(object_transform);
 			}
-
-			sceneData.object_inverse_transform = glm::inverse(object_transform);
 		}
 
 		if(settings.show_onscreen_log)

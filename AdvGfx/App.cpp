@@ -81,7 +81,13 @@ namespace App
         fps_timer.start();
 
         Compute::init();
-        Raytracer::init(render_buffer, desc.width, desc.height);
+        
+        RaytracerInitDesc raytracer_desc;
+        raytracer_desc.width_px = desc.width;
+        raytracer_desc.height_px = desc.height;
+        raytracer_desc.screen_buffer_ptr = render_buffer;
+        
+        Raytracer::init(raytracer_desc);
 
         while (!glfwWindowShouldClose(window))
         {
@@ -124,7 +130,7 @@ namespace App
         Raytracer::update(last_update_time + last_render_time);
         // Only get the render time
         last_update_time =  fps_timer.lap_delta();
-        Raytracer::raytrace(app_desc.width, app_desc.height);
+        Raytracer::raytrace();
 
         float actual_time = fps_timer.peek_delta();
         float sleep_time = (1000.0f / Raytracer::get_target_fps() - actual_time);
