@@ -11,6 +11,6 @@ if(lookIn[#saveTo].find(#varName) != lookIn[#saveTo].end()) \
 } \
 else \
 {\
-	LOGMSG(Log::MessageType::Debug,("Couldn't load json attribute " #varName));\
+	LOGDEBUG(("Couldn't load json attribute " #varName));\
 }
 #endif

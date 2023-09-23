@@ -31,10 +31,10 @@ Mesh::Mesh(const std::string& path)
 	loader.LoadASCIIFromFile(&model, &error, &warning, path);
 
 	if(!error.empty())
-		LOGMSG(Log::MessageType::Error, error)
+		LOGERROR(error)
 
 	if(!warning.empty())
-		LOGMSG(Log::MessageType::Default, warning)
+		LOGDEFAULT(warning)
 
 	auto primitive = model.meshes[0].primitives[0];
 
@@ -43,12 +43,11 @@ Mesh::Mesh(const std::string& path)
 	auto& vertex_buffer = model.bufferViews[vertex_accessor.bufferView];
 
 	int vertex_data_size = tinygltf::GetNumComponentsInType(vertex_accessor.type) * tinygltf::GetComponentSizeInBytes(vertex_accessor.componentType);
-	int vertex_count = vertex_buffer.byteLength / vertex_data_size;
+	int vertex_count = (int)vertex_buffer.byteLength / vertex_data_size;
 
 	// Indices
 	auto& index_accessor = model.accessors[primitive.indices];
 	auto& index_buffer_view = model.bufferViews[index_accessor.bufferView];
-	auto& index_buffer = model.buffers[index_buffer_view.buffer];
 
 	int index_data_size = tinygltf::GetNumComponentsInType(index_accessor.type) * tinygltf::GetComponentSizeInBytes(index_accessor.componentType);
 	size_t index_count = index_buffer_view.byteLength / index_data_size;
@@ -72,8 +71,8 @@ Mesh::Mesh(const std::string& path)
 		// Indices into the vertex buffer for each vertex of a triangle
 
 		if(indices_exist)
-			for(int t = 0; t < 3; t++)
-				tri_indices[t] = indices[i + t];
+			for(int j = 0; j < 3; j++)
+				tri_indices[j] = indices[i + j];
 
 		auto vert_buf = model.buffers[vertex_buffer.buffer].data.data();
 

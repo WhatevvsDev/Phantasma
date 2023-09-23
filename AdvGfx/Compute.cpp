@@ -99,7 +99,7 @@ struct
 #define CHECKCL(func) \
 {\
     cl_int function_result = func;\
-    if(function_result != CL_SUCCESS) LOGMSG(Log::MessageType::Error, get_cl_error_string(function_result));\
+    if(function_result != CL_SUCCESS) LOGERROR(get_cl_error_string(function_result));\
 }
 #else
 #define CHECKCL(func) func;
@@ -132,25 +132,25 @@ void ComputeKernel::compile()
 
     if(error != CL_SUCCESS)
     {
-        LOGMSG(Log::MessageType::Error, std::format("Failed to create kernel: {} \n {}", path, created_program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(compute.device)));
+        LOGERROR(std::format("Failed to create kernel: {} \n {}", path, created_program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(compute.device)));
         return;
     }
     state = ComputeKernelState::Built;
 
     if(previous_state != ComputeKernelState::Empty)
     {
-        LOGMSG(Log::MessageType::Debug, std::format("Recompiled kernel: {}", path));
+        LOGDEBUG(std::format("Recompiled kernel: {}", path));
     }
     else
     {
-        LOGMSG(Log::MessageType::Debug, std::format("Created kernel: {}", path));
+        LOGDEBUG(std::format("Created kernel: {}", path));
     }
 
     cl_kernel = cl::Kernel(created_program, entry_point.c_str(), &error);
 
     if(error != CL_SUCCESS)
     {
-        LOGMSG(Log::MessageType::Error, std::format("Failed to create kernel: {} \n {} error", path, get_cl_error_string(error)))     
+        LOGERROR(std::format("Failed to create kernel: {} \n {} error", path, get_cl_error_string(error)))     
         return;
     }
 
@@ -296,7 +296,7 @@ void Compute::create_kernel(const std::string& path, const std::string& entry_po
     std::string file_name_with_extension = path.substr(path.find_last_of("\\/") + 1);
     if(compute.kernels.find(file_name_with_extension) != compute.kernels.end())
     {
-        LOGMSG(Log::MessageType::Error, std::format("Kernel {} already exists, ignoring", file_name_with_extension));
+        LOGERROR(std::format("Kernel {} already exists, ignoring", file_name_with_extension));
         return;
     }
 
@@ -314,13 +314,13 @@ void select_platform()
 
     if(all_platforms.empty())
     {   
-        LOGMSG(Log::MessageType::Error, "No platforms found. Check OpenCL installation!");
+        LOGERROR("No platforms found. Check OpenCL installation!");
         exit(1);
     }
     else
     {
         compute.platform = all_platforms[0];
-        LOGMSG(Log::MessageType::Debug, std::format("Using platform: {}", compute.platform.getInfo<CL_PLATFORM_NAME>()));
+        LOGDEBUG(std::format("Using platform: {}", compute.platform.getInfo<CL_PLATFORM_NAME>()));
     }
 }
 
@@ -331,13 +331,13 @@ void select_device()
 
     if(all_devices.empty())
     {
-        LOGMSG(Log::MessageType::Error, "No suitable devices found. Check OpenCL installation!");
+        LOGERROR("No suitable devices found. Check OpenCL installation!");
         exit(1);
     }
     else
     {
         compute.device = all_devices[0];
-        LOGMSG(Log::MessageType::Debug, std::format("Using device: {}", compute.device.getInfo<CL_DEVICE_NAME>()));
+        LOGDEBUG(std::format("Using device: {}", compute.device.getInfo<CL_DEVICE_NAME>()));
     }
 }
 

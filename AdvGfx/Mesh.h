@@ -9,7 +9,7 @@ struct BVH;
 
 struct Tri 
 { 
-    glm::vec3 vertex0;
+	glm::vec3 vertex0;
 	float pad_0;
 	glm::vec3 vertex1;
 	float pad_1;
@@ -30,7 +30,7 @@ struct Mesh
 template <typename T>
 inline std::vector<T> reinterpret_gltf_primitive_buffer_as_vector(tinygltf::Accessor& accessor, tinygltf::Model& model)
 {
-	auto& buffer_view = model.bufferViews[accessor.bufferView];
+	auto& buffer_view = model.bufferViews[(size_t)accessor.bufferView];
 	auto& buffer = model.buffers[buffer_view.buffer];
 
 	int data_size = tinygltf::GetNumComponentsInType(accessor.type) * tinygltf::GetComponentSizeInBytes(accessor.componentType);
@@ -44,7 +44,7 @@ inline std::vector<T> reinterpret_gltf_primitive_buffer_as_vector(tinygltf::Acce
 	switch(accessor.componentType)
 	{
 		default:
-			LOGMSG(Log::MessageType::Error, std::format("Unsupported index type {}", accessor.componentType));
+			LOGERROR(std::format("Unsupported index type {}", accessor.componentType));
 			break;
 		case 5120: // signed byte
 		{

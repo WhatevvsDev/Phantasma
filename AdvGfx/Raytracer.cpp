@@ -177,7 +177,6 @@ namespace Raytracer
 			return glm::clamp(1.0f / fabsf(value - 1.0f), 0.01f, 100.0f);
 		}
 	}
-	#pragma warning(disable:4996)
 
 	// TODO: Temporary variables, will be consolidated into one system later
 	ComputeReadBuffer* screen_compute_buffer	{ nullptr };
@@ -459,7 +458,7 @@ namespace Raytracer
 	{
 		sceneData.resolution[0] = internal.render_width;
 		sceneData.resolution[1] = internal.render_height;
-		sceneData.tri_count = loaded_model->tris.size();
+		sceneData.tri_count = (uint)loaded_model->tris.size();
 
 		// TODO: we currently don't take into account world changes!
 
@@ -509,10 +508,10 @@ namespace Raytracer
 		if(internal.screenshot)
 		{
 			stbi_write_jpg("render.jpg", internal.render_width, internal.render_height, internal.render_channel_count, internal.buffer, 100);
-			LOGMSG(Log::MessageType::Debug, "Saved screenshot.");
+			LOGDEBUG("Saved screenshot.");
 			internal.screenshot = false;
 		}
-    }
+	}
 
 	void ui()
 	{

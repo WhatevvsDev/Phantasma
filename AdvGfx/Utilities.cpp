@@ -46,9 +46,9 @@ std::pair<std::string, Log::MessageType> Log::get_latest_msg()
 std::string read_file_to_string(const std::string& path)
 {
 	std::stringstream source_buffer;
-    std::ifstream program_source(path);
-    source_buffer << program_source.rdbuf();
-    program_source.close();
+	std::ifstream program_source(path);
+	source_buffer << program_source.rdbuf();
+	program_source.close();
 
 	return source_buffer.str();
 }

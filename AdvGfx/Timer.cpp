@@ -23,7 +23,7 @@ float Timer::to_now()
 {
 	if(!is_timing)
 	{
-		LOGMSG(Log::MessageType::Error, "Tried to get time on idle timer.");
+		LOGERROR("Tried to get time on idle timer.");
 		return 0.0f;
 	}
 
@@ -36,7 +36,7 @@ float Timer::lap_delta()
 {
 	if(!is_timing)
 	{
-		LOGMSG(Log::MessageType::Error, "Tried to get delta time on idle timer.");
+		LOGERROR("Tried to get delta time on idle timer.");
 		return 0.0f;
 	}
 
@@ -51,7 +51,7 @@ float Timer::peek_delta()
 {
 	if(!is_timing)
 	{
-		LOGMSG(Log::MessageType::Error, "Tried to peek delta time on idle timer.");
+		LOGERROR("Tried to peek delta time on idle timer.");
 		return 0.0f;
 	}
 	TimePoint now = Clock::now();
