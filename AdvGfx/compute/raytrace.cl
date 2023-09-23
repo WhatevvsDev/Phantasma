@@ -32,23 +32,7 @@ float4 transform(float4 vector, float* transform)
 	return result;
 }
 
-struct Tri 
-{ 
-    float3 vertex0;
-	float3 vertex1;
-	float3 vertex2;
-};
-
-struct Ray 
-{ 
-    float3 O;
-    float3 D; 
-    float t;
-	int tri_hit;
-	float3 light;
-	int depth;
-};
-
+// Taken from https://www.scratchapixel.com/lessons/3d-basic-rendering/introduction-to-shading/reflection-refraction-fresnel.html
 float3 refracted(float3 in, float3 n, float ior) 
 {
 	float cosi = clamp(dot(in, n), -1.0f, 1.0f);
@@ -65,14 +49,6 @@ float3 refracted(float3 in, float3 n, float ior)
     float eta = etai / etat;
     float k = 1 - eta * eta * (1 - cosi * cosi);
     return k < 0 ? 0 : eta * in + (eta * cosi - sqrt(k)) * n;
-
-	/*
-	//float cos_theta = fmin(dot(-in, n), 1.0f);
-	float cos_theta = fmin(dot(-in, n), 1.0f);
-    float3 r_out_perp =  ior * (in + cos_theta*n);
-    float3 r_out_parallel = -sqrt(fabs(1.0f - dot(r_out_perp, r_out_perp))) * n;
-    return r_out_perp + r_out_parallel;
-	*/
 }
 
 // Taken from https://www.scratchapixel.com/lessons/3d-basic-rendering/introduction-to-shading/reflection-refraction-fresnel.html
@@ -107,12 +83,43 @@ float fresnel(float3 ray_dir, float3 normal, float ior)
 	return reflection;
 }
 
+struct Tri 
+{ 
+    float3 vertex0;
+	float3 vertex1;
+	float3 vertex2;
+};
+
+struct Ray 
+{ 
+    float3 O;
+    float3 D; 
+    float t;
+	int tri_hit;
+	float3 light;
+	int depth;
+};
+
 struct BVHNode
 {
     float minx, miny, minz;
     int left_first;
     float maxx, maxy, maxz;
 	int tri_count;
+};
+
+struct SceneData
+{
+	uint resolution_x;
+	uint resolution_y;
+	uint mouse_x;
+	uint mouse_y;
+	float cam_pos_x, cam_pos_y, cam_pos_z;
+	uint tri_count;
+	float3 cam_forward;
+	float3 cam_right;
+	float3 cam_up;
+	float object_inverse_transform[16];
 };
 
 void intersect_tri(struct Ray* ray, struct Tri* tris, uint triIdx)
@@ -265,10 +272,6 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struc
 			current_ray.O = primary_ray->O;
 		}
 		
-
-		//if(depth == DEPTH)
-		//	ray->tri_hit = current_ray.tri_hit;
-
 		bool hit_anything = current_ray.t < 1e30;
 
 		if(!hit_anything)
@@ -298,7 +301,7 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struc
 		float d = 1.0f;
 		float s = 1.0f - d;
 
-		if(false)//(current_ray.tri_hit > 20479)//if(current_ray.tri_hit % 2 == 0)
+		if(false) // Diffuse
 		{
 			struct Ray shadow_ray;
 			shadow_ray.O = hit_pos;
@@ -322,7 +325,7 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struc
 
 			ray_stack[ray_stack_idx++] = specular_ray;
 		}
-		else
+		else // Dielectric
 		{
 			if(inner_normal)
 			{
@@ -365,20 +368,6 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struc
 	}
 	return diffuse;
 }
-
-struct SceneData
-{
-	uint resolution_x;
-	uint resolution_y;
-	uint mouse_x;
-	uint mouse_y;
-	float cam_pos_x, cam_pos_y, cam_pos_z;
-	uint tri_count;
-	float3 cam_forward;
-	float3 cam_right;
-	float3 cam_up;
-	float object_inverse_transform[16];
-};
 
 void kernel raytrace(global float* accumulation_buffer, global uint* buffer, global int* mouse, global struct Tri* tris, global struct BVHNode* nodes, global uint* trisIdx, global struct SceneData* sceneData)
 {     

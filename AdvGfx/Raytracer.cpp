@@ -94,17 +94,17 @@ namespace Raytracer
 
 	struct SceneData
 	{
-		uint resolution[2]		{ 0, 0 };
+		uint resolution[2] { 0, 0 };
 		uint mouse_pos[2] {};
-		glm::vec3 cam_pos		{ 0.0f, 10.0f, 0.0f };
-		uint tri_count			{ 0 };
-		glm::vec3 cam_forward	{ 0.0f };
-		float pad_1				{ 0.0f };
-		glm::vec3 cam_right		{ 0.0f };
-		float pad_2				{ 0.0f };
-		glm::vec3 cam_up		{ 0.0f };
-		float pad_3				{ 0.0f };
-		glm::mat4 object_inverse_transform;
+		glm::vec3 cam_pos { 0.0f, 10.0f, 0.0f };
+		uint tri_count { 0 };
+		glm::vec3 cam_forward { 0.0f };
+		float pad_1 { 0.0f };
+		glm::vec3 cam_right { 0.0f };
+		float pad_2 { 0.0f };
+		glm::vec3 cam_up { 0.0f };
+		float pad_3 { 0.0f };
+		glm::mat4 object_inverse_transform { glm::mat4(1) };
 	} sceneData;
 
 	struct
