@@ -11,7 +11,8 @@ namespace Raytracer::Input
 
 namespace Raytracer
 {
-	void init(uint32_t* screen_buffer_ptr);
+	void init(uint32_t* screen_buffer_ptr, int width_px, int height_px);
+	void resize(int width_px, int height_px);
 	void terminate();
 	void raytrace(int width, int height);
 	void update(const float delta_time_ms);

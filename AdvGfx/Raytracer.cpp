@@ -225,88 +225,86 @@ namespace Raytracer
 		o << settings_data << std::endl;
 	}
 
-	void update(const float delta_time_ms)
+	void orbit_camera_behavior(float delta_time_ms)
 	{
-		internal.show_move_speed_bar_time -= (delta_time_ms / 1000.0f);
+		static float orbit_cam_t = 0.0f;
+
+		if(settings.orbit_camera_rotations_per_second != 0.0f)
+		{
+			orbit_cam_t += (delta_time_ms / 1000.0f) * settings.orbit_camera_rotations_per_second;
+
+			glm::vec3 offset = glm::vec3(0.0f, settings.orbit_camera_height, settings.orbit_camera_distance);
+			glm::mat3 rotation = glm::eulerAngleY(glm::radians(orbit_cam_t * 360.0f));
+
+			offset = offset * rotation; // Rotate it
+			offset += settings.orbit_camera_position; // Position it
+
+			glm::vec3 to_center = glm::normalize(settings.orbit_camera_position - offset);
+
+			sceneData.cam_forward = to_center;
+			sceneData.cam_right = glm::cross(sceneData.cam_forward, glm::vec3(0.0f, 1.0f, 0.0f));
+			sceneData.cam_up = glm::cross(sceneData.cam_right, sceneData.cam_forward);
+			sceneData.cam_pos = offset;
+			internal.camera_dirty = true;
+		}
+	}
+
+	void free_float_camera_behavior(float delta_time_ms)
+	{
 		int moveHor =	(ImGui::IsKeyDown(ImGuiKey_D))		- (ImGui::IsKeyDown(ImGuiKey_A));
 		int moveVer =	(ImGui::IsKeyDown(ImGuiKey_Space))	- (ImGui::IsKeyDown(ImGuiKey_LeftCtrl));
 		int moveWard =	(ImGui::IsKeyDown(ImGuiKey_W))		- (ImGui::IsKeyDown(ImGuiKey_S));
-		
-		if(settings.orbit_camera_enabled)
+
+		glm::mat3 rotation = glm::eulerAngleXYZ(glm::radians(Input::cam_rotation.x), glm::radians(Input::cam_rotation.y), glm::radians(Input::cam_rotation.z));
+
+		sceneData.cam_forward = glm::vec3(0, 0, 1.0f) * rotation;
+		sceneData.cam_right = glm::vec3(-1.0f, 0, 0) * rotation;
+		sceneData.cam_up = glm::vec3(0, 1.0f, 0) * rotation;
+
+		glm::vec3 dir = 
+			sceneData.cam_forward * moveWard + 
+			sceneData.cam_up * moveVer + 
+			sceneData.cam_right * moveHor;
+
+		glm::normalize(dir);
+		glm::vec3 camera_move_delta = glm::vec3(dir * delta_time_ms * 0.01f) * camera_speed_t_to_m_per_second();
+
+		// We are actually moving the camera
+		if(glm::dot(camera_move_delta, camera_move_delta) != 0.0f)
 		{
-			static float orbit_cam_t = 0.0f;
-
-			if(settings.orbit_camera_rotations_per_second != 0.0f)
-			{
-				orbit_cam_t += (delta_time_ms / 1000.0f) * settings.orbit_camera_rotations_per_second;
-
-				glm::vec3 offset = glm::vec3(0.0f, settings.orbit_camera_height, settings.orbit_camera_distance);
-				glm::mat3 rotation = glm::eulerAngleY(glm::radians(orbit_cam_t * 360.0f));
-
-				offset = offset * rotation; // Rotate it
-				offset += settings.orbit_camera_position; // Position it
-
-				glm::vec3 to_center = glm::normalize(settings.orbit_camera_position - offset);
-
-				sceneData.cam_forward = to_center;
-				sceneData.cam_right = glm::cross(sceneData.cam_forward, glm::vec3(0.0f, 1.0f, 0.0f));
-				sceneData.cam_up = glm::cross(sceneData.cam_right, sceneData.cam_forward);
-				sceneData.cam_pos = offset;
-				internal.camera_dirty = true;
-			}
-		}
-		else
-		{
-			glm::mat3 rotation = glm::eulerAngleXYZ(glm::radians(Input::cam_rotation.x), glm::radians(Input::cam_rotation.y), glm::radians(Input::cam_rotation.z));
-
-			sceneData.cam_forward = glm::vec3(0, 0, 1.0f) * rotation;
-			sceneData.cam_right = glm::vec3(-1.0f, 0, 0) * rotation;
-			sceneData.cam_up = glm::vec3(0, 1.0f, 0) * rotation;
-
-			glm::vec3 dir = 
-				sceneData.cam_forward * moveWard + 
-				sceneData.cam_up * moveVer + 
-				sceneData.cam_right * moveHor;
-
-			glm::normalize(dir);
-			glm::vec3 camera_move_delta = glm::vec3(dir * delta_time_ms * 0.01f) * camera_speed_t_to_m_per_second();
-
-			// We are actually moving the camera
-			if(glm::dot(camera_move_delta, camera_move_delta) != 0.0f)
-			{
-				internal.camera_dirty = true;
+			internal.camera_dirty = true;
 				
-				//static glm::vec3 target_cam_pos;
-				//float position_t = (settings.camera_position_smoothing != 0 ? (1.0f - settings.camera_position_smoothing * 0.75f) * (delta_time_ms / 200.0f) : 1.0f);
-				//target_cam_pos += move_velocity;
-				//sceneData.cam_pos = glm::lerp(sceneData.cam_pos, target_cam_pos, position_t);
-				sceneData.cam_pos += camera_move_delta;
-			}
+			sceneData.cam_pos += camera_move_delta;
+		}
 
-			bool allow_camera_rotation = !internal.show_debug_ui;
+		bool allow_camera_rotation = !internal.show_debug_ui;
 
-			if(allow_camera_rotation)
+		if(allow_camera_rotation)
+		{
+			auto mouse_delta = ImGui::GetIO().MouseDelta;
+
+			glm::vec3 camera_angular_delta = glm::vec3(-mouse_delta.y, mouse_delta.x, 0) * 0.1f;
+
+			if(glm::dot(camera_angular_delta, camera_angular_delta) != 0.0f)
 			{
-				auto mouse_delta = ImGui::GetIO().MouseDelta;
+				Input::cam_rotation += camera_angular_delta;
 
-				//static glm::vec3 target_rotation;
-				//float rotation_t = (settings.camera_rotation_smoothing != 0 ? (1.0f - settings.camera_rotation_smoothing * 0.75f) * (delta_time_ms / 50.0f) : 1.0f);
-				//target_rotation += glm::vec3(-mouse_delta.y, mouse_delta.x, 0) * 0.1f;
-				//Input::cam_rotation = glm::lerp(Input::cam_rotation, target_rotation, rotation_t);
-				glm::vec3 camera_angular_delta = glm::vec3(-mouse_delta.y, mouse_delta.x, 0) * 0.1f;
+				// limit pitch
+				if(fabs(Input::cam_rotation.x) > 89.9f)
+					Input::cam_rotation.x = 89.9f * sgn(Input::cam_rotation.x);
 
-				if(glm::dot(camera_angular_delta, camera_angular_delta) != 0.0f)
-				{
-					Input::cam_rotation += camera_angular_delta;
-
-					// limit pitch
-					if(fabs(Input::cam_rotation.x) > 89.9f)
-						Input::cam_rotation.x = 89.9f * sgn(Input::cam_rotation.x);
-
-					internal.camera_dirty = true;
-				}
+				internal.camera_dirty = true;
 			}
 		}
+	}
+
+	void update(const float delta_time_ms)
+	{
+		internal.show_move_speed_bar_time -= (delta_time_ms / 1000.0f);
+		
+		settings.orbit_camera_enabled
+			? orbit_camera_behavior(delta_time_ms)
+			: free_float_camera_behavior(delta_time_ms);
 
 		if(settings.recompile_changed_shaders_automatically)
 			Compute::recompile_kernels(ComputeKernelRecompilationCondition::SourceChanged);

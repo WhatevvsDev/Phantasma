@@ -81,7 +81,7 @@ namespace App
         fps_timer.start();
 
         Compute::init();
-        Raytracer::init(render_buffer);
+        Raytracer::init(render_buffer, desc.width, desc.height);
 
         while (!glfwWindowShouldClose(window))
         {
