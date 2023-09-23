@@ -607,7 +607,7 @@ namespace Raytracer
 
 		auto view = glm::lookAtRH(glm::vec3(sceneData.cam_pos), glm::vec3(sceneData.cam_pos) + glm::vec3(sceneData.cam_forward), glm::vec3(0.0f, 1.0f, 0.0f));
 
-		glm::mat4 projection = glm::perspectiveRH(glm::radians(90.0f), 1200.0f / 800.0f, 0.1f, 1000.0f);
+		glm::mat4 projection = glm::perspectiveRH(glm::radians(90.0f), (float)internal.render_width / (float)internal.render_height, 0.1f, 1000.0f);
 
 		if(internal.mouse_click_tri != -1)
 		{
