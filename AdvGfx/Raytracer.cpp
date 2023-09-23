@@ -207,13 +207,10 @@ namespace Raytracer
 	{
 		desc.validate();
 
-		internal.buffer = desc.screen_buffer_ptr;
-		internal.render_width = desc.width_px;
-		internal.render_height = desc.height_px;
-
 		RaytracerResizeDesc resize_desc;
 		resize_desc.width_px = desc.width_px;
 		resize_desc.height_px = desc.height_px;
+		resize_desc.new_buffer_ptr = desc.screen_buffer_ptr;
 
 		resize(resize_desc);
 	}
@@ -314,7 +311,7 @@ namespace Raytracer
 		terminate_save_data();
 	}
 
-	void orbit_camera_behavior(float delta_time_ms)
+	void update_orbit_camera_behavior(float delta_time_ms)
 	{
 		static float orbit_cam_t = 0.0f;
 
@@ -338,7 +335,7 @@ namespace Raytracer
 		}
 	}
 
-	void free_float_camera_behavior(float delta_time_ms)
+	void update_free_float_camera_behavior(float delta_time_ms)
 	{
 		int moveHor =	(ImGui::IsKeyDown(ImGuiKey_D))		- (ImGui::IsKeyDown(ImGuiKey_A));
 		int moveVer =	(ImGui::IsKeyDown(ImGuiKey_Space))	- (ImGui::IsKeyDown(ImGuiKey_LeftCtrl));
@@ -392,8 +389,8 @@ namespace Raytracer
 		internal.show_move_speed_bar_time -= (delta_time_ms / 1000.0f);
 		
 		settings.orbit_camera_enabled
-			? orbit_camera_behavior(delta_time_ms)
-			: free_float_camera_behavior(delta_time_ms);
+			? update_orbit_camera_behavior(delta_time_ms)
+			: update_free_float_camera_behavior(delta_time_ms);
 
 		if(settings.recompile_changed_shaders_automatically)
 			Compute::recompile_kernels(ComputeKernelRecompilationCondition::SourceChanged);
