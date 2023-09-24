@@ -33,8 +33,6 @@ namespace Raytracer
 		int fps_limit_value { 80 }; // TODO: this is sometimes very inaccurate in practice?
 
 		float camera_speed_t {0.5f};
-		float camera_rotation_smoothing = { 0.1f };
-		float camera_position_smoothing = { 0.1f };
 
 		bool orbit_camera_enabled { false };
 		glm::vec3 orbit_camera_position { 0.0f };
@@ -192,8 +190,6 @@ namespace Raytracer
 			TryFromJSONVal(save_data, settings, fps_limit_enabled);
 			TryFromJSONVal(save_data, settings, fps_limit_value);
 			TryFromJSONVal(save_data, settings, recompile_changed_shaders_automatically);
-			TryFromJSONVal(save_data, settings, camera_position_smoothing);
-			TryFromJSONVal(save_data, settings, camera_rotation_smoothing);
 
 			TryFromJSONVal(save_data, settings, orbit_camera_enabled);
 			TryFromJSONVal(save_data, settings, orbit_camera_position);
@@ -257,8 +253,6 @@ namespace Raytracer
 		save_data["settings"]["fps_limit_enabled"] = settings.fps_limit_enabled;
 		save_data["settings"]["fps_limit_value"] = settings.fps_limit_value;
 		save_data["settings"]["recompile_changed_shaders_automatically"] = settings.recompile_changed_shaders_automatically;
-		save_data["settings"]["camera_position_smoothing"] = settings.camera_position_smoothing;
-		save_data["settings"]["camera_rotation_smoothing"] = settings.camera_rotation_smoothing;
 
 		save_data["settings"]["orbit_camera_enabled"] = settings.orbit_camera_enabled;
 		save_data["settings"]["orbit_camera_position"] = settings.orbit_camera_position;
