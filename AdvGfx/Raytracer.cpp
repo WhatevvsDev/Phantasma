@@ -24,13 +24,6 @@
 #include <ImPlot.h>
 #include <IconsFontAwesome6.h>
 
-enum class TonemappingType
-{
-	None,
-	ApproximateACES,
-	Reinhard
-};
-
 bool RaytracerInitDesc::validate() const
 {
 	bool valid { true };
@@ -94,8 +87,6 @@ namespace Raytracer
 		bool show_onscreen_log { false };
 
 		bool accumulate_frames { true };
-
-		TonemappingType active_tonemapping { TonemappingType::None };
 	} settings;
 
 	struct SceneData
@@ -237,7 +228,6 @@ namespace Raytracer
 		{
 			json save_data = json::parse(f);
 
-			TryFromJSONVal(save_data, settings, active_tonemapping);
 			TryFromJSONVal(save_data, settings, camera_speed_t);
 			TryFromJSONVal(save_data, settings, fps_limit_enabled);
 			TryFromJSONVal(save_data, settings, fps_limit_value);
@@ -303,7 +293,6 @@ namespace Raytracer
 	{
 		json save_data;
 
-		save_data["settings"]["active_tonemapping"] = settings.active_tonemapping;
 		save_data["settings"]["camera_speed_t"] = settings.camera_speed_t;
 		save_data["settings"]["fps_limit_enabled"] = settings.fps_limit_enabled;
 		save_data["settings"]["fps_limit_value"] = settings.fps_limit_value;
@@ -453,31 +442,6 @@ namespace Raytracer
 			.execute();
 	}
 
-	// Applies tonemapping (if a type is selected)
-	void raytrace_apply_post_process(const ComputeReadWriteBuffer& screen_buffer)
-	{
-		if(settings.active_tonemapping != TonemappingType::None)
-		{
-			ComputeOperation* op { nullptr};
-
-			switch(settings.active_tonemapping)
-			{
-				case TonemappingType::Reinhard:
-					op = new ComputeOperation("reinhard_tonemapping.cl");
-					break;
-				case TonemappingType::ApproximateACES:
-					op = new ComputeOperation("approximate_aces_tonemapping.cl");
-					break;
-			}
-
-			op->read_write(screen_buffer)
-				.write({&sceneData, 1})
-				.global_dispatch({internal.render_width, internal.render_height, 1})
-				.execute();
-			delete op;
-		}
-	}
-
 	void raytrace()
 	{
 		internal.performance.timer.reset();
@@ -517,7 +481,6 @@ namespace Raytracer
 			.execute();
 
 		raytrace_average_samples(screen_buffer, (*internal.gpu_accumulation_buffer));
-		raytrace_apply_post_process(screen_buffer);
 
 		sceneData.reset_accumulator = false;
 
@@ -701,30 +664,6 @@ namespace Raytracer
 		
 		ImGui::Checkbox("Show onscreen log?", &settings.show_onscreen_log);
 		ImGui::Checkbox("Accumulate frames?", &settings.accumulate_frames);
-
-		// Has to be in order!
-		static std::pair<TonemappingType, std::string> tonemapping_text[] =
-		{
-			{TonemappingType::None, "None"},
-			{TonemappingType::ApproximateACES, "Approximate ACES"},
-			{TonemappingType::Reinhard, "Reinhard"},
-		};
-
-		ImGui::DragFloat("Camera rotation smoothing", &settings.camera_rotation_smoothing, 0.01f, 0.0f, 1.0f);
-		ImGui::DragFloat("Camera position smoothing", &settings.camera_position_smoothing, 0.01f, 0.0f, 1.0f);
-
-
-		if(ImGui::BeginCombo("Tonemapping", tonemapping_text[(int)settings.active_tonemapping].second.c_str()))
-		{
-			for(auto& tonemap : tonemapping_text)
-			{
-				if(ImGui::Selectable(tonemap.second.c_str(), settings.active_tonemapping == tonemap.first))
-				{
-					settings.active_tonemapping = tonemap.first;
-				}
-			}
-			ImGui::EndCombo();
-		}
 
 		ImGui::End();
 	}
