@@ -85,7 +85,7 @@ void subdivide( uint nodeIdx, BVH& bvh, const std::vector<Tri>& tris)
 		if (cost < bestCost) 
 			bestPos = candidatePos, bestAxis = axis, bestCost = cost;
 	}
-	int axis = bestAxis;9
+	int axis = bestAxis;
 	float splitPos = bestPos;
 
 	glm::vec3 parent_aabb_extent = bvh.bvhNodes[nodeIdx].max - bvh.bvhNodes[nodeIdx].min; // extent of parent
