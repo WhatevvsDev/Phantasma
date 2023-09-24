@@ -24,46 +24,6 @@
 #include <ImPlot.h>
 #include <IconsFontAwesome6.h>
 
-bool RaytracerInitDesc::validate() const
-{
-	bool valid { true };
-
-	assert((screen_buffer_ptr != nullptr) && "RaytracerInitDesc did not have screen_buffer_ptr set properly");
-	
-	if(width_px == 0)
-	{
-		LOGERROR("RaytracerInitDesc has an invalid width");
-		return false;
-	}
-
-	if (height_px == 0)
-	{
-		LOGERROR("RaytracerInitDesc has an invalid height");
-		return false;
-	}
-
-	return valid;
-}
-
-bool RaytracerResizeDesc::validate() const
-{
-	bool valid { true };
-	
-	if(width_px == 0)
-	{
-		LOGERROR("RaytracerResizeDesc has an invalid width");
-		return false;
-	}
-
-	if (height_px == 0)
-	{
-		LOGERROR("RaytracerResizeDesc has an invalid height");
-		return false;
-	}
-
-	return valid;
-}
-
 namespace Raytracer
 {	
 	struct
