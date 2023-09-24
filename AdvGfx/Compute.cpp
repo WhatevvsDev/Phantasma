@@ -376,8 +376,11 @@ void Compute::init()
     */
 }
 
-void Compute::recompile_kernels(ComputeKernelRecompilationCondition condition)
+// Returns true if any kernels have been recompiled
+bool Compute::recompile_kernels(ComputeKernelRecompilationCondition condition)
 {
+    bool recompiled_any = false;
+
     for(auto& [key, kernel] : compute.kernels)
     {
         bool recompile_kernel = false;
@@ -395,8 +398,10 @@ void Compute::recompile_kernels(ComputeKernelRecompilationCondition condition)
         if(recompile_kernel)
         {
             kernel.compile();
+            recompiled_any = true;
         }
     }
+    return recompiled_any;
 }
 
 bool Compute::kernel_exists(const std::string& kernel_name)

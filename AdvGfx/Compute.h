@@ -153,7 +153,7 @@ namespace Compute
 
 	void create_kernel(const std::string& path, const std::string& entry_point);
 
-	void recompile_kernels(ComputeKernelRecompilationCondition condition);
+	bool recompile_kernels(ComputeKernelRecompilationCondition condition);
 
 	bool kernel_exists(const std::string& kernel_name);
 }

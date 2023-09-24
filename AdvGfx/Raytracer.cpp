@@ -89,6 +89,8 @@ namespace Raytracer
 
 		bool show_onscreen_log { false };
 
+		bool accumulate_frames { true };
+
 		TonemappingType active_tonemapping { TonemappingType::None };
 	} settings;
 
@@ -105,6 +107,7 @@ namespace Raytracer
 		glm::vec3 cam_up { 0.0f };
 		float pad_3 { 0.0f };
 		glm::mat4 object_inverse_transform { glm::mat4(1) };
+		int frame_number;
 	} sceneData;
 
 	struct
@@ -270,7 +273,7 @@ namespace Raytracer
 		init_load_shaders();
 
 		// TODO: Temporary, will probably be replaced with asset browser?
-		loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\not_fractal.gltf");
+		loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\triangle_gathering.gltf");
 
 		// TODO: temporary, will be consolidated into one system later
 		tris_compute_buffer		= new ComputeWriteBuffer({loaded_model->tris});
@@ -393,7 +396,12 @@ namespace Raytracer
 			: update_free_float_camera_behavior(delta_time_ms);
 
 		if(settings.recompile_changed_shaders_automatically)
-			Compute::recompile_kernels(ComputeKernelRecompilationCondition::SourceChanged);
+		{
+			if(Compute::recompile_kernels(ComputeKernelRecompilationCondition::SourceChanged))
+			{
+				internal.camera_dirty = true;
+			}
+		}
 
 		float old_camera_speed_t = settings.camera_speed_t;
 		settings.camera_speed_t += ImGui::GetIO().MouseWheel * 0.01f;
@@ -456,10 +464,14 @@ namespace Raytracer
 		sceneData.resolution[0] = internal.render_width;
 		sceneData.resolution[1] = internal.render_height;
 		sceneData.tri_count = (uint)loaded_model->tris.size();
+		sceneData.frame_number++;
 
 		// TODO: we currently don't take into account world changes!
 
 		unsigned int render_area = internal.render_width * internal.render_height;
+
+		if(!settings.accumulate_frames)
+			internal.camera_dirty = true;
 
 		if(internal.camera_dirty)
 		{
@@ -651,8 +663,9 @@ namespace Raytracer
 		ImGui::Text("Framerate Limit");	
 		ImGui::InputInt("## Framerate Limit Value Input Int", &settings.fps_limit_value, 0, 0);
 		ImGui::Checkbox("Limit framerate?", &settings.fps_limit_enabled);
-
+		
 		ImGui::Checkbox("Show onscreen log?", &settings.show_onscreen_log);
+		ImGui::Checkbox("Accumulate frames?", &settings.accumulate_frames);
 
 		// Has to be in order!
 		static std::pair<TonemappingType, std::string> tonemapping_text[] =

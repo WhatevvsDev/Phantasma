@@ -120,7 +120,10 @@ struct SceneData
 	float3 cam_right;
 	float3 cam_up;
 	float object_inverse_transform[16];
+	int frame_number;
 };
+
+#define EPSILON 0.000001f
 
 void intersect_tri(struct Ray* ray, struct Tri* tris, uint triIdx)
 {
@@ -128,7 +131,7 @@ void intersect_tri(struct Ray* ray, struct Tri* tris, uint triIdx)
 	const float3 edge2 = tris[triIdx].vertex2 - tris[triIdx].vertex0;
 	const float3 h = cross( ray->D, edge2 );
 	const float a = dot( edge1, h );
-	if (a > -0.000001f && a < 0.000001f) return; // ray parallel to triangle
+	if (a > -EPSILON && a < EPSILON) return; // ray parallel to triangle
 	const float f = 1 / a;
 	const float3 s = ray->O - tris[triIdx].vertex0;
 	const float u = f * dot( s, h );
@@ -215,7 +218,7 @@ float3 sky_color(struct Ray* ray, float3* sun_dir)
 {
 	float3 sky_color = (float3)(0.333f, 0.61f, 0.84f);
 	float3 horizon_color = (float3)(0.9f, 0.9f, 0.92f);
-	
+
 	float rd = (ray->D.y + 1.0f) * 0.5f;
 	float horizont = smoothstep(0.3f, 0.75f, 1.0f - rd);
 	
@@ -223,150 +226,143 @@ float3 sky_color(struct Ray* ray, float3* sun_dir)
 
 	float sunp = min(dot(ray->D, -*sun_dir), 0.0f);
 	float sun = smoothstep(0.99f, 1.0f, sunp * sunp * sunp * sunp);
-	return lerp(sky, (float3)(1.0f, 1.0f, 1.0f), sun);
+	float sun_intensity = 1.0f;
+	return lerp(sky, (float3)(sun_intensity), sun) * 2.0f;
 }
 
 #define DEPTH 32
 #define EULER 2.71828f
 
-float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* tris, uint* trisIdx, uint depth, float* inverse_transform)
+float3 tri_normal(struct Tri* tri)
 {
-	float3 sun_dir = normalize((float3)(0.5f, 1.0f, -0.7f));
+	float3 a = (*tri).vertex0;
+	float3 b = (*tri).vertex1;
+	float3 c = (*tri).vertex2;
 
-	float3 transformed_dir = transform((float4)(primary_ray->D, 0), inverse_transform).xyz;
-	float3 transformed_o = transform((float4)(primary_ray->O, 1), inverse_transform).xyz;
+	return normalize(cross(a - b, a - c));
+}
 
-	const int ray_stack_size = 32;
+uint WangHash( uint s ) 
+{ 
+	s = (s ^ 61) ^ (s >> 16);
+	s *= 9, s = s ^ (s >> 4);
+	s *= 0x27d4eb2d;
+	s = s ^ (s >> 15); 
+	return s; 
+}
+uint RandomInt( uint* s ) // Marsaglia's XOR32 RNG
+{ 
+	*s ^= *s << 13;
+	*s ^= *s >> 17;
+	* s ^= *s << 5; 
+	return *s; 
+}
+float RandomFloat( uint* s ) 
+{ 
+	return RandomInt( s ) * 2.3283064365387e-10f; // = 1 / (2^32-1)
+}
+
+float3 random_unit_vector( uint* rand_seed)
+{
+	float3 result = (float3)(RandomFloat(rand_seed), RandomFloat(rand_seed), RandomFloat(rand_seed));
+
+	result *= 2;
+	result -= 1;
+
+	int joe = 100;
+	while(joe--)
+	{
+		if(dot(result,result) < 1.0f)
+		{
+			return normalize(result);
+		}
+		result = (float3)(RandomFloat(rand_seed), RandomFloat(rand_seed), RandomFloat(rand_seed));
+		result *= 2;
+		result -= 1;
+	}
+
+	return normalize(result);
+}
+
+float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* tris, uint* trisIdx, uint depth, float* inverse_transform, uint* rand_seed)
+{
+	float3 sun_dir = normalize((float3)(1.0f, 0.8f, -0.7f));
 
 	// Keeping track of current ray in the stack
+	const int ray_stack_size = 32;
 	struct Ray ray_stack[ray_stack_size];
 	int ray_stack_idx = 1;
 
 	ray_stack[0] = *primary_ray;
 
-	float3 diffuse = (float3)(0.0f);
+	float3 color = (float3)(1.0f);
+	int ray_count = 0;
 
 	while(ray_stack_idx > 0)
 	{
+		// Go through ray stack, return if empty
 		ray_stack_idx--;
-		struct Ray current_ray = ray_stack[ray_stack_idx];
 		if(ray_stack_idx < 0)
-			return 1;
+			return color;
 
-		if(dot(current_ray.light, current_ray.light) < 0.00001f || 
-		( current_ray.depth <= 0 ))
-		{
+		struct Ray current_ray = ray_stack[ray_stack_idx];
+
+		bool out_of_scope = (dot(current_ray.light, current_ray.light) < EPSILON || ( current_ray.depth <= 0 ));
+
+		if(out_of_scope)
 			continue;
-		}
 
-		if(current_ray.depth == DEPTH)
-		{
-			current_ray.D = transformed_dir;
-			current_ray.O = transformed_o;
-		}
+		// Do raytracing bits
 		intersect_bvh(&current_ray, 0, nodes, tris, trisIdx);
-
-		if(current_ray.depth == DEPTH)
-		{
-			current_ray.D = primary_ray->D;
-			current_ray.O = primary_ray->O;
-		}
 		
 		bool hit_anything = current_ray.t < 1e30;
 
 		if(!hit_anything)
 		{
-		 	diffuse += sky_color(&current_ray, &sun_dir) * current_ray.light;
+		 	color *= sky_color(&current_ray, &sun_dir) * current_ray.light;
 			continue;
 		}
 		else
 		{
-			if(current_ray.depth == DEPTH)
-			{
-				primary_ray->tri_hit = current_ray.tri_hit;
-				primary_ray->t = current_ray.t;
-				current_ray.D = transformed_dir;
-				current_ray.O = transformed_o;
-			}
-		}
-		
-		float3 hit_pos = current_ray.O + (current_ray.D * current_ray.t);
-		float3 a = tris[current_ray.tri_hit].vertex0;
-		float3 b = tris[current_ray.tri_hit].vertex1;
-		float3 c = tris[current_ray.tri_hit].vertex2;
+			float3 hit_pos = current_ray.O + (current_ray.D * current_ray.t - EPSILON);
+			float3 normal = tri_normal(&tris[current_ray.tri_hit]);
+			bool inner_normal = (dot(normal, current_ray.D) < 0.0f);
 
-		float3 normal = normalize(cross(a - c, a - b));
-		bool inner_normal = (dot(normal, current_ray.D) < 0.0f);
-		
-		float d = 1.0f;
-		float s = 1.0f - d;
-
-		if(false) // Diffuse
-		{
-			struct Ray shadow_ray;
-			shadow_ray.O = hit_pos;
-			shadow_ray.D = sun_dir;
-			shadow_ray.t = 1e30f;
-			
-			// We force intersect for diffuse ray
-			intersect_bvh(&shadow_ray, 0, nodes, tris, trisIdx);
-				
-			bool shadow = shadow_ray.t < 1e30;
-			float shadowt = (clamp((1.0f - shadow), 0.0f, 1.0f));
-
-			diffuse += (float3)(current_ray.light * d * shadowt) * dot(-normal, sun_dir);
-
-			struct Ray specular_ray;
-			specular_ray.O = hit_pos;
-			specular_ray.D = reflected(current_ray.D, normal);
-			specular_ray.t = 1e30f;
-			specular_ray.light = current_ray.light * s * shadowt;
-			specular_ray.depth = current_ray.depth - 1;
-
-			ray_stack[ray_stack_idx++] = specular_ray;
-		}
-		else // Dielectric
-		{
 			if(inner_normal)
-			{
-				float absorbtion_coefficient = 0.1f;
+			normal = -normal;
 
-				current_ray.light *= pow(EULER, -absorbtion_coefficient * current_ray.t) * (float3)(1.0f, 0.0f, 0.0f);
+			float3 hemisphere_normal = random_unit_vector(rand_seed);
+			if(dot(hemisphere_normal, normal) < 0.0f)
+			{
+				hemisphere_normal = -hemisphere_normal;
 			}
 
-			float ior = 1.33f; // water is 1.33
+			struct Ray new_ray;
+			new_ray.O = hit_pos;
+			new_ray.D = hemisphere_normal;
+			new_ray.t = 1e30f;
+			new_ray.tri_hit = 0;
+			new_ray.light = current_ray.light;
+			new_ray.depth = current_ray.depth - 1;
+			ray_count++;
 
-			float refraction_ratio = (!inner_normal ? (1.0f / ior) : ior);
+			ray_stack[ray_stack_idx++] = new_ray;
+			
+			float3 object_color;
 
-			float reflectance = clamp(fresnel(current_ray.D, -normal, ior), 0.0f, 1.0f);
-			float transmittance = 1.0f - reflectance;
-			float3 bias = normal * 0.01f * (inner_normal ? 1.0f : -1.0f);
-
+			if(current_ray.tri_hit > 2)
 			{
-				struct Ray reflection_ray;
-				reflection_ray.O = hit_pos + bias;
-				reflection_ray.D = normalize(reflected(current_ray.D, normal));
-				reflection_ray.t = 1e30f;
-				reflection_ray.light = current_ray.light * reflectance;
-				reflection_ray.depth = current_ray.depth - 2;
-
-				ray_stack[ray_stack_idx++] = reflection_ray;
+				object_color = (float3)(1.0f, 0.0f, 1.0f);
+			}
+			else
+			{
+				object_color = (float3)(1.0f, 1.0f, 1.0f);
 			}
 
-			if(reflectance < 1.0f)
-			{
-				struct Ray transmittance_ray;
-				transmittance_ray.O = hit_pos - bias;
-				transmittance_ray.D = normalize(refracted(current_ray.D, normal, refraction_ratio));
-				transmittance_ray.t = 1e30f;
-				transmittance_ray.light = current_ray.light * transmittance;
-				transmittance_ray.depth = current_ray.depth - 2;
-
-				ray_stack[ray_stack_idx++] = transmittance_ray;
-			}
-		}	
+			color *= object_color * current_ray.light * 0.5f;
+		}
 	}
-	return diffuse;
+	return color;// light;// / (float)ray_count;
 }
 
 void kernel raytrace(global float* accumulation_buffer, global uint* buffer, global int* mouse, global struct Tri* tris, global struct BVHNode* nodes, global uint* trisIdx, global struct SceneData* sceneData)
@@ -377,6 +373,7 @@ void kernel raytrace(global float* accumulation_buffer, global uint* buffer, glo
 	int x = get_global_id(0);
 	int y = get_global_id(1);
 	uint pixel_dest = (x + y * width);
+	uint rand_seed = WangHash(pixel_dest + sceneData->frame_number * width * height);
 
 	float x_t = ((x / (float)width) - 0.5f) * 2.0f;
 	float y_t = ((y / (float)height)- 0.5f) * 2.0f;
@@ -395,25 +392,19 @@ void kernel raytrace(global float* accumulation_buffer, global uint* buffer, glo
 	ray.light = 1.0f;
 	ray.depth = DEPTH;
 
-	float3 color = trace(&ray, 0, nodes, tris, trisIdx, DEPTH, sceneData->object_inverse_transform);
+	float3 color = trace(&ray, 0, nodes, tris, trisIdx, DEPTH, sceneData->object_inverse_transform, &rand_seed);
 
 	bool is_mouse_ray = (x == sceneData->mouse_x) && (y == sceneData->mouse_y);
 	bool ray_hit_anything = ray.t < 1e30f;
 
 	if(is_mouse_ray)
 	{
-		*mouse = ray_hit_anything ?
-					ray.tri_hit :
-					-1;
+		*mouse = ray_hit_anything
+		 ? ray.tri_hit
+		 : -1;
 	}
 	
 	accumulation_buffer[pixel_dest * 4 + 0] += color.x;
 	accumulation_buffer[pixel_dest * 4 + 1] += color.y;
 	accumulation_buffer[pixel_dest * 4 + 2] += color.z;
-
-	int r = clamp((int)(color.x * 255.0f), 0, 255);
-	int g = clamp((int)(color.y * 255.0f), 0, 255);
-	int b = clamp((int)(color.z * 255.0f), 0, 255);
-
-	buffer[pixel_dest] = 0x00010000 * b + 0x00000100 * g + 0x00000001 * r;
 }
