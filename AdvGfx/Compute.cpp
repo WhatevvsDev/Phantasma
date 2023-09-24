@@ -205,10 +205,33 @@ ComputeReadWriteBuffer::ComputeReadWriteBuffer(const ComputeDataHandle& data)
     
 }
 
+ComputeGPUOnlyBuffer::ComputeGPUOnlyBuffer(size_t data_size)
+    : internal_buffer(cl::Buffer(compute.context, CL_MEM_HOST_NO_ACCESS, data_size))
+{
+    
+}
+
 ComputeOperation::ComputeOperation(const std::string& kernel_name)
     : kernel(&compute.kernels.find(kernel_name)->second)
 {
 
+}
+
+
+ComputeOperation& ComputeOperation::write(const ComputeGPUOnlyBuffer& buffer)
+{
+    kernel->cl_kernel.setArg(arg_count, buffer.internal_buffer);
+
+    arg_count++;
+    return *this;
+}
+
+ComputeOperation& ComputeOperation::read_write(const ComputeGPUOnlyBuffer& buffer)
+{
+    kernel->cl_kernel.setArg(arg_count, buffer.internal_buffer);
+
+    arg_count++;
+    return *this;
 }
 
 ComputeOperation& ComputeOperation::write(const ComputeDataHandle& data)
@@ -244,6 +267,15 @@ ComputeOperation& ComputeOperation::read(const ComputeReadBuffer& buffer)
     arg_count++;
     return *this;
 }
+
+ComputeOperation& ComputeOperation::read(const ComputeGPUOnlyBuffer& buffer)
+{
+    kernel->cl_kernel.setArg(arg_count, buffer.internal_buffer);
+
+    arg_count++;
+    return *this;
+}
+
 
 ComputeOperation& ComputeOperation::read_write(const ComputeReadWriteBuffer& buffer)
 {

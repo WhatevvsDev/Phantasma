@@ -72,6 +72,12 @@
     <ClCompile Include="ImGuizmo.cpp">
       <Filter>External Source</Filter>
     </ClCompile>
+    <ClCompile Include="implot.cpp">
+      <Filter>External Source</Filter>
+    </ClCompile>
+    <ClCompile Include="implot_items.cpp">
+      <Filter>External Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="App.h">
@@ -109,6 +115,9 @@
     </ClInclude>
     <ClInclude Include="JSONUtility.h">
       <Filter>Utils</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

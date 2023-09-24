@@ -7,6 +7,9 @@
 #include "Mesh.h"
 #include "LogUtility.h"
 #include "IOUtility.h"
+#include "Utilities.h"
+#include "Timer.h"
+
 
 #include <fstream>
 #include <ostream>
@@ -18,6 +21,7 @@
 #include <stb_image_write.h>
 #include <GLFW/glfw3.h>
 #include <ImGuizmo.h>
+#include <ImPlot.h>
 #include <IconsFontAwesome6.h>
 
 enum class TonemappingType
@@ -108,13 +112,13 @@ namespace Raytracer
 		float pad_3 { 0.0f };
 		glm::mat4 object_inverse_transform { glm::mat4(1) };
 		int frame_number;
+		bool reset_accumulator;
 	} sceneData;
 
 	struct
 	{
 		uint32_t  mouse_click_tri = 0; // TODO: Purely for testing ImGuizmo, backing code should be changed later
 		uint32_t* buffer { nullptr };
-		float* accumulation_buffer { nullptr};
 		float show_move_speed_bar_time { 0.0f };
 		bool show_debug_ui { false };
 		bool screenshot { false };
@@ -129,6 +133,15 @@ namespace Raytracer
 		const int render_channel_count { 4 };
 		
 		ImGuizmo::OPERATION current_gizmo_operation { ImGuizmo::TRANSLATE };
+		ComputeGPUOnlyBuffer* gpu_accumulation_buffer;
+
+		struct
+		{
+			Timer timer;
+			static const int data_samples { 256 };
+			float update_times_ms[data_samples] {};
+			float render_times_ms[data_samples] {};
+		} performance;
 	} internal;
 
 	namespace Input
@@ -200,9 +213,6 @@ namespace Raytracer
 
 		internal.render_width = desc.width_px;
 		internal.render_height = desc.height_px;
-
-		delete[] internal.accumulation_buffer;
-		internal.accumulation_buffer = new float[desc.width_px * desc.height_px * internal.render_channel_count];
 	}
 
 	// Creates the necessary buffers and sets internal state
@@ -271,6 +281,10 @@ namespace Raytracer
 		init_internal(desc);
 		init_load_saved_data();
 		init_load_shaders();
+
+		internal.gpu_accumulation_buffer = new ComputeGPUOnlyBuffer((size_t)(internal.render_width * internal.render_height * internal.render_channel_count * sizeof(float)));
+
+		internal.performance.timer.start();
 
 		// TODO: Temporary, will probably be replaced with asset browser?
 		loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\triangle_gathering.gltf");
@@ -389,6 +403,8 @@ namespace Raytracer
 
 	void update(const float delta_time_ms)
 	{
+		internal.performance.timer.reset();
+
 		internal.show_move_speed_bar_time -= (delta_time_ms / 1000.0f);
 		
 		settings.orbit_camera_enabled
@@ -419,10 +435,13 @@ namespace Raytracer
 
 			internal.world_dirty = false;
 		}
+
+		rotate_array_right(internal.performance.update_times_ms, internal.performance.data_samples);
+		internal.performance.update_times_ms[0] = internal.performance.timer.to_now();
 	}
 
 	// Averages out acquired samples, and renders them to the screen
-	void raytrace_average_samples(const ComputeReadWriteBuffer& screen_buffer, const ComputeReadWriteBuffer& accumulated_samples)
+	void raytrace_average_samples(const ComputeReadWriteBuffer& screen_buffer, const ComputeGPUOnlyBuffer& accumulated_samples)
 	{
 		float samples_reciprocal = 1.0f / (float)internal.accumulated_samples;
 
@@ -461,6 +480,8 @@ namespace Raytracer
 
 	void raytrace()
 	{
+		internal.performance.timer.reset();
+
 		sceneData.resolution[0] = internal.render_width;
 		sceneData.resolution[1] = internal.render_height;
 		sceneData.tri_count = (uint)loaded_model->tris.size();
@@ -475,18 +496,17 @@ namespace Raytracer
 
 		if(internal.camera_dirty)
 		{
+			sceneData.reset_accumulator = true;
 			internal.camera_dirty = false;
 			internal.accumulated_samples = 0;
-			memset(internal.accumulation_buffer, 0, sizeof(float) * render_area * internal.render_channel_count);
 		}
 
 		ComputeReadWriteBuffer screen_buffer({internal.buffer, (size_t)(render_area)});
-		ComputeReadWriteBuffer accumulation_buffer({internal.accumulation_buffer, (size_t)(render_area * 4)});
 
 		internal.accumulated_samples++;
 
 		ComputeOperation("raytrace.cl")
-			.read_write(accumulation_buffer)
+			.read_write(*internal.gpu_accumulation_buffer)
 			.read(ComputeReadBuffer({internal.buffer, (size_t)(render_area)}))
 			.read(ComputeReadBuffer({&internal.mouse_over_idx, 1}))
 			.write(*tris_compute_buffer)
@@ -496,8 +516,14 @@ namespace Raytracer
 			.global_dispatch({internal.render_width, internal.render_height, 1})
 			.execute();
 
-		raytrace_average_samples(screen_buffer, accumulation_buffer);
+		raytrace_average_samples(screen_buffer, (*internal.gpu_accumulation_buffer));
 		raytrace_apply_post_process(screen_buffer);
+
+		sceneData.reset_accumulator = false;
+
+		// We query performance here to avoid screenshot/ui code
+		rotate_array_right(internal.performance.render_times_ms, internal.performance.data_samples);
+		internal.performance.render_times_ms[0] = internal.performance.timer.to_now();
 
 		if(internal.show_debug_ui)
 		{
@@ -520,6 +546,7 @@ namespace Raytracer
 			LOGDEBUG("Saved screenshot.");
 			internal.screenshot = false;
 		}
+
 	}
 
 	void ui()
@@ -638,7 +665,15 @@ namespace Raytracer
 		// TODO: Remake this as not just a standard debug window, but something more user friendly
 
 		ImGui::Begin(" Debug settings window");
+
+
 		
+		ImPlot::BeginPlot("Performance plot", {-1, 0}, ImPlotFlags_NoInputs);
+		
+		ImPlot::PlotLine("Update time (ms)", internal.performance.update_times_ms, internal.performance.data_samples, 1.0f, 0.0f, ImPlotLineFlags_Shaded);
+		ImPlot::PlotLine("Render time (ms)", internal.performance.render_times_ms, internal.performance.data_samples, 1.0f, 0.0f, ImPlotLineFlags_Shaded);
+		ImPlot::EndPlot();
+
 		ImGui::Checkbox("Orbit camera enabled?", &settings.orbit_camera_enabled);
 		if(!settings.orbit_camera_enabled)
 			ImGui::BeginDisabled();

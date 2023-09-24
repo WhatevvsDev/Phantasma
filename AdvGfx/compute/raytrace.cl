@@ -121,6 +121,7 @@ struct SceneData
 	float3 cam_up;
 	float object_inverse_transform[16];
 	int frame_number;
+	bool reset_accumulator;
 };
 
 #define EPSILON 0.000001f
@@ -404,7 +405,17 @@ void kernel raytrace(global float* accumulation_buffer, global uint* buffer, glo
 		 : -1;
 	}
 	
-	accumulation_buffer[pixel_dest * 4 + 0] += color.x;
-	accumulation_buffer[pixel_dest * 4 + 1] += color.y;
-	accumulation_buffer[pixel_dest * 4 + 2] += color.z;
+	if(sceneData->reset_accumulator)
+	{
+		accumulation_buffer[pixel_dest * 4 + 0] = color.x;
+		accumulation_buffer[pixel_dest * 4 + 1] = color.y;
+		accumulation_buffer[pixel_dest * 4 + 2] = color.z;
+	}
+	else
+	{
+		accumulation_buffer[pixel_dest * 4 + 0] += color.x;
+		accumulation_buffer[pixel_dest * 4 + 1] += color.y;
+		accumulation_buffer[pixel_dest * 4 + 2] += color.z;
+	}
+
 }

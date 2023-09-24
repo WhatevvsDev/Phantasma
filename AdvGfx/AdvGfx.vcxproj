@@ -71,20 +71,20 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <ExternalIncludePath>$(SolutionDir)Dependencies\ImGUI;$(SolutionDir)Dependencies\glm;$(SolutionDir)Dependencies\GLFW3\include;$(SolutionDir)Dependencies\OpenCL\include;$(SolutionDir)Dependencies\STB;$(SolutionDir)Dependencies\NlohmannJSON;$(SolutionDir)Dependencies\TinyGLTF;$(SolutionDir)Dependencies\ImGuizmo;$(SolutionDir)Dependencies\FontAwesome;$(ExternalIncludePath)</ExternalIncludePath>
+    <ExternalIncludePath>$(SolutionDir)Dependencies\ImGUI;$(SolutionDir)Dependencies\glm;$(SolutionDir)Dependencies\GLFW3\include;$(SolutionDir)Dependencies\OpenCL\include;$(SolutionDir)Dependencies\STB;$(SolutionDir)Dependencies\NlohmannJSON;$(SolutionDir)Dependencies\TinyGLTF;$(SolutionDir)Dependencies\ImGuizmo;$(SolutionDir)Dependencies\FontAwesome;$(SolutionDir)Dependencies\ImPlot;$(ExternalIncludePath)</ExternalIncludePath>
     <SourcePath>$(SolutionDir)Dependencies\ImGuizmo;$(SolutionDir)Dependencies\ImGUI;$(SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <ExternalIncludePath>$(SolutionDir)Dependencies\ImGUI;$(SolutionDir)Dependencies\glm;$(SolutionDir)Dependencies\GLFW3\include;$(SolutionDir)Dependencies\OpenCL\include;$(SolutionDir)Dependencies\STB;$(SolutionDir)Dependencies\NlohmannJSON;$(SolutionDir)Dependencies\TinyGLTF;$(SolutionDir)Dependencies\ImGuizmo;$(SolutionDir)Dependencies\FontAwesome;$(ExternalIncludePath)</ExternalIncludePath>
+    <ExternalIncludePath>$(SolutionDir)Dependencies\ImGUI;$(SolutionDir)Dependencies\glm;$(SolutionDir)Dependencies\GLFW3\include;$(SolutionDir)Dependencies\OpenCL\include;$(SolutionDir)Dependencies\STB;$(SolutionDir)Dependencies\NlohmannJSON;$(SolutionDir)Dependencies\TinyGLTF;$(SolutionDir)Dependencies\ImGuizmo;$(SolutionDir)Dependencies\FontAwesome;$(SolutionDir)Dependencies\ImPlot;$(ExternalIncludePath)</ExternalIncludePath>
     <SourcePath>$(SolutionDir)Dependencies\ImGuizmo;$(SolutionDir)Dependencies\ImGUI;$(SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <SourcePath>$(SolutionDir)Dependencies\ImGuizmo;$(SolutionDir)Dependencies\ImGUI;$(VC_SourcePath);</SourcePath>
-    <ExternalIncludePath>$(SolutionDir)Dependencies\ImGUI;$(SolutionDir)Dependencies\glm;$(SolutionDir)Dependencies\GLFW3\include;$(SolutionDir)Dependencies\OpenCL\include;$(SolutionDir)Dependencies\STB;$(SolutionDir)Dependencies\NlohmannJSON;$(SolutionDir)Dependencies\TinyGLTF;$(SolutionDir)Dependencies\ImGuizmo;$(SolutionDir)Dependencies\FontAwesome;$(ExternalIncludePath)</ExternalIncludePath>
+    <ExternalIncludePath>$(SolutionDir)Dependencies\ImGUI;$(SolutionDir)Dependencies\glm;$(SolutionDir)Dependencies\GLFW3\include;$(SolutionDir)Dependencies\OpenCL\include;$(SolutionDir)Dependencies\STB;$(SolutionDir)Dependencies\NlohmannJSON;$(SolutionDir)Dependencies\TinyGLTF;$(SolutionDir)Dependencies\ImGuizmo;$(SolutionDir)Dependencies\FontAwesome;$(SolutionDir)Dependencies\ImPlot;$(ExternalIncludePath)</ExternalIncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <SourcePath>$(SolutionDir)Dependencies\ImGuizmo;$(SolutionDir)Dependencies\ImGUI;$(VC_SourcePath);</SourcePath>
-    <ExternalIncludePath>$(SolutionDir)Dependencies\ImGUI;$(SolutionDir)Dependencies\glm;$(SolutionDir)Dependencies\GLFW3\include;$(SolutionDir)Dependencies\OpenCL\include;$(SolutionDir)Dependencies\STB;$(SolutionDir)Dependencies\NlohmannJSON;$(SolutionDir)Dependencies\TinyGLTF;$(SolutionDir)Dependencies\ImGuizmo;$(SolutionDir)Dependencies\FontAwesome;$(ExternalIncludePath)</ExternalIncludePath>
+    <ExternalIncludePath>$(SolutionDir)Dependencies\ImGUI;$(SolutionDir)Dependencies\glm;$(SolutionDir)Dependencies\GLFW3\include;$(SolutionDir)Dependencies\OpenCL\include;$(SolutionDir)Dependencies\STB;$(SolutionDir)Dependencies\NlohmannJSON;$(SolutionDir)Dependencies\TinyGLTF;$(SolutionDir)Dependencies\ImGuizmo;$(SolutionDir)Dependencies\FontAwesome;$(SolutionDir)Dependencies\ImPlot;$(ExternalIncludePath)</ExternalIncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -178,6 +178,8 @@
     <ClCompile Include="imgui_impl_opengl3.cpp" />
     <ClCompile Include="imgui_tables.cpp" />
     <ClCompile Include="imgui_widgets.cpp" />
+    <ClCompile Include="implot.cpp" />
+    <ClCompile Include="implot_items.cpp" />
     <ClCompile Include="Math.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <ClCompile Include="Raytracer.cpp" />
@@ -198,6 +200,7 @@
     <ClInclude Include="Raytracer.h" />
     <ClInclude Include="strippedwindows.h" />
     <ClInclude Include="Timer.h" />
+    <ClInclude Include="Utilities.h" />
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="compute\raytrace.cl">

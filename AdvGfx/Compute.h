@@ -107,6 +107,13 @@ private:
 	ComputeDataHandle data_handle;
 };
 
+struct ComputeGPUOnlyBuffer
+{
+	ComputeGPUOnlyBuffer(size_t data_size);
+
+	cl::Buffer internal_buffer;
+};
+
 struct ComputeOperation
 {
 	ComputeOperation(const std::string& kernel_name);
@@ -115,11 +122,17 @@ struct ComputeOperation
 
 	ComputeOperation& write(const ComputeWriteBuffer& buffer);
 
+	ComputeOperation& write(const ComputeGPUOnlyBuffer& buffer);
+
 	// Data should already be resized to accomodate data!
 	// Buffer should not be created inline
 	ComputeOperation& read(const ComputeReadBuffer& buffer);
 
+	ComputeOperation& read(const ComputeGPUOnlyBuffer& buffer);
+
 	ComputeOperation& read_write(const ComputeReadWriteBuffer& buffer);
+
+	ComputeOperation& read_write(const ComputeGPUOnlyBuffer& buffer);
 
 	ComputeOperation& local_dispatch(glm::ivec3 size);
 
