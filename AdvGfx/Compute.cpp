@@ -290,12 +290,6 @@ ComputeOperation& ComputeOperation::read_write(const ComputeReadWriteBuffer& buf
     return *this;
 }
 
-ComputeOperation& ComputeOperation::local_dispatch(glm::ivec3 size)
-{
-    local_dispatch_size = size;
-    return *this;
-}
-
 ComputeOperation& ComputeOperation::global_dispatch(glm::ivec3 size)
 {
     global_dispatch_size = size;
@@ -307,9 +301,10 @@ void ComputeOperation::execute()
     if(!kernel->is_valid())
         return;
 
-    CHECKCL(compute.queue.enqueueNDRangeKernel(kernel->cl_kernel, cl::NullRange, 
-    cl::NDRange(global_dispatch_size.x, global_dispatch_size.y, global_dispatch_size.z), 
-    cl::NullRange));
+    cl::NDRange global = cl::NDRange(global_dispatch_size.x, global_dispatch_size.y, global_dispatch_size.z);
+    cl::NDRange local = cl::NullRange;
+
+    CHECKCL(compute.queue.enqueueNDRangeKernel(kernel->cl_kernel, cl::NullRange, global, local));
 
     CHECKCL(compute.queue.finish());
 

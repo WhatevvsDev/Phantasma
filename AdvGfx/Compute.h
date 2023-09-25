@@ -134,8 +134,6 @@ struct ComputeOperation
 
 	ComputeOperation& read_write(const ComputeGPUOnlyBuffer& buffer);
 
-	ComputeOperation& local_dispatch(glm::ivec3 size);
-
 	ComputeOperation& global_dispatch(glm::ivec3 size);
 
 	void execute();
@@ -149,7 +147,6 @@ private:
 
 	int arg_count { 0 };
 
-	glm::ivec3 local_dispatch_size{1, 1, 1};
 	glm::ivec3 global_dispatch_size{1, 1, 1};
 
 	ComputeKernel* kernel { nullptr };

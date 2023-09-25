@@ -98,6 +98,8 @@ struct Ray
 	int tri_hit;
 	float3 light;
 	int depth;
+	float3 D_reciprocal;
+	uint bvh_hits;
 };
 
 struct BVHNode
@@ -132,7 +134,7 @@ void intersect_tri(struct Ray* ray, struct Tri* tris, uint triIdx)
 	const float3 edge2 = tris[triIdx].vertex2 - tris[triIdx].vertex0;
 	const float3 h = cross( ray->D, edge2 );
 	const float a = dot( edge1, h );
-	if (a > -EPSILON && a < EPSILON) return; // ray parallel to triangle
+	if (fabs(a) < EPSILON) return; // ray parallel to triangle
 	const float f = 1 / a;
 	const float3 s = ray->O - tris[triIdx].vertex0;
 	const float u = f * dot( s, h );
@@ -151,11 +153,11 @@ void intersect_tri(struct Ray* ray, struct Tri* tris, uint triIdx)
 
 float intersect_aabb( struct Ray* ray, struct BVHNode* node )
 {
-	float tx1 = (node->minx - ray->O.x) / ray->D.x, tx2 = (node->maxx - ray->O.x) / ray->D.x;
+	float tx1 = (node->minx - ray->O.x) * ray->D_reciprocal.x, tx2 = (node->maxx - ray->O.x)  * ray->D_reciprocal.x;
 	float tmin = min( tx1, tx2 ), tmax = max( tx1, tx2 );
-	float ty1 = (node->miny - ray->O.y) / ray->D.y, ty2 = (node->maxy - ray->O.y) / ray->D.y;
+	float ty1 = (node->miny - ray->O.y)  * ray->D_reciprocal.y, ty2 = (node->maxy - ray->O.y)  * ray->D_reciprocal.y;
 	tmin = max( tmin, min( ty1, ty2 ) ), tmax = min( tmax, max( ty1, ty2 ) );
-	float tz1 = (node->minz - ray->O.z) / ray->D.z, tz2 = (node->maxz - ray->O.z) / ray->D.z;
+	float tz1 = (node->minz - ray->O.z)  * ray->D_reciprocal.z, tz2 = (node->maxz - ray->O.z)  * ray->D_reciprocal.z;
 	tmin = max( tmin, min( tz1, tz2 ) ), tmax = min( tmax, max( tz1, tz2 ) );
 	if (tmax >= tmin && tmin < ray->t && tmax > 0) return tmin; else return 1e30f;
 }
@@ -184,6 +186,7 @@ void intersect_bvh( struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct
 		}
 		else
 		{
+			ray->bvh_hits++;
 			struct BVHNode* left_child = &nodes[node->left_first];
 			struct BVHNode* right_child = &nodes[node->left_first + 1];
 			float left_dist = intersect_aabb(ray, left_child);
@@ -270,8 +273,8 @@ float3 random_unit_vector( uint* rand_seed)
 	result *= 2;
 	result -= 1;
 
-	int joe = 100;
-	while(joe--)
+	int failsafe = 100;
+	while(failsafe--)
 	{
 		if(dot(result,result) < 1.0f)
 		{
@@ -314,6 +317,7 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struc
 			continue;
 
 		// Do raytracing bits
+		current_ray.D_reciprocal = 1.0f / current_ray.D;
 		intersect_bvh(&current_ray, 0, nodes, tris, trisIdx);
 		
 		bool hit_anything = current_ray.t < 1e30;
@@ -373,7 +377,9 @@ void kernel raytrace(global float* accumulation_buffer, global uint* buffer, glo
 
 	int x = get_global_id(0);
 	int y = get_global_id(1);
+
 	uint pixel_dest = (x + y * width);
+	
 	uint rand_seed = WangHash(pixel_dest + sceneData->frame_number * width * height);
 
 	float x_t = ((x / (float)width) - 0.5f) * 2.0f;
@@ -417,5 +423,4 @@ void kernel raytrace(global float* accumulation_buffer, global uint* buffer, glo
 		accumulation_buffer[pixel_dest * 4 + 1] += color.y;
 		accumulation_buffer[pixel_dest * 4 + 2] += color.z;
 	}
-
 }
