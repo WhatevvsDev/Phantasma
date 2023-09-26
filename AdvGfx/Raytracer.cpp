@@ -233,7 +233,7 @@ namespace Raytracer
 		internal.performance.timer.start();
 
 		// TODO: Temporary, will probably be replaced with asset browser?
-		loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\triangle_gathering.gltf");
+		loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\sah_test.gltf");
 
 		// TODO: temporary, will be consolidated into one system later
 		tris_compute_buffer		= new ComputeWriteBuffer({loaded_model->tris});

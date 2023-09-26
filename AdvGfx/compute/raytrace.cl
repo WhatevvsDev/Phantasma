@@ -174,6 +174,8 @@ void intersect_bvh( struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct
 
 	while(1)
 	{
+		ray->bvh_hits++;
+
 		if(node->tri_count > 0)
 		{
 			for (uint i = 0; i < node->tri_count; i++ )
@@ -186,7 +188,6 @@ void intersect_bvh( struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct
 		}
 		else
 		{
-			ray->bvh_hits++;
 			struct BVHNode* left_child = &nodes[node->left_first];
 			struct BVHNode* right_child = &nodes[node->left_first + 1];
 			float left_dist = intersect_aabb(ray, left_child);
@@ -231,7 +232,7 @@ float3 sky_color(struct Ray* ray, float3* sun_dir)
 	float sunp = min(dot(ray->D, -*sun_dir), 0.0f);
 	float sun = smoothstep(0.99f, 1.0f, sunp * sunp * sunp * sunp);
 	float sun_intensity = 1.0f;
-	return lerp(sky, (float3)(sun_intensity), sun) * 2.0f;
+	return lerp(sky, (float3)(sun_intensity), sun) * 3;
 }
 
 #define DEPTH 32
@@ -300,7 +301,6 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struc
 	ray_stack[0] = *primary_ray;
 
 	float3 color = (float3)(1.0f);
-	int ray_count = 0;
 
 	while(ray_stack_idx > 0)
 	{
@@ -319,6 +319,11 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struc
 		// Do raytracing bits
 		current_ray.D_reciprocal = 1.0f / current_ray.D;
 		intersect_bvh(&current_ray, 0, nodes, tris, trisIdx);
+
+		if(current_ray.depth == DEPTH)
+		{
+			primary_ray->bvh_hits = current_ray.bvh_hits;			
+		}
 		
 		bool hit_anything = current_ray.t < 1e30;
 
@@ -349,25 +354,14 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struc
 			new_ray.tri_hit = 0;
 			new_ray.light = current_ray.light;
 			new_ray.depth = current_ray.depth - 1;
-			ray_count++;
-
 			ray_stack[ray_stack_idx++] = new_ray;
 			
-			float3 object_color;
-
-			if(current_ray.tri_hit > 2)
-			{
-				object_color = (float3)(1.0f, 0.0f, 1.0f);
-			}
-			else
-			{
-				object_color = (float3)(1.0f, 1.0f, 1.0f);
-			}
+			float3 object_color = (float3)(1.0f, 1.0f, 1.0f);
 
 			color *= object_color * current_ray.light * 0.5f;
 		}
 	}
-	return color;// light;// / (float)ray_count;
+	return color;
 }
 
 void kernel raytrace(global float* accumulation_buffer, global uint* buffer, global int* mouse, global struct Tri* tris, global struct BVHNode* nodes, global uint* trisIdx, global struct SceneData* sceneData)
@@ -400,6 +394,9 @@ void kernel raytrace(global float* accumulation_buffer, global uint* buffer, glo
 	ray.depth = DEPTH;
 
 	float3 color = trace(&ray, 0, nodes, tris, trisIdx, DEPTH, sceneData->object_inverse_transform, &rand_seed);
+
+
+	color = ray.bvh_hits * 0.1f;
 
 	bool is_mouse_ray = (x == sceneData->mouse_x) && (y == sceneData->mouse_y);
 	bool ray_hit_anything = ray.t < 1e30f;
