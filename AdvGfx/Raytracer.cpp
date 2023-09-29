@@ -233,7 +233,7 @@ namespace Raytracer
 		internal.performance.timer.start();
 
 		// TODO: Temporary, will probably be replaced with asset browser?
-		loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\sah_test.gltf");
+		loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\not_fractal.gltf");
 
 		// TODO: temporary, will be consolidated into one system later
 		tris_compute_buffer		= new ComputeWriteBuffer({loaded_model->tris});
@@ -582,15 +582,14 @@ namespace Raytracer
 		// TODO: Remake this as not just a standard debug window, but something more user friendly
 
 		ImGui::Begin(" Debug settings window");
-
-
 		
-		ImPlot::BeginPlot("Performance plot", {-1, 0}, ImPlotFlags_NoInputs);
+		if (ImPlot::BeginPlot("Performance plot", {-1, 0}, ImPlotFlags_NoInputs))
+		{
+			ImPlot::PlotLine("Update time (ms)", internal.performance.update_times_ms, internal.performance.data_samples, 1.0f, 0.0f, ImPlotLineFlags_Shaded);
+			ImPlot::PlotLine("Render time (ms)", internal.performance.render_times_ms, internal.performance.data_samples, 1.0f, 0.0f, ImPlotLineFlags_Shaded);
+			ImPlot::EndPlot();
+		}
 		
-		ImPlot::PlotLine("Update time (ms)", internal.performance.update_times_ms, internal.performance.data_samples, 1.0f, 0.0f, ImPlotLineFlags_Shaded);
-		ImPlot::PlotLine("Render time (ms)", internal.performance.render_times_ms, internal.performance.data_samples, 1.0f, 0.0f, ImPlotLineFlags_Shaded);
-		ImPlot::EndPlot();
-
 		ImGui::Checkbox("Orbit camera enabled?", &settings.orbit_camera_enabled);
 		if(!settings.orbit_camera_enabled)
 			ImGui::BeginDisabled();

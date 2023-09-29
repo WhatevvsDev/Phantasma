@@ -100,6 +100,7 @@ struct Ray
 	int depth;
 	float3 D_reciprocal;
 	uint bvh_hits;
+	uint ray_parent;
 };
 
 struct BVHNode
@@ -126,7 +127,7 @@ struct SceneData
 	bool reset_accumulator;
 };
 
-#define EPSILON 0.000001f
+#define EPSILON 0.00001f
 
 void intersect_tri(struct Ray* ray, struct Tri* tris, uint triIdx)
 {
@@ -232,7 +233,7 @@ float3 sky_color(struct Ray* ray, float3* sun_dir)
 	float sunp = min(dot(ray->D, -*sun_dir), 0.0f);
 	float sun = smoothstep(0.99f, 1.0f, sunp * sunp * sunp * sunp);
 	float sun_intensity = 1.0f;
-	return lerp(sky, (float3)(sun_intensity), sun) * 3;
+	return lerp(sky, (float3)(sun_intensity), sun);
 }
 
 #define DEPTH 32
@@ -300,7 +301,7 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struc
 
 	ray_stack[0] = *primary_ray;
 
-	float3 color = (float3)(1.0f);
+	float3 color = (float3)(.0f);
 
 	while(ray_stack_idx > 0)
 	{
@@ -329,14 +330,14 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struc
 
 		if(!hit_anything)
 		{
-		 	color *= sky_color(&current_ray, &sun_dir) * current_ray.light;
+			color += current_ray.light * sky_color(&current_ray, &sun_dir);
 			continue;
 		}
 		else
 		{
-			float3 hit_pos = current_ray.O + (current_ray.D * current_ray.t - EPSILON);
+			float3 hit_pos = current_ray.O + (current_ray.D * current_ray.t);
 			float3 normal = tri_normal(&tris[current_ray.tri_hit]);
-			bool inner_normal = (dot(normal, current_ray.D) < 0.0f);
+			bool inner_normal = (dot(normal, current_ray.D) > 0.0f);
 
 			if(inner_normal)
 			normal = -normal;
@@ -348,17 +349,21 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struc
 			}
 
 			struct Ray new_ray;
-			new_ray.O = hit_pos;
+			new_ray.O = hit_pos + EPSILON * hemisphere_normal;
 			new_ray.D = hemisphere_normal;
 			new_ray.t = 1e30f;
 			new_ray.tri_hit = 0;
-			new_ray.light = current_ray.light;
+			new_ray.light = current_ray.light * dot(normal, hemisphere_normal);
 			new_ray.depth = current_ray.depth - 1;
 			ray_stack[ray_stack_idx++] = new_ray;
-			
-			float3 object_color = (float3)(1.0f, 1.0f, 1.0f);
+			new_ray.ray_parent = ray_stack_idx;
 
-			color *= object_color * current_ray.light * 0.5f;
+			
+			float3 albedo = (float3)(1.0f, 1.0f, 0.0f);
+			float3 brdf = albedo / (float)M_PI;
+
+			ray_stack[current_ray.ray_parent].light = (float)M_PI * 2.0f * brdf * current_ray.light * dot(normal, hemisphere_normal);
+			
 		}
 	}
 	return color;
@@ -395,8 +400,7 @@ void kernel raytrace(global float* accumulation_buffer, global uint* buffer, glo
 
 	float3 color = trace(&ray, 0, nodes, tris, trisIdx, DEPTH, sceneData->object_inverse_transform, &rand_seed);
 
-
-	color = ray.bvh_hits * 0.1f;
+	//color = ray.bvh_hits * 0.1f;
 
 	bool is_mouse_ray = (x == sceneData->mouse_x) && (y == sceneData->mouse_y);
 	bool ray_hit_anything = ray.t < 1e30f;

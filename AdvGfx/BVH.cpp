@@ -73,7 +73,7 @@ void subdivide( uint nodeIdx, BVH& bvh, const std::vector<Tri>& tris)
 	// determine split axis and position
 	//glm::vec3 extent = node.max - node.min;
 	
-	
+	/*
 	// determine split axis using SAH
 	int bestAxis = -1;
 	float bestPos = 0, bestCost = 1e30f;
@@ -93,15 +93,15 @@ void subdivide( uint nodeIdx, BVH& bvh, const std::vector<Tri>& tris)
 	float parentCost = node.tri_count * parentArea;
 	
 	if (bestCost >= parentCost) return;
-	
+	*/
 
-	//if (node.tri_count <= 2) return;
-	//// determine split axis and position
-	//glm::vec3 extent = node.max - node.min;
-	//int axis = 0;
-	//if (extent.y > extent.x) axis = 1;
-	//if (extent.z > extent[axis]) axis = 2;
-	//float splitPos = node.min[axis] + extent[axis] * 0.5f;
+	if (node.tri_count <= 2) return;
+	// determine split axis and position
+	glm::vec3 extent = node.max - node.min;
+	int axis = 0;
+	if (extent.y > extent.x) axis = 1;
+	if (extent.z > extent[axis]) axis = 2;
+	float splitPos = node.min[axis] + extent[axis] * 0.5f;
 
 	// in-place partition
 	int i = node.left_first;
