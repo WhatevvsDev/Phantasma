@@ -359,7 +359,13 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struc
 			new_ray.ray_parent = ray_stack_idx;
 
 			
-			float3 albedo = (float3)(1.0f, 1.0f, 0.0f);
+			float3 albedo = (float3)(1.0f, 0.0f, 0.0f);
+
+			if(current_ray.tri_hit <= 1)
+			{
+				albedo = (float3)(1.0f, 1.0f, 1.0f);
+			}
+
 			float3 brdf = albedo / (float)M_PI;
 
 			ray_stack[current_ray.ray_parent].light = (float)M_PI * 2.0f * brdf * current_ray.light * dot(normal, hemisphere_normal);
@@ -400,8 +406,6 @@ void kernel raytrace(global float* accumulation_buffer, global uint* buffer, glo
 
 	float3 color = trace(&ray, 0, nodes, tris, trisIdx, DEPTH, sceneData->object_inverse_transform, &rand_seed);
 
-	//color = ray.bvh_hits * 0.1f;
-
 	bool is_mouse_ray = (x == sceneData->mouse_x) && (y == sceneData->mouse_y);
 	bool ray_hit_anything = ray.t < 1e30f;
 
@@ -411,6 +415,8 @@ void kernel raytrace(global float* accumulation_buffer, global uint* buffer, glo
 		 ? ray.tri_hit
 		 : -1;
 	}
+
+	//color = ray.bvh_hits / 10.0f;
 	
 	if(sceneData->reset_accumulator)
 	{
