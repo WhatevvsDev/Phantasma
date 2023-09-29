@@ -290,6 +290,11 @@ float3 random_unit_vector( uint* rand_seed)
 	return normalize(result);
 }
 
+float beers_law(float thickness, float absorbtion_coefficient)
+{
+	return pow(EULER, -absorbtion_coefficient * thickness);
+}
+
 float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* tris, uint* trisIdx, uint depth, float* inverse_transform, uint* rand_seed)
 {
 	float3 sun_dir = normalize((float3)(1.0f, 0.8f, -0.7f));
@@ -301,7 +306,7 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struc
 
 	ray_stack[0] = *primary_ray;
 
-	float3 color = (float3)(.0f);
+	float3 color = (float3)(0.0f);
 
 	while(ray_stack_idx > 0)
 	{
@@ -315,7 +320,9 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struc
 		bool out_of_scope = (dot(current_ray.light, current_ray.light) < EPSILON || ( current_ray.depth <= 0 ));
 
 		if(out_of_scope)
+		{
 			continue;
+		}
 
 		// Do raytracing bits
 		current_ray.D_reciprocal = 1.0f / current_ray.D;
@@ -340,36 +347,78 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struc
 			bool inner_normal = (dot(normal, current_ray.D) > 0.0f);
 
 			if(inner_normal)
-			normal = -normal;
+				normal = -normal;
 
 			float3 hemisphere_normal = random_unit_vector(rand_seed);
 			if(dot(hemisphere_normal, normal) < 0.0f)
-			{
 				hemisphere_normal = -hemisphere_normal;
-			}
 
 			struct Ray new_ray;
-			new_ray.O = hit_pos + EPSILON * hemisphere_normal;
-			new_ray.D = hemisphere_normal;
+			new_ray.O = hit_pos + hemisphere_normal * 0.0000000f;
 			new_ray.t = 1e30f;
-			new_ray.tri_hit = 0;
-			new_ray.light = current_ray.light * dot(normal, hemisphere_normal);
 			new_ray.depth = current_ray.depth - 1;
-			ray_stack[ray_stack_idx++] = new_ray;
 			new_ray.ray_parent = ray_stack_idx;
 
-			
-			float3 albedo = (float3)(1.0f, 0.0f, 0.0f);
+			bool is_mirror = false;//(current_ray.tri_hit > 1) && ((current_ray.tri_hit % 10) == 0);
+			bool is_dielectric = false;//(current_ray.tri_hit > 1) && ((current_ray.tri_hit % 10) == 1);
 
-			if(current_ray.tri_hit <= 1)
+			float3 albedo = (float3)(0.7f, 0.7f, 1.0f);
+
+			if(is_mirror)
 			{
-				albedo = (float3)(1.0f, 1.0f, 1.0f);
+				float mirror_absorption = 0.1f;
+
+				new_ray.D = reflected(current_ray.D, normal);
+				ray_stack[ray_stack_idx++] = new_ray;
+
+				ray_stack[current_ray.ray_parent].light = current_ray.light * (1.0f - mirror_absorption);
 			}
+			else
+			{
+				if(is_dielectric)
+				{
+					float ior = 1.77f;
 
-			float3 brdf = albedo / (float)M_PI;
+					float refraction_ratio = ior;//(inner_normal ? (1.0f / ior) : ior);
 
-			ray_stack[current_ray.ray_parent].light = (float)M_PI * 2.0f * brdf * current_ray.light * dot(normal, hemisphere_normal);
-			
+					float reflectance = fresnel(current_ray.D, normal, ior);
+					float transmittance = 1.0f - reflectance;
+					float random = RandomFloat(rand_seed);
+
+					if(reflectance > random)
+					{
+						new_ray.D = reflected(current_ray.D, normal);
+						ray_stack[ray_stack_idx++] = new_ray;
+
+						ray_stack[current_ray.ray_parent].light = current_ray.light * reflectance * albedo;
+					}
+					else
+					{
+						new_ray.D = refracted(current_ray.D, normal, refraction_ratio);
+						ray_stack[ray_stack_idx++] = new_ray;
+
+						ray_stack[current_ray.ray_parent].light = current_ray.light * transmittance * albedo;
+					
+						if(inner_normal)
+						{
+							float absorbtion_coefficient = 0.95f;
+
+							ray_stack[current_ray.ray_parent].light *= beers_law(current_ray.t, absorbtion_coefficient);
+						}
+					}
+				}
+				else
+				{
+
+
+					new_ray.D = hemisphere_normal;
+					ray_stack[ray_stack_idx++] = new_ray;
+
+					float3 brdf = albedo / (float)M_PI;
+
+					ray_stack[current_ray.ray_parent].light = (float)M_PI * 2.0f * brdf * current_ray.light * dot(normal, hemisphere_normal);
+				}
+			}
 		}
 	}
 	return color;
