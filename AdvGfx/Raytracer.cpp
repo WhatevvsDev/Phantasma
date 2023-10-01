@@ -146,6 +146,7 @@ namespace Raytracer
 	// TODO: Temporary variables, will be consolidated into one system later
 	ComputeReadBuffer* screen_compute_buffer	{ nullptr };
 	ComputeWriteBuffer* tris_compute_buffer		{ nullptr };
+	ComputeWriteBuffer* normals_compute_buffer	{ nullptr };
 	ComputeWriteBuffer* bvh_compute_buffer		{ nullptr };
 	ComputeWriteBuffer* tri_idx_compute_buffer	{ nullptr };
 
@@ -233,10 +234,11 @@ namespace Raytracer
 		internal.performance.timer.start();
 
 		// TODO: Temporary, will probably be replaced with asset browser?
-		loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\triangle_gathering.gltf");
+		loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\flat_vs_smoothed.gltf");
 
 		// TODO: temporary, will be consolidated into one system later
 		tris_compute_buffer		= new ComputeWriteBuffer({loaded_model->tris});
+		normals_compute_buffer	= new ComputeWriteBuffer({loaded_model->normals});
 		bvh_compute_buffer		= new ComputeWriteBuffer({loaded_model->bvh->bvhNodes});
 		tri_idx_compute_buffer	= new ComputeWriteBuffer({loaded_model->bvh->triIdx});
 
@@ -427,6 +429,7 @@ namespace Raytracer
 			.read_write(*internal.gpu_accumulation_buffer)
 			.read(ComputeReadBuffer({internal.buffer, (size_t)(render_area)}))
 			.read(ComputeReadBuffer({&internal.mouse_over_idx, 1}))
+			.write(*normals_compute_buffer)
 			.write(*tris_compute_buffer)
 			.write(*bvh_compute_buffer)
 			.write(*tri_idx_compute_buffer)

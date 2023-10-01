@@ -90,17 +90,25 @@ struct Tri
 	float3 vertex2;
 };
 
+struct RayIntersection
+{
+	// Barycentrics, we can reconstruct w
+	float u;
+	float v;
+	int tri_hit;
+};
+
 struct Ray 
 { 
     float3 O;
     float3 D; 
     float t;
-	int tri_hit;
 	float3 light;
 	int depth;
 	float3 D_reciprocal;
 	uint bvh_hits;
 	uint ray_parent;
+	struct RayIntersection intersection;
 };
 
 struct BVHNode
@@ -148,7 +156,9 @@ void intersect_tri(struct Ray* ray, struct Tri* tris, uint triIdx)
 	if(ray->t > t)
 	{
 		ray->t = t;
-		ray->tri_hit = triIdx;
+		ray->intersection.tri_hit = triIdx;
+		ray->intersection.u = u;
+		ray->intersection.v = v;
 	}
 }
 
@@ -295,7 +305,20 @@ float beers_law(float thickness, float absorbtion_coefficient)
 	return pow(EULER, -absorbtion_coefficient * thickness);
 }
 
-float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* tris, uint* trisIdx, uint depth, float* inverse_transform, uint* rand_seed)
+float3 interpolate_tri_normal(float4* normals, struct Ray* ray)
+{
+	float u = ray->intersection.u;
+	float v = ray->intersection.v;
+	float w = 1.0f - u - v;
+
+	float3 v0normal = normals[ray->intersection.tri_hit * 3 + 0].xyz;
+	float3 v1normal = normals[ray->intersection.tri_hit * 3 + 1].xyz;
+	float3 v2normal = normals[ray->intersection.tri_hit * 3 + 2].xyz;
+
+	return normalize(v0normal * w + v1normal * u + v2normal * v);
+}
+
+float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, float4* normals, struct Tri* tris, uint* trisIdx, uint depth, float* inverse_transform, uint* rand_seed)
 {
 	float3 sun_dir = normalize((float3)(1.0f, 0.8f, -0.7f));
 
@@ -343,8 +366,8 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struc
 		else
 		{
 			float3 hit_pos = current_ray.O + (current_ray.D * current_ray.t);
-			float3 normal = tri_normal(&tris[current_ray.tri_hit]);
-			bool inner_normal = (dot(normal, current_ray.D) > 0.0f);
+			float3 normal = interpolate_tri_normal(normals, &current_ray);
+			bool inner_normal = (dot(normal, current_ray.D) > 0.5f);
 
 			if(inner_normal)
 				normal = -normal;
@@ -354,15 +377,17 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struc
 				hemisphere_normal = -hemisphere_normal;
 
 			struct Ray new_ray;
-			new_ray.O = hit_pos + hemisphere_normal * 0.0000000f;
+			new_ray.O = hit_pos + hemisphere_normal * EPSILON;
 			new_ray.t = 1e30f;
 			new_ray.depth = current_ray.depth - 1;
 			new_ray.ray_parent = ray_stack_idx;
 
-			bool is_mirror = false;//(current_ray.tri_hit > 1) && ((current_ray.tri_hit % 10) == 0);
-			bool is_dielectric = false;//(current_ray.tri_hit > 1) && ((current_ray.tri_hit % 10) == 1);
+			bool is_mirror = false;
+			bool is_dielectric = false;
 
-			float3 albedo = (float3)(0.7f, 0.7f, 1.0f);
+			float3 albedo = (float3)(1.0f, 0.9f, 1.0f);
+			float ior = 1.88f;
+			float absorbtion_coefficient = 0.05f;
 
 			if(is_mirror)
 			{
@@ -377,40 +402,34 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struc
 			{
 				if(is_dielectric)
 				{
-					float ior = 1.77f;
-
-					float refraction_ratio = ior;//(inner_normal ? (1.0f / ior) : ior);
+					float refraction_ratio = (inner_normal ? (1.0f / ior) : ior);// <- Only use with objects that are enclosed
 
 					float reflectance = fresnel(current_ray.D, normal, ior);
 					float transmittance = 1.0f - reflectance;
 					float random = RandomFloat(rand_seed);
-
+					
 					if(reflectance > random)
 					{
 						new_ray.D = reflected(current_ray.D, normal);
 						ray_stack[ray_stack_idx++] = new_ray;
 
-						ray_stack[current_ray.ray_parent].light = current_ray.light * reflectance * albedo;
+						ray_stack[current_ray.ray_parent].light = current_ray.light * albedo;
 					}
 					else
 					{
 						new_ray.D = refracted(current_ray.D, normal, refraction_ratio);
 						ray_stack[ray_stack_idx++] = new_ray;
 
-						ray_stack[current_ray.ray_parent].light = current_ray.light * transmittance * albedo;
+						ray_stack[current_ray.ray_parent].light = current_ray.light * albedo;
 					
 						if(inner_normal)
 						{
-							float absorbtion_coefficient = 0.95f;
-
 							ray_stack[current_ray.ray_parent].light *= beers_law(current_ray.t, absorbtion_coefficient);
 						}
 					}
 				}
 				else
 				{
-
-
 					new_ray.D = hemisphere_normal;
 					ray_stack[ray_stack_idx++] = new_ray;
 
@@ -424,7 +443,7 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, struc
 	return color;
 }
 
-void kernel raytrace(global float* accumulation_buffer, global uint* buffer, global int* mouse, global struct Tri* tris, global struct BVHNode* nodes, global uint* trisIdx, global struct SceneData* sceneData)
+void kernel raytrace(global float* accumulation_buffer, global uint* buffer, global int* mouse, global float4* normals, global struct Tri* tris, global struct BVHNode* nodes, global uint* trisIdx, global struct SceneData* sceneData)
 {     
 	int width = sceneData->resolution_x;
 	int height = sceneData->resolution_y;
@@ -449,11 +468,10 @@ void kernel raytrace(global float* accumulation_buffer, global uint* buffer, glo
 	ray.O = (float3)(sceneData->cam_pos_x, sceneData->cam_pos_y, sceneData->cam_pos_z);
     ray.D = normalize( pixelPos );
     ray.t = 1e30f;
-	ray.tri_hit = 0;
 	ray.light = 1.0f;
 	ray.depth = DEPTH;
 
-	float3 color = trace(&ray, 0, nodes, tris, trisIdx, DEPTH, sceneData->object_inverse_transform, &rand_seed);
+	float3 color = trace(&ray, 0, nodes, normals, tris, trisIdx, DEPTH, sceneData->object_inverse_transform, &rand_seed);
 
 	bool is_mouse_ray = (x == sceneData->mouse_x) && (y == sceneData->mouse_y);
 	bool ray_hit_anything = ray.t < 1e30f;
@@ -461,7 +479,7 @@ void kernel raytrace(global float* accumulation_buffer, global uint* buffer, glo
 	if(is_mouse_ray)
 	{
 		*mouse = ray_hit_anything
-		 ? ray.tri_hit
+		 ? ray.intersection.tri_hit
 		 : -1;
 	}
 

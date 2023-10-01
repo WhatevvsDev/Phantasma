@@ -21,6 +21,7 @@ struct Mesh
 {
 	Mesh(const std::string& path);
 	std::vector<Tri> tris;
+	std::vector<glm::vec4> normals;
 	BVH* bvh;
 
 	Tri& get_tri_ref(int idx);
@@ -28,7 +29,7 @@ struct Mesh
 };
 
 template <typename T>
-inline std::vector<T> reinterpret_gltf_primitive_buffer_as_vector(tinygltf::Accessor& accessor, tinygltf::Model& model)
+inline std::vector<T> reinterpret_gltf_data_primitive_buffer_as_vector(tinygltf::Accessor& accessor, tinygltf::Model& model)
 {
 	auto& buffer_view = model.bufferViews[(size_t)accessor.bufferView];
 	auto& buffer = model.buffers[buffer_view.buffer];

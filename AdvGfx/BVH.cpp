@@ -87,7 +87,7 @@ void subdivide( uint nodeIdx, BVH& bvh, const std::vector<Tri>& tris)
 	glm::vec3 e = node.max - node.min; // extent of parent
 	float parentArea = aabb_area(e);
 	float parentCost = node.tri_count * parentArea;
-	LOGDEFAULT(std::format("Best {}, Parent {}", bestCost, parentCost));
+
 	if (bestCost >= parentCost) return;
 	// in-place partition
 	int i = node.left_first;

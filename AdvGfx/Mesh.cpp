@@ -38,12 +38,19 @@ Mesh::Mesh(const std::string& path)
 
 	auto primitive = model.meshes[0].primitives[0];
 
-	// Vertices
-	auto& vertex_accessor = model.accessors[primitive.attributes["POSITION"]];
-	auto& vertex_buffer = model.bufferViews[vertex_accessor.bufferView];
+	// Vertex position
+	auto& vertex_position_accessor = model.accessors[primitive.attributes["POSITION"]];
+	auto& vertex_position_buffer = model.bufferViews[vertex_position_accessor.bufferView];
 
-	int vertex_data_size = tinygltf::GetNumComponentsInType(vertex_accessor.type) * tinygltf::GetComponentSizeInBytes(vertex_accessor.componentType);
-	int vertex_count = (int)vertex_buffer.byteLength / vertex_data_size;
+	int vertex_position_data_size = tinygltf::GetNumComponentsInType(vertex_position_accessor.type) * tinygltf::GetComponentSizeInBytes(vertex_position_accessor.componentType);
+	int vertex_position_count = (int)vertex_position_buffer.byteLength / vertex_position_data_size;
+
+	// Vertex normals
+	auto& vertex_normal_accessor = model.accessors[primitive.attributes["NORMAL"]];
+	auto& vertex_normal_buffer = model.bufferViews[vertex_normal_accessor.bufferView];
+
+	int vertex_normal_data_size = tinygltf::GetNumComponentsInType(vertex_normal_accessor.type) * tinygltf::GetComponentSizeInBytes(vertex_normal_accessor.componentType);
+	int vertex_normal_count = (int)vertex_normal_buffer.byteLength / vertex_normal_data_size;
 
 	// Indices
 	auto& index_accessor = model.accessors[primitive.indices];
@@ -56,14 +63,18 @@ Mesh::Mesh(const std::string& path)
 	bool indices_exist = (index_buffer_view.byteLength != 0);
 
 	if(!indices_exist)
-		index_count = vertex_count;
+		index_count = vertex_position_count;
 		
 	tris.resize(index_count / 3);
+	normals.resize(index_count);
 
 	std::vector<int> indices;
 	
 	if(indices_exist)
-		indices = reinterpret_gltf_primitive_buffer_as_vector<int>(index_accessor, model);
+		indices = reinterpret_gltf_data_primitive_buffer_as_vector<int>(index_accessor, model);
+
+	auto vert_pos_buf = model.buffers[vertex_position_buffer.buffer].data.data();
+	auto vert_nor_buf = model.buffers[vertex_normal_buffer.buffer].data.data();
 
 	for(int i = 0, t = 0; i < index_count; i += 3, t++)
 	{
@@ -74,13 +85,17 @@ Mesh::Mesh(const std::string& path)
 			for(int j = 0; j < 3; j++)
 				tri_indices[j] = indices[i + j];
 
-		auto vert_buf = model.buffers[vertex_buffer.buffer].data.data();
 
-		auto float_buf = (glm::vec3*) &vert_buf[vertex_buffer.byteOffset];
+		auto pos_buf = (glm::vec3*) &vert_pos_buf[vertex_position_buffer.byteOffset];
+		auto normal_buf = (glm::vec3*) &vert_nor_buf[vertex_normal_buffer.byteOffset];
 
-		tris[t].vertex0 = float_buf[tri_indices[0]];
-		tris[t].vertex1 = float_buf[tri_indices[1]];
-		tris[t].vertex2 = float_buf[tri_indices[2]];
+		tris[t].vertex0 = pos_buf[tri_indices[0]];
+		tris[t].vertex1 = pos_buf[tri_indices[1]];
+		tris[t].vertex2 = pos_buf[tri_indices[2]];
+			
+		normals[i + 0] = glm::vec4(normal_buf[tri_indices[0]], 0);
+		normals[i + 1] = glm::vec4(normal_buf[tri_indices[1]], 0);
+		normals[i + 2] = glm::vec4(normal_buf[tri_indices[2]], 0);
 	}
 
 	bvh = new BVH(tris);
