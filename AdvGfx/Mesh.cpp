@@ -49,9 +49,6 @@ Mesh::Mesh(const std::string& path)
 	auto& vertex_normal_accessor = model.accessors[primitive.attributes["NORMAL"]];
 	auto& vertex_normal_buffer = model.bufferViews[vertex_normal_accessor.bufferView];
 
-	int vertex_normal_data_size = tinygltf::GetNumComponentsInType(vertex_normal_accessor.type) * tinygltf::GetComponentSizeInBytes(vertex_normal_accessor.componentType);
-	int vertex_normal_count = (int)vertex_normal_buffer.byteLength / vertex_normal_data_size;
-
 	// Indices
 	auto& index_accessor = model.accessors[primitive.indices];
 	auto& index_buffer_view = model.bufferViews[index_accessor.bufferView];

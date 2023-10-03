@@ -24,6 +24,8 @@
 // SOFTWARE.
 //
 
+#pragma warning(push, 0)
+
 #ifndef IMGUI_DEFINE_MATH_OPERATORS
 #define IMGUI_DEFINE_MATH_OPERATORS
 #endif
@@ -2728,3 +2730,5 @@ namespace ImGuizmo
       ComputeContext(svgView.m16, svgProjection.m16, gContext.mModelSource.m16, gContext.mMode);
    }
 };
+
+#pragma warning(pop)
