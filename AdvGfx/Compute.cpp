@@ -90,6 +90,7 @@ struct
     cl::Device device;
     cl::Platform platform; // Driver
     cl::CommandQueue queue;
+    std::string common_source { "" };
 
     std::unordered_map<std::string, ComputeKernel> kernels;
 
@@ -122,7 +123,16 @@ void ComputeKernel::compile()
     state = ComputeKernelState::Empty;
 
     cl::Program::Sources sources;
+
+    // First try to add common source, then add shader-specific source
+    bool common_shader_source_exists = compute.common_source.length() != 0;
+
+    if(common_shader_source_exists)
+        sources.push_back(compute.common_source);
+
     sources.push_back(read_file_to_string(path));
+
+
     state = ComputeKernelState::Source;
 
     cl::Program created_program(compute.context, sources);
@@ -143,7 +153,7 @@ void ComputeKernel::compile()
     }
     else
     {
-        LOGDEBUG(std::format("Created kernel: {}", path));
+        LOGDEBUG(std::format("Created kernel: {} {}", path, common_shader_source_exists ? " - With common source" : ""));
     }
 
     cl_kernel = cl::Kernel(created_program, entry_point.c_str(), &error);
@@ -374,33 +384,28 @@ void get_context_and_command_queue()
     compute.queue = cl::CommandQueue(compute.context, compute.device);
 }
 
+void load_common_shader_source()
+{
+    std::string expected_common_path = get_current_directory_path() + "\\..\\..\\AdvGfx\\compute\\common.cl";
+
+    compute.common_source = read_file_to_string(expected_common_path);
+
+    if(compute.common_source.length() == 0)
+    {
+        LOGDEFAULT("Could not find shader common source, or source was empty!");
+    }
+    else
+    {
+        LOGDEBUG("Loaded shader common source.");
+    }
+}
+
 void Compute::init()
 {
     select_platform();
     select_device();
     get_context_and_command_queue();
-  
-    // Example
-    /*
-    create_kernel("C:/Users/Matt/Desktop/AdvGfx/AdvGfx/compute/example.cl", "example");
-
-    std::vector<int> A = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-    std::vector<int> B = {0, 1, 2, 0, 1, 2, 0, 1, 2, 0};
-    std::vector<int> C;
-    C.resize(10);
-
-    ComputeOperation("kernel.cl")
-        .write(A)
-        .write(B)
-        .read(C)
-        .global_dispatch({10, 1, 1})
-        .execute();
-
-    for(int i=0; i<10; i++)
-    {
-        printf("got: %i \n", C[i]);
-    }
-    */
+    load_common_shader_source();
 }
 
 // Returns true if any kernels have been recompiled

@@ -215,8 +215,9 @@ namespace Raytracer
 
 			bool wrong_file_extension = (file_extension != "cl");
 			bool already_exists = Compute::kernel_exists(file_name);
+			bool file_is_common_source = (file_name == "common");
 
-			if(wrong_file_extension || already_exists)
+			if(wrong_file_extension || already_exists || file_is_common_source)
 				continue;
 			
 			Compute::create_kernel(file_path, file_name);

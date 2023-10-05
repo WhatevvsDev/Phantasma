@@ -209,6 +209,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="compute\average_accumulated.cl" />
+    <None Include="compute\common.cl" />
     <None Include="compute\example.cl" />
     <None Include="compute\reinhard_tonemapping.cl" />
   </ItemGroup>
