@@ -14,3 +14,6 @@ else \
 	LOGDEBUG(("Couldn't load json attribute " #varName));\
 }
 #endif
+
+#define ToJSONVal(lookIn, saveTo, varName) \
+lookIn[#saveTo][#varName] = saveTo.varName;

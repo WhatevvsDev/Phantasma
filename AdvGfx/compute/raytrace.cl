@@ -1,4 +1,4 @@
-struct Tri 
+ struct Tri 
 { 
     float3 vertex0;
 	float3 vertex1;
@@ -277,11 +277,11 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, float
 			new_ray.ray_parent = ray_stack_idx;
 
 			bool is_mirror = false;
-			bool is_dielectric = false;
+			bool is_dielectric = true;
 
 			float3 albedo = (float3)(1.0f, 0.9f, 1.0f);
 			float ior = 1.88f;
-			float absorbtion_coefficient = 0.05f;
+			float absorbtion_coefficient = 0.9f;
 
 			if(is_mirror)
 			{

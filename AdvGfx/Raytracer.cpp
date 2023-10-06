@@ -45,6 +45,8 @@ namespace Raytracer
 		bool show_onscreen_log { false };
 
 		bool accumulate_frames { true };
+		bool limit_accumulated_frames { true };
+		int accumulated_frame_limit { 32 };
 	} settings;
 
 	struct SceneData
@@ -197,7 +199,11 @@ namespace Raytracer
 			TryFromJSONVal(save_data, settings, orbit_camera_distance);
 			TryFromJSONVal(save_data, settings, orbit_camera_height);
 			TryFromJSONVal(save_data, settings, orbit_camera_rotations_per_second);
-			
+
+			TryFromJSONVal(save_data, settings, accumulate_frames);
+			TryFromJSONVal(save_data, settings, limit_accumulated_frames);
+			TryFromJSONVal(save_data, settings, accumulated_frame_limit);
+
 			TryFromJSONVal(save_data, sceneData, cam_pos);
 		}
 	}
@@ -235,7 +241,7 @@ namespace Raytracer
 		internal.performance.timer.start();
 
 		// TODO: Temporary, will probably be replaced with asset browser?
-		loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\flat_vs_smoothed.gltf");
+		loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\stanfordbunny.gltf");
 
 		// TODO: temporary, will be consolidated into one system later
 		tris_compute_buffer		= new ComputeWriteBuffer({loaded_model->tris});
@@ -252,18 +258,22 @@ namespace Raytracer
 	{
 		json save_data;
 
-		save_data["settings"]["camera_speed_t"] = settings.camera_speed_t;
-		save_data["settings"]["fps_limit_enabled"] = settings.fps_limit_enabled;
-		save_data["settings"]["fps_limit_value"] = settings.fps_limit_value;
-		save_data["settings"]["recompile_changed_shaders_automatically"] = settings.recompile_changed_shaders_automatically;
+		ToJSONVal(save_data, settings, camera_speed_t);
+		ToJSONVal(save_data, settings, fps_limit_enabled);
+		ToJSONVal(save_data, settings, fps_limit_value);
+		ToJSONVal(save_data, settings, recompile_changed_shaders_automatically);
 
-		save_data["settings"]["orbit_camera_enabled"] = settings.orbit_camera_enabled;
-		save_data["settings"]["orbit_camera_position"] = settings.orbit_camera_position;
-		save_data["settings"]["orbit_camera_distance"] = settings.orbit_camera_distance;
-		save_data["settings"]["orbit_camera_height"] = settings.orbit_camera_height;
-		save_data["settings"]["orbit_camera_rotations_per_second"] = settings.orbit_camera_rotations_per_second;
+		ToJSONVal(save_data, settings, orbit_camera_enabled);
+		ToJSONVal(save_data, settings, orbit_camera_position);
+		ToJSONVal(save_data, settings, orbit_camera_distance);
+		ToJSONVal(save_data, settings, orbit_camera_height);
+		ToJSONVal(save_data, settings, orbit_camera_rotations_per_second);
 
-		save_data["sceneData"]["cam_pos"] = sceneData.cam_pos;
+		ToJSONVal(save_data, settings, accumulate_frames);
+		ToJSONVal(save_data, settings, limit_accumulated_frames);
+		ToJSONVal(save_data, settings, accumulated_frame_limit);
+
+		ToJSONVal(save_data, sceneData, cam_pos);
 
 		std::ofstream o("phantasma.data.json");
 		o << save_data << std::endl;
@@ -408,13 +418,10 @@ namespace Raytracer
 		sceneData.tri_count = (uint)loaded_model->tris.size();
 		sceneData.frame_number++;
 
-		// TODO: we currently don't take into account world changes!
-
-		unsigned int render_area = internal.render_width * internal.render_height;
-
 		if(!settings.accumulate_frames)
 			internal.camera_dirty = true;
 
+		// TODO: we currently don't take into account world changes!
 		if(internal.camera_dirty)
 		{
 			sceneData.reset_accumulator = true;
@@ -422,7 +429,16 @@ namespace Raytracer
 			internal.accumulated_samples = 0;
 		}
 
+		unsigned int render_area = internal.render_width * internal.render_height;
 		ComputeReadWriteBuffer screen_buffer({internal.buffer, (size_t)(render_area)});
+		
+		if(settings.limit_accumulated_frames)
+		{
+			if(internal.accumulated_samples > settings.accumulated_frame_limit)
+			{
+				goto skip_rendering_goto;
+			}
+		}
 
 		internal.accumulated_samples++;
 
@@ -441,6 +457,8 @@ namespace Raytracer
 		raytrace_average_samples(screen_buffer, (*internal.gpu_accumulation_buffer));
 
 		sceneData.reset_accumulator = false;
+
+		skip_rendering_goto:;
 
 		// We query performance here to avoid screenshot/ui code
 		rotate_array_right(internal.performance.render_times_ms, internal.performance.data_samples);
@@ -604,6 +622,16 @@ namespace Raytracer
 		ImGui::DragFloat("Orbit rotations per second", &settings.orbit_camera_rotations_per_second, 0.01f, -1.0f, 1.0f);
 
 		if(!settings.orbit_camera_enabled)
+			ImGui::EndDisabled();
+
+		ImGui::Checkbox("Limit accumulated frames?", &settings.limit_accumulated_frames);
+
+		if(!settings.limit_accumulated_frames)
+			ImGui::BeginDisabled();
+
+		ImGui::InputInt("Accumulated frame limit", &settings.accumulated_frame_limit, 0, 0);
+
+		if(!settings.limit_accumulated_frames)
 			ImGui::EndDisabled();
 
 		if (ImGui::Button("Recompile Shaders"))
