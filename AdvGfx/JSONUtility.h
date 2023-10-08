@@ -8,7 +8,7 @@ using json = nlohmann::json;
 if(lookIn[#saveTo].find(#varName) != lookIn[#saveTo].end()) \
 {\
 	lookIn[#saveTo].at(#varName).get_to(saveTo.varName);\
-} \
+}\
 else \
 {\
 	LOGDEBUG(("Couldn't load json attribute " #varName));\

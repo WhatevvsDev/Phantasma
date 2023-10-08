@@ -62,8 +62,8 @@ namespace Raytracer
 		glm::vec3 cam_up { 0.0f };
 		float pad_3 { 0.0f };
 		glm::mat4 object_inverse_transform { glm::mat4(1) };
-		int frame_number;
-		bool reset_accumulator;
+		int frame_number { 0 };
+		bool reset_accumulator { false };
 	} sceneData;
 
 	struct
@@ -76,7 +76,7 @@ namespace Raytracer
 
 		bool world_dirty { false };
 		bool camera_dirty { true };
-		int mouse_over_idx;
+		int mouse_over_idx { - 1};
 
 		int accumulated_samples { 0 };
 		int render_width { 0 };
@@ -84,7 +84,7 @@ namespace Raytracer
 		const int render_channel_count { 4 };
 		
 		ImGuizmo::OPERATION current_gizmo_operation { ImGuizmo::TRANSLATE };
-		ComputeGPUOnlyBuffer* gpu_accumulation_buffer;
+		ComputeGPUOnlyBuffer* gpu_accumulation_buffer { nullptr };
 
 		struct
 		{
@@ -158,7 +158,9 @@ namespace Raytracer
 	// Resizes buffers and sets internal state
 	void resize(const RaytracerResizeDesc& desc)
 	{
-		if(desc.new_buffer_ptr != nullptr)
+		bool replace_buffer = desc.new_buffer_ptr != nullptr;
+
+		if(replace_buffer)
 		{
 			internal.buffer = desc.new_buffer_ptr;
 		}
@@ -185,7 +187,10 @@ namespace Raytracer
 	{
 		// Load settings
 		std::ifstream f("phantasma.data.json");
-		if(f.good())
+
+		bool file_opened_successfully = f.good();
+
+		if(file_opened_successfully)
 		{
 			json save_data = json::parse(f);
 
@@ -288,7 +293,9 @@ namespace Raytracer
 	{
 		static float orbit_cam_t = 0.0f;
 
-		if(settings.orbit_camera_rotations_per_second != 0.0f)
+		bool camera_is_orbiting = (settings.orbit_camera_rotations_per_second != 0.0f);
+
+		if(camera_is_orbiting)
 		{
 			orbit_cam_t += (delta_time_ms / 1000.0f) * settings.orbit_camera_rotations_per_second;
 
@@ -328,8 +335,9 @@ namespace Raytracer
 		glm::normalize(dir);
 		glm::vec3 camera_move_delta = glm::vec3(dir * delta_time_ms * 0.01f) * camera_speed_t_to_m_per_second();
 
-		// We are actually moving the camera
-		if(glm::dot(camera_move_delta, camera_move_delta) != 0.0f)
+		bool camera_is_moving = (glm::dot(camera_move_delta, camera_move_delta) != 0.0f);
+
+		if(camera_is_moving)
 		{
 			internal.camera_dirty = true;
 				
@@ -344,12 +352,14 @@ namespace Raytracer
 
 			glm::vec3 camera_angular_delta = glm::vec3(-mouse_delta.y, mouse_delta.x, 0) * 0.1f;
 
-			if(glm::dot(camera_angular_delta, camera_angular_delta) != 0.0f)
+			bool camera_is_rotating = (glm::dot(camera_angular_delta, camera_angular_delta) != 0.0f);
+
+			if(camera_is_rotating)
 			{
 				Input::cam_rotation += camera_angular_delta;
+				bool pitch_exceeds_limit = (fabs(Input::cam_rotation.x) > 89.9f);
 
-				// limit pitch
-				if(fabs(Input::cam_rotation.x) > 89.9f)
+				if(pitch_exceeds_limit)
 					Input::cam_rotation.x = 89.9f * sgn(Input::cam_rotation.x);
 
 				internal.camera_dirty = true;
@@ -369,7 +379,9 @@ namespace Raytracer
 
 		if(settings.recompile_changed_shaders_automatically)
 		{
-			if(Compute::recompile_kernels(ComputeKernelRecompilationCondition::SourceChanged))
+			bool recompiled_any_shaders = Compute::recompile_kernels(ComputeKernelRecompilationCondition::SourceChanged);
+
+			if(recompiled_any_shaders)
 			{
 				internal.camera_dirty = true;
 			}
@@ -432,12 +444,11 @@ namespace Raytracer
 		unsigned int render_area = internal.render_width * internal.render_height;
 		ComputeReadWriteBuffer screen_buffer({internal.buffer, (size_t)(render_area)});
 		
-		if(settings.limit_accumulated_frames)
+		bool accumulated_enough_frames = (internal.accumulated_samples > settings.accumulated_frame_limit);
+
+		if(settings.limit_accumulated_frames && accumulated_enough_frames)
 		{
-			if(internal.accumulated_samples > settings.accumulated_frame_limit)
-			{
-				goto skip_rendering_goto;
-			}
+			goto skip_rendering_goto;
 		}
 
 		internal.accumulated_samples++;
@@ -485,7 +496,6 @@ namespace Raytracer
 			LOGDEBUG("Saved screenshot.");
 			internal.screenshot = false;
 		}
-
 	}
 
 	void ui()
@@ -517,7 +527,9 @@ namespace Raytracer
 		// Bless this mess
 		auto& draw_list = *ImGui::GetForegroundDrawList();
 
-		if(internal.show_move_speed_bar_time > 0 || internal.show_debug_ui)
+		bool move_speed_bar_visible = (internal.show_move_speed_bar_time > 0 || internal.show_debug_ui);
+
+		if(move_speed_bar_visible)
 		{
 			{ // Movement speed bar
 
