@@ -9,6 +9,7 @@
 #include "IOUtility.h"
 #include "Utilities.h"
 #include "Timer.h"
+#include "AssetManager.h"
 
 
 #include <fstream>
@@ -147,12 +148,11 @@ namespace Raytracer
 
 	// TODO: Temporary variables, will be consolidated into one system later
 	ComputeReadBuffer* screen_compute_buffer	{ nullptr };
-	ComputeWriteBuffer* tris_compute_buffer		{ nullptr };
+	/*ComputeWriteBuffer* tris_compute_buffer		{ nullptr };
 	ComputeWriteBuffer* normals_compute_buffer	{ nullptr };
 	ComputeWriteBuffer* bvh_compute_buffer		{ nullptr };
-	ComputeWriteBuffer* tri_idx_compute_buffer	{ nullptr };
+	ComputeWriteBuffer* tri_idx_compute_buffer	{ nullptr };*/
 
-	Mesh* loaded_model { nullptr };
 	glm::mat4 object_transform = glm::mat4(1);
 
 	// Resizes buffers and sets internal state
@@ -235,6 +235,8 @@ namespace Raytracer
 		}
 	}
 
+#define MESHPATH (get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\stanfordbunny.gltf")
+
 	void init(const RaytracerInitDesc& desc)
 	{
 		init_internal(desc);
@@ -245,14 +247,17 @@ namespace Raytracer
 
 		internal.performance.timer.start();
 
+		AssetManager::init();
+
 		// TODO: Temporary, will probably be replaced with asset browser?
-		loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\stanfordbunny.gltf");
+		AssetManager::load_mesh(MESHPATH);
+		//loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\stanfordbunny.gltf");
 
 		// TODO: temporary, will be consolidated into one system later
-		tris_compute_buffer		= new ComputeWriteBuffer({loaded_model->tris});
-		normals_compute_buffer	= new ComputeWriteBuffer({loaded_model->normals});
-		bvh_compute_buffer		= new ComputeWriteBuffer({loaded_model->bvh->bvhNodes});
-		tri_idx_compute_buffer	= new ComputeWriteBuffer({loaded_model->bvh->triIdx});
+		//tris_compute_buffer		= new ComputeWriteBuffer({loaded_model->tris});
+		//normals_compute_buffer	= new ComputeWriteBuffer({loaded_model->normals});
+		//bvh_compute_buffer		= new ComputeWriteBuffer({loaded_model->bvh->bvhNodes});
+		//tri_idx_compute_buffer	= new ComputeWriteBuffer({loaded_model->bvh->triIdx});
 
 		// TODO: this should be created on new mesh instance (DOESNT EXIST YET);
 		sceneData.object_inverse_transform = glm::inverse(object_transform);
@@ -395,11 +400,11 @@ namespace Raytracer
 
 		if(internal.world_dirty)
 		{
-			loaded_model->reconstruct_bvh();
+			/*loaded_model->reconstruct_bvh();
 
 			tris_compute_buffer->update(loaded_model->tris);
 			bvh_compute_buffer->update(loaded_model->bvh->bvhNodes);
-			tri_idx_compute_buffer->update(loaded_model->bvh->triIdx);
+			tri_idx_compute_buffer->update(loaded_model->bvh->triIdx);*/
 
 			internal.world_dirty = false;
 		}
@@ -427,7 +432,7 @@ namespace Raytracer
 
 		sceneData.resolution[0] = internal.render_width;
 		sceneData.resolution[1] = internal.render_height;
-		sceneData.tri_count = (uint)loaded_model->tris.size();
+		sceneData.tri_count = 0; //TODO: Remove this //(uint)loaded_model->tris.size();
 		sceneData.frame_number++;
 
 		if(!settings.accumulate_frames)
@@ -457,10 +462,10 @@ namespace Raytracer
 			.read_write(*internal.gpu_accumulation_buffer)
 			.read(ComputeReadBuffer({internal.buffer, (size_t)(render_area)}))
 			.read(ComputeReadBuffer({&internal.mouse_over_idx, 1}))
-			.write(*normals_compute_buffer)
-			.write(*tris_compute_buffer)
-			.write(*bvh_compute_buffer)
-			.write(*tri_idx_compute_buffer)
+			.write(AssetManager::get_normals_compute_buffer())
+			.write(AssetManager::get_tris_compute_buffer())
+			.write(AssetManager::get_bvh_compute_buffer())
+			.write(AssetManager::get_tri_idx_compute_buffer())
 			.write({&sceneData, 1})
 			.global_dispatch({internal.render_width, internal.render_height, 1})
 			.execute();
@@ -503,7 +508,7 @@ namespace Raytracer
 		ImGui::SetNextWindowPos({});
 		ImGui::Begin("Transform tools", 0, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
 
-		float icon_font_size = 50.0f;
+		float icon_font_size = 50.0f;	
 
 		ImGui::SetWindowFontScale(0.9f);
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {0, 0});
