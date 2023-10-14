@@ -380,7 +380,7 @@ namespace Raytracer
 		if(settings.recompile_changed_shaders_automatically)
 		{
 			bool recompiled_any_shaders = Compute::recompile_kernels(ComputeKernelRecompilationCondition::SourceChanged);
-
+			 
 			if(recompiled_any_shaders)
 			{
 				internal.camera_dirty = true;
@@ -413,7 +413,7 @@ namespace Raytracer
 	{
 		float samples_reciprocal = 1.0f / (float)internal.accumulated_samples;
 
-		ComputeOperation("average_accumulated.cl")
+		ComputeOperation("make_heatmap.cl")
 			.read_write(accumulated_samples)
 			.read_write(screen_buffer)
 			.write({&samples_reciprocal, 1})

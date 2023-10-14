@@ -128,5 +128,6 @@
     <None Include="compute\reinhard_tonemapping.cl" />
     <None Include="compute\average_accumulated.cl" />
     <None Include="compute\common.cl" />
+    <None Include="compute\make_heatmap.cl" />
   </ItemGroup>
 </Project>

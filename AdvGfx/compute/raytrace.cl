@@ -367,6 +367,8 @@ void kernel raytrace(global float* accumulation_buffer, global uint* buffer, glo
 
 	float3 color = trace(&ray, 0, nodes, normals, tris, trisIdx, DEPTH, sceneData->object_inverse_transform, &rand_seed);
 
+	color = ray.bvh_hits * 0.031f;
+
 	bool is_mouse_ray = (x == sceneData->mouse_x) && (y == sceneData->mouse_y);
 	bool ray_hit_anything = ray.t < 1e30f;
 
@@ -392,3 +394,4 @@ void kernel raytrace(global float* accumulation_buffer, global uint* buffer, glo
 		accumulation_buffer[pixel_dest * 4 + 2] += color.z;
 	}
 }
+
