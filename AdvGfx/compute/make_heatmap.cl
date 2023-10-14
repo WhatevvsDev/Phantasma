@@ -1045,7 +1045,11 @@ void kernel make_heatmap(global float* accumulation_buffer, global uint* render_
 
 	//color = (float3)(1.0f, 0.0f, 0.0f);
 
-    uint heatmap_color = colors[(int)(color.x * 1024.0f)];
+    int heatmap_idx = (int)(color.x * 1024.0f);
+    heatmap_idx = clamp(heatmap_idx, 0, 1023);
+
+    
+    uint heatmap_color = colors[heatmap_idx];
 
     int r = heatmap_color & 0x000000ff;
 	int g = heatmap_color & 0x0000ff00;
