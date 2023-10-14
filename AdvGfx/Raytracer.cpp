@@ -55,7 +55,7 @@ namespace Raytracer
 		uint resolution[2] { 0, 0 };
 		uint mouse_pos[2] {};
 		glm::vec3 cam_pos { 0.0f, 10.0f, 0.0f };
-		uint tri_count { 0 };
+		int frame_number { 0 };
 		glm::vec3 cam_forward { 0.0f };
 		float pad_1 { 0.0f };
 		glm::vec3 cam_right { 0.0f };
@@ -63,7 +63,6 @@ namespace Raytracer
 		glm::vec3 cam_up { 0.0f };
 		float pad_3 { 0.0f };
 		glm::mat4 object_inverse_transform { glm::mat4(1) };
-		int frame_number { 0 };
 		bool reset_accumulator { false };
 	} sceneData;
 
@@ -432,7 +431,6 @@ namespace Raytracer
 
 		sceneData.resolution[0] = internal.render_width;
 		sceneData.resolution[1] = internal.render_height;
-		sceneData.tri_count = 0; //TODO: Remove this //(uint)loaded_model->tris.size();
 		sceneData.frame_number++;
 
 		if(!settings.accumulate_frames)
