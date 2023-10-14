@@ -24,7 +24,6 @@ struct Mesh
 	std::vector<glm::vec4> normals;
 	BVH* bvh;
 
-	Tri& get_tri_ref(int idx);
 	void reconstruct_bvh();
 };
 
