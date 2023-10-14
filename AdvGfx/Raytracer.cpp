@@ -64,6 +64,7 @@ namespace Raytracer
 		float pad_3 { 0.0f };
 		glm::mat4 object_inverse_transform { glm::mat4(1) };
 		bool reset_accumulator { false };
+		uint mesh_idx { 0 };
 	} sceneData;
 
 	struct
@@ -234,8 +235,6 @@ namespace Raytracer
 		}
 	}
 
-#define MESHPATH (get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\stanfordbunny.gltf")
-
 	void init(const RaytracerInitDesc& desc)
 	{
 		init_internal(desc);
@@ -249,7 +248,8 @@ namespace Raytracer
 		AssetManager::init();
 
 		// TODO: Temporary, will probably be replaced with asset browser?
-		AssetManager::load_mesh(MESHPATH);
+		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\stanfordbunny.gltf");
+		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\flat_vs_smoothed.gltf");
 		//loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\stanfordbunny.gltf");
 
 		// TODO: temporary, will be consolidated into one system later
@@ -417,7 +417,8 @@ namespace Raytracer
 	{
 		float samples_reciprocal = 1.0f / (float)internal.accumulated_samples;
 
-		ComputeOperation("make_heatmap.cl")
+		// TODO: pass this a buffer of heatmap colors, instead of hardcoding it into the shader
+		ComputeOperation("average_accumulated.cl")
 			.read_write(accumulated_samples)
 			.read_write(screen_buffer)
 			.write({&samples_reciprocal, 1})
@@ -464,6 +465,7 @@ namespace Raytracer
 			.write(AssetManager::get_tris_compute_buffer())
 			.write(AssetManager::get_bvh_compute_buffer())
 			.write(AssetManager::get_tri_idx_compute_buffer())
+			.write(AssetManager::get_mesh_header_buffer())
 			.write({&sceneData, 1})
 			.global_dispatch({internal.render_width, internal.render_height, 1})
 			.execute();
@@ -626,6 +628,14 @@ namespace Raytracer
 			ImPlot::PlotLine("Render time (ms)", internal.performance.render_times_ms, internal.performance.data_samples, 1.0f, 0.0f, ImPlotLineFlags_Shaded);
 			ImPlot::EndPlot();
 		}
+
+
+		int mesh_idx_proxy = (int)sceneData.mesh_idx;
+		if (ImGui::DragInt("Mesh index", &mesh_idx_proxy, 1.0f, 0, AssetManager::loaded_mesh_count() - 1))
+		{
+			internal.camera_dirty = true;
+		}
+		sceneData.mesh_idx = (unsigned int)mesh_idx_proxy;
 		
 		ImGui::Checkbox("Orbit camera enabled?", &settings.orbit_camera_enabled);
 		if(!settings.orbit_camera_enabled)

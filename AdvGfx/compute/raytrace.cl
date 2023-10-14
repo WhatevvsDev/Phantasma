@@ -47,11 +47,27 @@ struct SceneData
 	float3 cam_up;
 	float object_inverse_transform[16];
 	bool reset_accumulator;
+	uint mesh_idx;
+};
+
+struct MeshHeader
+{
+	uint tris_offset;
+	uint tris_count;
+
+	uint normals_offset;
+	uint normals_count; // Is in theory always 3x tris_count;
+
+	uint root_bvh_node_idx;
+	uint bvh_node_count; // Technically could be unnecessary
+
+	uint tri_idx_offset;
+	uint tri_idx_count;
 };
 
 #define EPSILON 0.00001f
 
-void intersect_tri(struct Ray* ray, struct Tri* tris, uint triIdx)
+void intersect_tri(struct Ray* ray, struct Tri* tris, uint triIdx, struct MeshHeader* header)
 {
 	const float3 edge1 = tris[triIdx].vertex1 - tris[triIdx].vertex0;
 	const float3 edge2 = tris[triIdx].vertex2 - tris[triIdx].vertex0;
@@ -87,10 +103,11 @@ float intersect_aabb( struct Ray* ray, struct BVHNode* node )
 	if (tmax >= tmin && tmin < ray->t && tmax > 0) return tmin; else return 1e30f;
 }
 
-void intersect_bvh( struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* tris, uint* trisIdx)
+void intersect_bvh( struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* tris, uint* trisIdx, struct MeshHeader* mesh_header)
 {
 	// Keeping track of current node in the stack
-	struct BVHNode* node = &nodes[0];
+	uint node_offset = mesh_header->root_bvh_node_idx;
+	struct BVHNode* node = &nodes[nodeIdx];
 	struct BVHNode* traversal_stack[32];
 	uint stack_ptr = 0; 
 
@@ -104,7 +121,7 @@ void intersect_bvh( struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct
 		if(node->tri_count > 0)
 		{
 			for (uint i = 0; i < node->tri_count; i++ )
-				intersect_tri( ray, tris, trisIdx[node->left_first + i]);
+				intersect_tri( ray, &tris[mesh_header->tris_offset], trisIdx[node->left_first + i + mesh_header->tri_idx_offset], mesh_header);
 
 			if(stack_ptr == 0)
 				break;
@@ -113,8 +130,8 @@ void intersect_bvh( struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct
 		}
 		else
 		{
-			struct BVHNode* left_child = &nodes[node->left_first];
-			struct BVHNode* right_child = &nodes[node->left_first + 1];
+			struct BVHNode* left_child = &nodes[node->left_first + node_offset];
+			struct BVHNode* right_child = &nodes[node->left_first + node_offset + 1];
 			float left_dist = intersect_aabb(ray, left_child);
 			float right_dist = intersect_aabb(ray, right_child);
 
@@ -211,16 +228,30 @@ float3 interpolate_tri_normal(float4* normals, struct Ray* ray)
 	return normalize(v0normal * w + v1normal * u + v2normal * v);
 }
 
-float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, float4* normals, struct Tri* tris, uint* trisIdx, uint depth, float* inverse_transform, uint* rand_seed)
+struct TraceArgs
+{
+	struct Ray* primary_ray;
+	struct BVHNode* nodes;
+	float4* normals;
+	struct Tri* tris;
+	uint* trisIdx;
+	uint depth;
+	uint* rand_seed;
+	struct MeshHeader* mesh_headers;
+	uint mesh_idx;
+};
+
+float3 trace(struct TraceArgs* args)
 {
 	float3 sun_dir = normalize((float3)(1.0f, 0.8f, -0.7f));
+	struct MeshHeader header = args->mesh_headers[args->mesh_idx];
 
 	// Keeping track of current ray in the stack
 	const int ray_stack_size = 32;
 	struct Ray ray_stack[ray_stack_size];
 	int ray_stack_idx = 1;
 
-	ray_stack[0] = *primary_ray;
+	ray_stack[0] = *args->primary_ray;
 
 	float3 color = (float3)(0.0f);
 
@@ -242,11 +273,11 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, float
 
 		// Do raytracing bits
 		current_ray.D_reciprocal = 1.0f / current_ray.D;
-		intersect_bvh(&current_ray, 0, nodes, tris, trisIdx);
+		intersect_bvh(&current_ray, header.root_bvh_node_idx, args->nodes, args->tris, args->trisIdx, &header);
 
 		if(current_ray.depth == DEPTH)
 		{
-			primary_ray->bvh_hits = current_ray.bvh_hits;			
+			args->primary_ray->bvh_hits = current_ray.bvh_hits;			
 		}
 		
 		bool hit_anything = current_ray.t < 1e30;
@@ -259,13 +290,13 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, float
 		else
 		{
 			float3 hit_pos = current_ray.O + (current_ray.D * current_ray.t);
-			float3 normal = interpolate_tri_normal(normals, &current_ray);
+			float3 normal = interpolate_tri_normal(&args->normals[header.normals_offset], &current_ray);
 			bool inner_normal = (dot(normal, current_ray.D) > 0.5f);
 
 			if(inner_normal)
 				normal = -normal;
 
-			float3 hemisphere_normal = random_unit_vector(rand_seed);
+			float3 hemisphere_normal = random_unit_vector(args->rand_seed);
 			if(dot(hemisphere_normal, normal) < 0.0f)
 				hemisphere_normal = -hemisphere_normal;
 
@@ -299,7 +330,7 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, float
 
 					float reflectance = fresnel(current_ray.D, normal, ior);
 					float transmittance = 1.0f - reflectance;
-					float random = RandomFloat(rand_seed);
+					float random = RandomFloat(args->rand_seed);
 					
 					if(reflectance > random)
 					{
@@ -336,7 +367,7 @@ float3 trace(struct Ray* primary_ray, uint nodeIdx, struct BVHNode* nodes, float
 	return color;
 }
 
-void kernel raytrace(global float* accumulation_buffer, global uint* buffer, global int* mouse, global float4* normals, global struct Tri* tris, global struct BVHNode* nodes, global uint* trisIdx, global struct SceneData* sceneData)
+void kernel raytrace(global float* accumulation_buffer, global uint* buffer, global int* mouse, global float4* normals, global struct Tri* tris, global struct BVHNode* nodes, global uint* trisIdx, global struct MeshHeader* mesh_headers, global struct SceneData* sceneData)
 {     
 	int width = sceneData->resolution_x;
 	int height = sceneData->resolution_y;
@@ -364,9 +395,20 @@ void kernel raytrace(global float* accumulation_buffer, global uint* buffer, glo
 	ray.light = 1.0f;
 	ray.depth = DEPTH;
 
-	float3 color = trace(&ray, 0, nodes, normals, tris, trisIdx, DEPTH, sceneData->object_inverse_transform, &rand_seed);
+	struct TraceArgs trace_args;
+	trace_args.primary_ray = &ray;
+	trace_args.nodes = nodes;
+	trace_args.normals = normals;
+	trace_args.tris = tris;
+	trace_args.trisIdx = trisIdx;
+	trace_args.depth = DEPTH;
+	trace_args.rand_seed = &rand_seed;
+	trace_args.mesh_headers = mesh_headers;
+	trace_args.mesh_idx = sceneData->mesh_idx;
 
-	color = ray.bvh_hits * 0.031f;
+	float3 color = trace(&trace_args);
+
+	//color = ray.bvh_hits * 0.031f;
 
 	bool is_mouse_ray = (x == sceneData->mouse_x) && (y == sceneData->mouse_y);
 	bool ray_hit_anything = ray.t < 1e30f;
