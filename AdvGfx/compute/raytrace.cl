@@ -48,6 +48,8 @@ struct SceneData
 	float object_inverse_transform[16];
 	bool reset_accumulator;
 	uint mesh_idx;
+	uint exr_width;
+	uint exr_height;
 };
 
 struct MeshHeader
@@ -64,6 +66,27 @@ struct MeshHeader
 	uint tri_idx_offset;
 	uint tri_idx_count;
 };
+
+#define PI 3.14159265359f
+
+float3 get_exr_color(float3 direction, float* exr, uint exr_width, uint exr_height)
+{
+	float theta = acos(direction.y);
+	float phi = atan2(direction.z, direction.x) + PI;
+
+	float u = phi / (2 * PI);
+	float v = theta / PI;
+
+	int i = (int)(u * exr_width);
+	int j = (int)(v * exr_height);
+
+	int idx = (i + j * exr_width) * 4;
+	
+	float3 color = (float3)(exr[idx + 0],exr[idx + 1],exr[idx + 2]);
+	float intensity = exr[idx + 3];
+	
+	return color * intensity * 1.25f;
+}
 
 #define EPSILON 0.00001f
 
@@ -239,6 +262,9 @@ struct TraceArgs
 	uint* rand_seed;
 	struct MeshHeader* mesh_headers;
 	uint mesh_idx;
+	float* exr;
+	uint exr_width;
+	uint exr_height;
 };
 
 float3 trace(struct TraceArgs* args)
@@ -284,7 +310,7 @@ float3 trace(struct TraceArgs* args)
 
 		if(!hit_anything)
 		{
-			color += current_ray.light * sky_color(&current_ray, &sun_dir);
+			color += current_ray.light * get_exr_color(current_ray.D, args->exr, args->exr_width, args->exr_height);
 			continue;
 		}
 		else
@@ -310,8 +336,8 @@ float3 trace(struct TraceArgs* args)
 			bool is_dielectric = true;
 
 			float3 albedo = (float3)(1.0f, 0.9f, 1.0f);
-			float ior = 1.88f;
-			float absorbtion_coefficient = 0.9f;
+			float ior = 1.66f;
+			float absorbtion_coefficient = 0.1f;
 
 			if(is_mirror)
 			{
@@ -367,7 +393,7 @@ float3 trace(struct TraceArgs* args)
 	return color;
 }
 
-void kernel raytrace(global float* accumulation_buffer, global uint* buffer, global int* mouse, global float4* normals, global struct Tri* tris, global struct BVHNode* nodes, global uint* trisIdx, global struct MeshHeader* mesh_headers, global struct SceneData* sceneData)
+void kernel raytrace(global float* accumulation_buffer, global uint* buffer, global int* mouse, global float4* normals, global struct Tri* tris, global struct BVHNode* nodes, global uint* trisIdx, global struct MeshHeader* mesh_headers, global struct SceneData* sceneData, global float* exr)
 {     
 	int width = sceneData->resolution_x;
 	int height = sceneData->resolution_y;
@@ -376,7 +402,7 @@ void kernel raytrace(global float* accumulation_buffer, global uint* buffer, glo
 	int y = get_global_id(1);
 
 	uint pixel_dest = (x + y * width);
-	
+
 	uint rand_seed = WangHash(pixel_dest + sceneData->frame_number * width * height);
 
 	float x_t = ((x / (float)width) - 0.5f) * 2.0f;
@@ -405,6 +431,9 @@ void kernel raytrace(global float* accumulation_buffer, global uint* buffer, glo
 	trace_args.rand_seed = &rand_seed;
 	trace_args.mesh_headers = mesh_headers;
 	trace_args.mesh_idx = sceneData->mesh_idx;
+	trace_args.exr = exr;
+	trace_args.exr_width = sceneData->exr_width;
+	trace_args.exr_height = sceneData->exr_height;
 
 	float3 color = trace(&trace_args);
 

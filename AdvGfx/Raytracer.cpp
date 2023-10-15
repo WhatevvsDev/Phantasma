@@ -25,6 +25,9 @@
 #include <ImPlot.h>
 #include <IconsFontAwesome6.h>
 
+#define TINYEXR_IMPLEMENTATION
+#include "tinyexr.h"
+
 namespace Raytracer
 {	
 	struct
@@ -65,6 +68,8 @@ namespace Raytracer
 		glm::mat4 object_inverse_transform { glm::mat4(1) };
 		bool reset_accumulator { false };
 		uint mesh_idx { 0 };
+		uint exr_width;
+		uint exr_height;
 	} sceneData;
 
 	struct
@@ -148,10 +153,8 @@ namespace Raytracer
 
 	// TODO: Temporary variables, will be consolidated into one system later
 	ComputeReadBuffer* screen_compute_buffer	{ nullptr };
-	/*ComputeWriteBuffer* tris_compute_buffer		{ nullptr };
-	ComputeWriteBuffer* normals_compute_buffer	{ nullptr };
-	ComputeWriteBuffer* bvh_compute_buffer		{ nullptr };
-	ComputeWriteBuffer* tri_idx_compute_buffer	{ nullptr };*/
+
+	ComputeWriteBuffer* exr_buffer	{ nullptr };
 
 	glm::mat4 object_transform = glm::mat4(1);
 
@@ -235,22 +238,42 @@ namespace Raytracer
 		}
 	}
 
+	float* out; // width * height * RGBA
+
+	void init_load_exr()
+	{
+		std::string exr_path = get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\resting_place_2k.exr";
+	
+		int width;
+		int height;
+		const char* err = NULL; // or nullptr in C++11
+
+		int ret = LoadEXR(&out, &width, &height, exr_path.c_str(), &err);
+
+		sceneData.exr_width = (uint)width;
+		sceneData.exr_height = (uint)height;
+
+		printf("exr1: %i %i | %i", width, height, ret);
+
+		exr_buffer = new ComputeWriteBuffer({out, (size_t)(width * height * 4)});
+	}
+
 	void init(const RaytracerInitDesc& desc)
 	{
 		init_internal(desc);
 		init_load_saved_data();
 		init_load_shaders();
+		init_load_exr();
 
 		internal.gpu_accumulation_buffer = new ComputeGPUOnlyBuffer((size_t)(internal.render_width * internal.render_height * internal.render_channel_count * sizeof(float)));
 
 		internal.performance.timer.start();
 
+		// TODO: make this "automatic", keep track of things in asset folder
+		// make them loadable to CPU, and then also optionally GPU using a free list or sm
 		AssetManager::init();
-
-		// TODO: Temporary, will probably be replaced with asset browser?
 		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\stanfordbunny.gltf");
 		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\flat_vs_smoothed.gltf");
-		//loaded_model = new Mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\stanfordbunny.gltf");
 
 		// TODO: temporary, will be consolidated into one system later
 		//tris_compute_buffer		= new ComputeWriteBuffer({loaded_model->tris});
@@ -467,6 +490,7 @@ namespace Raytracer
 			.write(AssetManager::get_tri_idx_compute_buffer())
 			.write(AssetManager::get_mesh_header_buffer())
 			.write({&sceneData, 1})
+			.write(*exr_buffer)
 			.global_dispatch({internal.render_width, internal.render_height, 1})
 			.execute();
 
