@@ -30,6 +30,12 @@
 
 namespace Raytracer
 {	
+	struct DiskAsset
+	{
+		std::filesystem::path path;
+		std::string filename;
+	};
+
 	struct
 	{
 		bool recompile_changed_shaders_automatically { true };
@@ -91,6 +97,10 @@ namespace Raytracer
 		
 		ImGuizmo::OPERATION current_gizmo_operation { ImGuizmo::TRANSLATE };
 		ComputeGPUOnlyBuffer* gpu_accumulation_buffer { nullptr };
+
+		std::vector<DiskAsset> exr_assets_on_disk;
+		float* loaded_exr_data { nullptr };
+		std::string current_exr { "None" };
 
 		struct
 		{
@@ -217,53 +227,61 @@ namespace Raytracer
 	}
 
 	// Search for, and automatically compile compute shaders
-	void init_load_shaders()
+	void init_find_assets()
 	{
-		std::string compute_directory = get_current_directory_path() + "\\..\\..\\AdvGfx\\compute\\";
-		for (const auto & possible_compute_shader : std::filesystem::directory_iterator(compute_directory))
+		std::string compute_directory = get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\";
+		for (const auto & asset_path : std::filesystem::recursive_directory_iterator(compute_directory))
 		{
-			std::string file_path = possible_compute_shader.path().string();
+			std::string file_path = asset_path.path().string();
 			std::string file_name_with_extension = file_path.substr(file_path.find_last_of("/\\") + 1);
 			std::string file_extension = file_name_with_extension.substr(file_name_with_extension.find_last_of(".") + 1);
 			std::string file_name = file_name_with_extension.substr(0, file_name_with_extension.length() - file_extension.length() - 1);
 
-			bool wrong_file_extension = (file_extension != "cl");
-			bool already_exists = Compute::kernel_exists(file_name);
+			bool wrong_file_extension = (file_extension != "cl") && (file_extension != "exr");
+			bool already_exists = (file_extension == "cl") && Compute::kernel_exists(file_name);
 			bool file_is_common_source = (file_name == "common");
 
 			if(wrong_file_extension || already_exists || file_is_common_source)
 				continue;
-			
-			Compute::create_kernel(file_path, file_name);
+
+			if(file_extension == "cl")
+			{
+				Compute::create_kernel(file_path, file_name);
+				continue;
+			}
+
+			if(file_extension == "exr")
+			{
+				internal.exr_assets_on_disk.push_back({asset_path, file_name});
+				printf("Found exr file: %s\n", file_name.c_str());
+				continue;
+			}
 		}
 	}
 
-	float* out; // width * height * RGBA
-
-	void init_load_exr()
+	void load_exr(uint index = 0)
 	{
-		std::string exr_path = get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\resting_place_2k.exr";
+		std::string exr_path = internal.exr_assets_on_disk[index].path.string();
 	
 		int width;
 		int height;
 		const char* err = NULL; // or nullptr in C++11
 
-		int ret = LoadEXR(&out, &width, &height, exr_path.c_str(), &err);
+		delete[] internal.loaded_exr_data;
+		int ret = LoadEXR(&internal.loaded_exr_data, &width, &height, exr_path.c_str(), &err);
 
 		sceneData.exr_width = (uint)width;
 		sceneData.exr_height = (uint)height;
 
-		printf("exr1: %i %i | %i", width, height, ret);
-
-		exr_buffer = new ComputeWriteBuffer({out, (size_t)(width * height * 4)});
+		exr_buffer = new ComputeWriteBuffer({internal.loaded_exr_data, (size_t)(width * height * 4)});
 	}
 
 	void init(const RaytracerInitDesc& desc)
 	{
 		init_internal(desc);
 		init_load_saved_data();
-		init_load_shaders();
-		init_load_exr();
+		init_find_assets();
+		load_exr();
 
 		internal.gpu_accumulation_buffer = new ComputeGPUOnlyBuffer((size_t)(internal.render_width * internal.render_height * internal.render_channel_count * sizeof(float)));
 
@@ -653,6 +671,23 @@ namespace Raytracer
 			ImPlot::EndPlot();
 		}
 
+
+		if(ImGui::BeginCombo("EXRs", internal.current_exr.c_str()))
+		{
+			uint idx = 0;
+			for(auto& exr : internal.exr_assets_on_disk)
+			{
+				if (ImGui::Selectable((exr.filename + ".exr").c_str(), exr.filename == internal.current_exr))
+				{
+					internal.current_exr = exr.filename;
+					load_exr(idx);
+				}
+
+				idx++;
+			}
+
+			ImGui::EndCombo();
+		}
 
 		int mesh_idx_proxy = (int)sceneData.mesh_idx;
 		if (ImGui::DragInt("Mesh index", &mesh_idx_proxy, 1.0f, 0, AssetManager::loaded_mesh_count() - 1))

@@ -127,13 +127,11 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="compute\raytrace.cl" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="compute\example.cl" />
-    <None Include="compute\reinhard_tonemapping.cl" />
-    <None Include="compute\average_accumulated.cl" />
-    <None Include="compute\common.cl" />
-    <None Include="compute\make_heatmap.cl" />
+    <CopyFileToFolders Include="assets\compute\average_accumulated.cl" />
+    <CopyFileToFolders Include="assets\compute\common.cl" />
+    <CopyFileToFolders Include="assets\compute\example.cl" />
+    <CopyFileToFolders Include="assets\compute\make_heatmap.cl" />
+    <CopyFileToFolders Include="assets\compute\raytrace.cl" />
+    <CopyFileToFolders Include="assets\compute\reinhard_tonemapping.cl" />
   </ItemGroup>
 </Project>

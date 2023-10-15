@@ -386,7 +386,7 @@ void get_context_and_command_queue()
 
 void load_common_shader_source()
 {
-    std::string expected_common_path = get_current_directory_path() + "\\..\\..\\AdvGfx\\compute\\common.cl";
+    std::string expected_common_path = get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\compute\\common.cl";
 
     compute.common_source = read_file_to_string(expected_common_path);
 

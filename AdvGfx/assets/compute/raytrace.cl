@@ -85,7 +85,7 @@ float3 get_exr_color(float3 direction, float* exr, uint exr_width, uint exr_heig
 	float3 color = (float3)(exr[idx + 0],exr[idx + 1],exr[idx + 2]);
 	float intensity = exr[idx + 3];
 	
-	return color * intensity * 1.25f;
+	return color * intensity;
 }
 
 #define EPSILON 0.00001f
