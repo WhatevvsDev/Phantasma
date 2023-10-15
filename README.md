@@ -18,6 +18,7 @@ Latest Render
 - GPU Acceleration via OpenCL
 - Live shader recompilation
 - Pathtracing
+- SAH BVH
 
 ### Using (And thanks to)
 - [GLFW](https://www.glfw.org/)
@@ -25,6 +26,7 @@ Latest Render
 - [OpenCL](https://www.khronos.org/opencl/)
 - [Dear ImGui](https://github.com/ocornut/imgui)
 - [TinyGLTF](https://github.com/syoyo/tinygltf)
+- [TinyEXR](https://github.com/syoyo/tinyexr)
 - [Nlohmann JSON](https://github.com/nlohmann/json)
 - [STB](https://github.com/nothings/stb)
 - [ImGuizmo](https://github.com/CedricGuillemet/ImGuizmo)
