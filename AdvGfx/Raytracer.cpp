@@ -295,12 +295,6 @@ namespace Raytracer
 		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\flat_vs_smoothed.gltf");
 		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\mid_poly_sphere.gltf");
 
-		// TODO: temporary, will be consolidated into one system later
-		//tris_compute_buffer		= new ComputeWriteBuffer({loaded_model->tris});
-		//normals_compute_buffer	= new ComputeWriteBuffer({loaded_model->normals});
-		//bvh_compute_buffer		= new ComputeWriteBuffer({loaded_model->bvh->bvhNodes});
-		//tri_idx_compute_buffer	= new ComputeWriteBuffer({loaded_model->bvh->triIdx});
-
 		// TODO: this should be created on new mesh instance (DOESNT EXIST YET);
 		sceneData.object_inverse_transform = glm::inverse(object_transform);
 	}
