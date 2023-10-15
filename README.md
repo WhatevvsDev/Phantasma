@@ -17,7 +17,7 @@ Latest Render
 ### Current features
 - GPU Acceleration via OpenCL
 - Live shader recompilation
-- Whitted rendering
+- Pathtracing
 
 ### Using (And thanks to)
 - [GLFW](https://www.glfw.org/)
