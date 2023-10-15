@@ -274,6 +274,7 @@ namespace Raytracer
 		sceneData.exr_height = (uint)height;
 
 		exr_buffer = new ComputeWriteBuffer({internal.loaded_exr_data, (size_t)(width * height * 4)});
+		internal.camera_dirty = true;
 	}
 
 	void init(const RaytracerInitDesc& desc)
@@ -292,6 +293,7 @@ namespace Raytracer
 		AssetManager::init();
 		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\stanfordbunny.gltf");
 		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\flat_vs_smoothed.gltf");
+		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\mid_poly_sphere.gltf");
 
 		// TODO: temporary, will be consolidated into one system later
 		//tris_compute_buffer		= new ComputeWriteBuffer({loaded_model->tris});
