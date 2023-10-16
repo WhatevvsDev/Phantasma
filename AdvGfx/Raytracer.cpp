@@ -546,7 +546,7 @@ namespace Raytracer
 			return;
 
 		ImGui::PushStyleColor(ImGuiCol_WindowBg, {0, 0, 0, 0});
-		ImGui::DockSpaceOverViewport(0, ImGuiDockNodeFlags_PassthruCentralNode | ImGuiDockNodeFlags_AutoHideTabBar | ImGuiDockNodeFlags_NoDockingInCentralNode | ImGuiDockNodeFlags_NoSplit);
+		ImGui::DockSpaceOverViewport(0, ImGuiDockNodeFlags_PassthruCentralNode | ImGuiDockNodeFlags_AutoHideTabBar | ImGuiDockNodeFlags_NoDockingInCentralNode);
 		ImGui::PopStyleColor();
 
 		ImGui::Begin("Debug window 1", 0, ImGuiWindowFlags_NoTitleBar);
