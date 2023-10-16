@@ -1,15 +1,3 @@
-struct SceneData
-{
-	uint resolution_x;
-	uint resolution_y;
-	uint tri_count;
-	uint dummy;
-	float4 cam_pos;
-	float4 cam_forward;
-	float4 cam_right;
-	float4 cam_up;
-};
-
 float luminance(float3 v)
 {
     return dot(v, (float3)(0.2126f, 0.7152f, 0.0722f));

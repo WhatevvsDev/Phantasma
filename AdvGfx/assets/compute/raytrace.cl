@@ -34,24 +34,6 @@ struct BVHNode
 	int tri_count;
 };
 
-struct SceneData
-{
-	uint resolution_x;
-	uint resolution_y;
-	uint mouse_x;
-	uint mouse_y;
-	float cam_pos_x, cam_pos_y, cam_pos_z;
-	int frame_number;
-	float3 cam_forward;
-	float3 cam_right;
-	float3 cam_up;
-	float object_inverse_transform[16];
-	bool reset_accumulator;
-	uint mesh_idx;
-	uint exr_width;
-	uint exr_height;
-};
-
 struct MeshHeader
 {
 	uint tris_offset;

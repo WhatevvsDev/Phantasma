@@ -108,3 +108,29 @@ float RandomFloat( uint* s )
 { 
 	return RandomInt( s ) * 2.3283064365387e-10f; // = 1 / (2^32-1)
 }
+
+// Structs
+
+#ifndef SCENE_DATA
+
+#define SCENE_DATA
+
+struct SceneData
+{
+	uint resolution_x;
+	uint resolution_y;
+	uint mouse_x;
+	uint mouse_y;
+	float cam_pos_x, cam_pos_y, cam_pos_z;
+	int frame_number;
+	float3 cam_forward;
+	float3 cam_right;
+	float3 cam_up;
+	float object_inverse_transform[16];
+	bool reset_accumulator;
+	uint mesh_idx;
+	uint exr_width;
+	uint exr_height;
+};
+
+#endif

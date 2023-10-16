@@ -1,11 +1,9 @@
-void kernel average_accumulated(global float* accumulation_buffer, global uint* render_buffer, global float* sample_count_reciprocal)
+void kernel average_accumulated(global float* accumulation_buffer, global uint* render_buffer, global float* sample_count_reciprocal, global struct SceneData* scene_data)
 {     
 	int x = get_global_id(0);
 	int y = get_global_id(1);
 
-	int width = 1200;
-
-	uint pixel_dest = (x + y * width);
+	uint pixel_dest = (x + y * scene_data->resolution_x);
 
 	float3 color = (float3)(
 		accumulation_buffer[pixel_dest * 4 + 0], 

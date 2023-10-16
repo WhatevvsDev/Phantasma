@@ -58,11 +58,11 @@ namespace App
 		ImPlot::CreateContext();
 		ImGuiIO& io = ImGui::GetIO(); (void)io;
 		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-		io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
 		// Merge icons into  font
-		float text_font_size = 18.0f;
-		float icon_font_size = 50.0f;
+		float text_font_size = 15.0f;
+		float icon_font_size = 35.0f;
 		io.Fonts->AddFontFromFileTTF("Roboto.ttf", text_font_size);
 
 		// Add in Icon font
@@ -126,7 +126,6 @@ namespace App
 		ImGui::NewFrame();
 		ImGuizmo::BeginFrame();
 		ImGuizmo::SetRect(0, 0, (float)app_desc.width, (float)app_desc.height);
-		//ImGuizmo::SetDrawlist(ImGui::GetForegroundDrawList());
 
 		// We need total delta time
 		Raytracer::update(last_update_time + last_render_time);

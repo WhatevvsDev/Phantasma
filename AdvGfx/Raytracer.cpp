@@ -108,6 +108,7 @@ namespace Raytracer
 			static const int data_samples { 256 };
 			float update_times_ms[data_samples] {};
 			float render_times_ms[data_samples] {};
+			float max_time = 0.0f;
 		} performance;
 	} internal;
 
@@ -291,8 +292,8 @@ namespace Raytracer
 		// TODO: make this "automatic", keep track of things in asset folder
 		// make them loadable to CPU, and then also optionally GPU using a free list or sm
 		AssetManager::init();
-		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\stanfordbunny.gltf");
-		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\flat_vs_smoothed.gltf");
+		//AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\stanfordbunny.gltf");
+		//AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\flat_vs_smoothed.gltf");
 		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\mid_poly_sphere.gltf");
 
 		// TODO: this should be created on new mesh instance (DOESNT EXIST YET);
@@ -334,26 +335,21 @@ namespace Raytracer
 	{
 		static float orbit_cam_t = 0.0f;
 
-		bool camera_is_orbiting = (settings.orbit_camera_rotations_per_second != 0.0f);
+		orbit_cam_t += (delta_time_ms / 1000.0f) * settings.orbit_camera_rotations_per_second;
 
-		if(camera_is_orbiting)
-		{
-			orbit_cam_t += (delta_time_ms / 1000.0f) * settings.orbit_camera_rotations_per_second;
+		glm::vec3 offset = glm::vec3(0.0f, settings.orbit_camera_height, settings.orbit_camera_distance);
+		glm::mat3 rotation = glm::eulerAngleY(glm::radians(orbit_cam_t * 360.0f));
 
-			glm::vec3 offset = glm::vec3(0.0f, settings.orbit_camera_height, settings.orbit_camera_distance);
-			glm::mat3 rotation = glm::eulerAngleY(glm::radians(orbit_cam_t * 360.0f));
+		offset = offset * rotation; // Rotate it
+		offset += settings.orbit_camera_position; // Position it
 
-			offset = offset * rotation; // Rotate it
-			offset += settings.orbit_camera_position; // Position it
+		glm::vec3 to_center = glm::normalize(settings.orbit_camera_position - offset);
 
-			glm::vec3 to_center = glm::normalize(settings.orbit_camera_position - offset);
-
-			sceneData.cam_forward = to_center;
-			sceneData.cam_right = glm::cross(sceneData.cam_forward, glm::vec3(0.0f, 1.0f, 0.0f));
-			sceneData.cam_up = glm::cross(sceneData.cam_right, sceneData.cam_forward);
-			sceneData.cam_pos = offset;
-			internal.camera_dirty = true;
-		}
+		sceneData.cam_forward = to_center;
+		sceneData.cam_right = glm::cross(sceneData.cam_forward, glm::vec3(0.0f, 1.0f, 0.0f));
+		sceneData.cam_up = glm::cross(sceneData.cam_right, sceneData.cam_forward);
+		sceneData.cam_pos = offset;
+		internal.camera_dirty = true;
 	}
 
 	void update_free_float_camera_behavior(float delta_time_ms)
@@ -447,6 +443,7 @@ namespace Raytracer
 
 		rotate_array_right(internal.performance.update_times_ms, internal.performance.data_samples);
 		internal.performance.update_times_ms[0] = internal.performance.timer.to_now();
+		internal.performance.max_time = glm::max(internal.performance.max_time, internal.performance.update_times_ms[0]);
 	}
 
 	// Averages out acquired samples, and renders them to the screen
@@ -459,6 +456,7 @@ namespace Raytracer
 			.read_write(accumulated_samples)
 			.read_write(screen_buffer)
 			.write({&samples_reciprocal, 1})
+			.write({&sceneData, 1})
 			.global_dispatch({internal.render_width, internal.render_height, 1})
 			.execute();
 	}
@@ -517,6 +515,7 @@ namespace Raytracer
 		// We query performance here to avoid screenshot/ui code
 		rotate_array_right(internal.performance.render_times_ms, internal.performance.data_samples);
 		internal.performance.render_times_ms[0] = internal.performance.timer.to_now();
+		internal.performance.max_time = glm::max(internal.performance.max_time, internal.performance.render_times_ms[0]);
 
 		if(internal.show_debug_ui)
 		{
@@ -543,6 +542,137 @@ namespace Raytracer
 
 	void ui()
 	{
+		if(!internal.show_debug_ui)
+			return;
+
+		ImGui::PushStyleColor(ImGuiCol_WindowBg, {0, 0, 0, 0});
+		ImGui::DockSpaceOverViewport(0, ImGuiDockNodeFlags_PassthruCentralNode | ImGuiDockNodeFlags_AutoHideTabBar | ImGuiDockNodeFlags_NoDockingInCentralNode | ImGuiDockNodeFlags_NoSplit);
+		ImGui::PopStyleColor();
+
+		ImGui::Begin("Debug window 1", 0, ImGuiWindowFlags_NoTitleBar);
+		ImGui::BeginTabBar("my tab bar :)");
+
+		if(ImGui::BeginTabItem("Settings"))
+		{
+			ImGui::SeparatorText("General");
+			ImGui::Indent();
+
+			
+			ImGui::Checkbox("Show onscreen log?", &settings.show_onscreen_log);
+
+			ImGui::Unindent();
+			ImGui::Dummy({20, 20});
+			ImGui::SeparatorText("Camera");
+			ImGui::Indent();
+
+			if (ImGui::BeginCombo("Camera Movement", settings.orbit_camera_enabled ? "Orbit" : "Free"))
+			{
+				if (ImGui::Selectable("Freecam", !settings.orbit_camera_enabled))
+				{
+					settings.orbit_camera_enabled = false;
+				}
+
+				if (ImGui::Selectable("Orbit", settings.orbit_camera_enabled))
+				{
+					settings.orbit_camera_enabled = true;
+				}
+				ImGui::EndCombo();
+			}
+
+			if(settings.orbit_camera_enabled)
+			{
+				ImGui::DragFloat3("Position", glm::value_ptr(settings.orbit_camera_position));
+				ImGui::DragFloat("Distance", &settings.orbit_camera_distance, 0.1f);
+				ImGui::DragFloat("Height", &settings.orbit_camera_height, 0.1f);
+				ImGui::DragFloat("Rotations/s", &settings.orbit_camera_rotations_per_second, 0.001f, -1.0f, 1.0f);
+			}
+
+			ImGui::Unindent();
+			ImGui::Dummy({20, 20});
+			ImGui::SeparatorText("Accumulation & Frames");
+			ImGui::Indent();
+
+			ImGui::Checkbox("Accumulate frames?", &settings.accumulate_frames);
+			if(!settings.accumulate_frames)
+				ImGui::BeginDisabled();
+			ImGui::Text("Accumulation Limit");
+			ImGui::Checkbox("##Limit accumulated frames checkbox", &settings.limit_accumulated_frames);
+			ImGui::SameLine();
+			ImGui::InputInt("##Frame limit", &settings.accumulated_frame_limit, 0, 0);
+			if(!settings.accumulate_frames)
+				ImGui::EndDisabled();
+
+			ImGui::Text("Framerate Limit");
+			ImGui::Checkbox("##Limit framerate checkbox", &settings.fps_limit_enabled);
+			ImGui::SameLine();
+			ImGui::InputInt("##Framerate limit", &settings.fps_limit_value, 0, 0);
+
+			ImGui::Unindent();
+			ImGui::Dummy({20, 20});
+			ImGui::SeparatorText("Shaders");
+			ImGui::Indent();
+
+			if (ImGui::Button("Recompile Shaders"))
+				Compute::recompile_kernels(ComputeKernelRecompilationCondition::Force);
+
+			if (ImGui::Button("Recompile Changed Shaders"))
+				Compute::recompile_kernels(ComputeKernelRecompilationCondition::SourceChanged);
+
+		ImGui::Checkbox("Automatically recompile changed shaders?", &settings.recompile_changed_shaders_automatically);
+
+			ImGui::EndTabItem();
+		}
+
+		if(ImGui::BeginTabItem("Performance"))
+		{
+			ImGui::PushStyleColor(ImGuiCol_FrameBg, {0, 0, 0, 0});
+			ImPlot::SetNextAxisToFit(ImAxis_Y1);
+			if (ImPlot::BeginPlot("Performance plot", {-1, 0}, ImPlotFlags_NoInputs))
+			{
+				ImPlot::SetNextFillStyle({0, 0, 0, -1}, 0.2f);
+				ImPlot::PlotLine("Update time (ms)", internal.performance.update_times_ms, internal.performance.data_samples, 1.0f, 0.0f, ImPlotLineFlags_Shaded);
+				ImPlot::SetNextFillStyle({0, 0, 0, -1}, 0.2f);
+				ImPlot::PlotLine("Render time (ms)", internal.performance.render_times_ms, internal.performance.data_samples, 1.0f, 0.0f, ImPlotLineFlags_Shaded);
+				ImPlot::EndPlot();
+			}
+			ImGui::PopStyleColor();
+			ImGui::EndTabItem();
+		}
+
+		if(ImGui::BeginTabItem("Scene Settings"))
+		{
+			if(ImGui::BeginCombo("EXRs", internal.current_exr.c_str()))
+			{
+				uint idx = 0;
+				for(auto& exr : internal.exr_assets_on_disk)
+				{
+					if (ImGui::Selectable((exr.filename + ".exr").c_str(), exr.filename == internal.current_exr))
+					{
+						internal.current_exr = exr.filename;
+						load_exr(idx);
+					}
+
+					idx++;
+				}
+
+				ImGui::EndCombo();
+			}
+
+			int mesh_idx_proxy = (int)sceneData.mesh_idx;
+			if (ImGui::DragInt("Mesh index", &mesh_idx_proxy, 1.0f, 0, AssetManager::loaded_mesh_count() - 1))
+			{
+				internal.camera_dirty = true;
+			}
+			sceneData.mesh_idx = (unsigned int)glm::clamp(mesh_idx_proxy, 0, glm::max(AssetManager::loaded_mesh_count() - 1, 0));
+			ImGui::EndTabItem();
+		}
+
+		ImGui::EndTabBar();
+		
+		ImGui::End();
+
+
+		/*
 		ImGui::SetNextWindowPos({});
 		ImGui::Begin("Transform tools", 0, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
 
@@ -587,8 +717,8 @@ namespace Raytracer
 					auto minpos = ImVec2(move_bar_padding, (float)sceneData.resolution[1] - move_bar_height - 32);
 					auto maxpos = ImVec2(move_bar_padding + move_bar_width, (float)sceneData.resolution[1] - 32);
 
-					draw_list.AddRectFilled(minpos, maxpos, IM_COL32(223, 223, 223, 255), 0.0f,  ImDrawCornerFlags_All);
-					draw_list.AddRect(ImVec2(minpos.x - 1, minpos.y - 1), ImVec2(maxpos.x + 1, maxpos.y + 1), IM_COL32(32, 32, 32, 255), 0.0f,  ImDrawCornerFlags_All, 2.0f);
+					draw_list.AddRectFilled(minpos, maxpos, IM_COL32(223, 223, 223, 255), 0.0f);
+					draw_list.AddRect(ImVec2(minpos.x - 1, minpos.y - 1), ImVec2(maxpos.x + 1, maxpos.y + 1), IM_COL32(32, 32, 32, 255), 0.0f, 2.0f);
 							
 					std::string text = std::format("Camera speed: {} m/s", camera_speed_t_to_m_per_second());
 					auto text_size = ImGui::CalcTextSize(text.c_str());
@@ -615,8 +745,8 @@ namespace Raytracer
 					auto minpos = ImVec2(move_bar_padding + hor_offset - width_half_extent - cap_extra_width, sceneData.resolution[1] - move_bar_height - 32 - cap_extra_height - divisor_extra_height *0.5f);
 					auto maxpos = ImVec2(move_bar_padding + hor_offset + width_half_extent + cap_extra_width, sceneData.resolution[1] - 32 + cap_extra_height + divisor_extra_height *0.5f);
 
-					draw_list.AddRectFilled(minpos, maxpos, IM_COL32(223, 223, 223, 255), 0.0f,  ImDrawCornerFlags_All);
-					draw_list.AddRect(ImVec2(minpos.x - 1, minpos.y - 1), ImVec2(maxpos.x + 1, maxpos.y + 1), IM_COL32(0, 0, 0, 255), 0.0f,  ImDrawCornerFlags_All, 2.0f);
+					draw_list.AddRectFilled(minpos, maxpos, IM_COL32(223, 223, 223, 255), 0.0f);
+					draw_list.AddRect(ImVec2(minpos.x - 1, minpos.y - 1), ImVec2(maxpos.x + 1, maxpos.y + 1), IM_COL32(0, 0, 0, 255), 0.0f, 2.0f);
 				}
 				{
 					float t_bar_half_width = 4;
@@ -625,8 +755,8 @@ namespace Raytracer
 					auto minpos = ImVec2(move_bar_padding - t_bar_half_width + move_bar_width * camera_speed_visual_t, sceneData.resolution[1] - move_bar_height - 32 - t_bar_half_height);
 					auto maxpos = ImVec2(move_bar_padding + t_bar_half_width + move_bar_width * camera_speed_visual_t, sceneData.resolution[1] - 32 + t_bar_half_height);
 
-					draw_list.AddRectFilled(minpos, maxpos, IM_COL32(223, 223, 223, 255), 0.0f,  ImDrawCornerFlags_All);
-					draw_list.AddRect(ImVec2(minpos.x - 1, minpos.y - 1), ImVec2(maxpos.x + 1, maxpos.y + 1), IM_COL32(32, 32, 32, 255), 0.0f,  ImDrawCornerFlags_All, 2.0f);
+					draw_list.AddRectFilled(minpos, maxpos, IM_COL32(223, 223, 223, 255), 0.0f);
+					draw_list.AddRect(ImVec2(minpos.x - 1, minpos.y - 1), ImVec2(maxpos.x + 1, maxpos.y + 1), IM_COL32(32, 32, 32, 255), 0.0f, 2.0f);
 				}
 			}
 		}
@@ -659,78 +789,7 @@ namespace Raytracer
 		// TODO: Remake this as not just a standard debug window, but something more user friendly
 
 		ImGui::Begin(" Debug settings window");
-		
-		if (ImPlot::BeginPlot("Performance plot", {-1, 0}, ImPlotFlags_NoInputs))
-		{
-			ImPlot::PlotLine("Update time (ms)", internal.performance.update_times_ms, internal.performance.data_samples, 1.0f, 0.0f, ImPlotLineFlags_Shaded);
-			ImPlot::PlotLine("Render time (ms)", internal.performance.render_times_ms, internal.performance.data_samples, 1.0f, 0.0f, ImPlotLineFlags_Shaded);
-			ImPlot::EndPlot();
-		}
-
-
-		if(ImGui::BeginCombo("EXRs", internal.current_exr.c_str()))
-		{
-			uint idx = 0;
-			for(auto& exr : internal.exr_assets_on_disk)
-			{
-				if (ImGui::Selectable((exr.filename + ".exr").c_str(), exr.filename == internal.current_exr))
-				{
-					internal.current_exr = exr.filename;
-					load_exr(idx);
-				}
-
-				idx++;
-			}
-
-			ImGui::EndCombo();
-		}
-
-		int mesh_idx_proxy = (int)sceneData.mesh_idx;
-		if (ImGui::DragInt("Mesh index", &mesh_idx_proxy, 1.0f, 0, AssetManager::loaded_mesh_count() - 1))
-		{
-			internal.camera_dirty = true;
-		}
-		sceneData.mesh_idx = (unsigned int)mesh_idx_proxy;
-		
-		ImGui::Checkbox("Orbit camera enabled?", &settings.orbit_camera_enabled);
-		if(!settings.orbit_camera_enabled)
-			ImGui::BeginDisabled();
-
-		ImGui::DragFloat3("Orbit position", glm::value_ptr(settings.orbit_camera_position));
-		ImGui::DragFloat("Orbit distance", &settings.orbit_camera_distance, 0.1f);
-		ImGui::DragFloat("Orbit height", &settings.orbit_camera_height, 0.1f);
-		ImGui::DragFloat("Orbit rotations per second", &settings.orbit_camera_rotations_per_second, 0.01f, -1.0f, 1.0f);
-
-		if(!settings.orbit_camera_enabled)
-			ImGui::EndDisabled();
-
-		ImGui::Checkbox("Limit accumulated frames?", &settings.limit_accumulated_frames);
-
-		if(!settings.limit_accumulated_frames)
-			ImGui::BeginDisabled();
-
-		ImGui::InputInt("Accumulated frame limit", &settings.accumulated_frame_limit, 0, 0);
-
-		if(!settings.limit_accumulated_frames)
-			ImGui::EndDisabled();
-
-		if (ImGui::Button("Recompile Shaders"))
-			Compute::recompile_kernels(ComputeKernelRecompilationCondition::Force);
-
-		if (ImGui::Button("Recompile Changed Shaders"))
-			Compute::recompile_kernels(ComputeKernelRecompilationCondition::SourceChanged);
-
-		ImGui::Checkbox("Automatically recompile changed shaders?", &settings.recompile_changed_shaders_automatically);
-
-		ImGui::Text("");
-		ImGui::Text("Framerate Limit");	
-		ImGui::InputInt("## Framerate Limit Value Input Int", &settings.fps_limit_value, 0, 0);
-		ImGui::Checkbox("Limit framerate?", &settings.fps_limit_enabled);
-		
-		ImGui::Checkbox("Show onscreen log?", &settings.show_onscreen_log);
-		ImGui::Checkbox("Accumulate frames?", &settings.accumulate_frames);
-
-		ImGui::End();
+		*/
 	}
 
 	int Raytracer::get_target_fps()
