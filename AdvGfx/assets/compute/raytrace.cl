@@ -48,9 +48,20 @@ struct MeshHeader
 
 	uint tri_idx_offset;
 	uint tri_idx_count;
+};
 
+struct MeshInstanceHeader
+{
 	float transform[16];
 	float inverse_transform[16];
+		
+	uint mesh_idx;
+};
+
+struct WorldManagerDeviceData
+{
+	uint mesh_count;
+	struct MeshInstanceHeader instances[256];
 };
 
 #define PI 3.14159265359f
@@ -113,7 +124,7 @@ float intersect_aabb( struct Ray* ray, struct BVHNode* node )
 	if (tmax >= tmin && tmin < ray->t && tmax > 0) return tmin; else return 1e30f;
 }
 
-void intersect_bvh( struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* tris, uint* trisIdx, struct MeshHeader* mesh_header)
+void intersect_bvh( struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* tris, uint* trisIdx, struct MeshHeader* mesh_header, float* inverse_transform)
 {
 	// Keeping track of current node in the stack
 	uint node_offset = mesh_header->root_bvh_node_idx;
@@ -123,8 +134,8 @@ void intersect_bvh( struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct
 
 	float3 org_dir = ray->D;
 	float3 org_pos = ray->O;
-	ray->D = transform((float4)(ray->D, 0), mesh_header[0].inverse_transform).xyz;
-	ray->O = transform((float4)(ray->O, 1), mesh_header[0].inverse_transform).xyz;
+	ray->D = transform((float4)(ray->D, 0), inverse_transform).xyz;
+	ray->O = transform((float4)(ray->O, 1), inverse_transform).xyz;
 	ray->D_reciprocal = 1.0f / ray->D;
 
 	if (intersect_aabb( ray, node ) == 1e30f)
@@ -248,6 +259,7 @@ struct TraceArgs
 	float* exr;
 	uint exr_width;
 	uint exr_height;
+	struct WorldManagerDeviceData* world_data;
 };
 
 float3 trace(struct TraceArgs* args)
@@ -279,19 +291,23 @@ float3 trace(struct TraceArgs* args)
 			continue;
 		}
 
+
+		float oldt = current_ray.t;
+		int hit_header_idx = -1;
+
 		// Do raytracing bits
-		intersect_bvh(&current_ray, args->mesh_headers[0].root_bvh_node_idx, args->nodes, args->tris, args->trisIdx, &args->mesh_headers[0]);
-		intersect_bvh(&current_ray, args->mesh_headers[1].root_bvh_node_idx, args->nodes, args->tris, args->trisIdx, &args->mesh_headers[1]);
-
-		int hit_header_idx;
-
-		if(current_ray.intersection.header_tri_count == args->mesh_headers[0].tris_count)
+		for(uint i = 0; i < (*args->world_data).mesh_count; i++)
 		{
-			hit_header_idx = 0;
-		}
-		else
-		{
-			hit_header_idx = 1;
+			struct MeshInstanceHeader* instance = &(*args->world_data).instances[i];
+			struct MeshHeader* mesh = &args->mesh_headers[instance->mesh_idx];
+
+			intersect_bvh(&current_ray, mesh->root_bvh_node_idx, args->nodes, args->tris, args->trisIdx, &args->mesh_headers[instance->mesh_idx], instance->inverse_transform);
+
+			if(current_ray.t < oldt)
+			{
+				hit_header_idx = (int)i;
+				oldt = current_ray.t;
+			}
 		}
 
 		if(current_ray.depth == DEPTH)
@@ -310,11 +326,15 @@ float3 trace(struct TraceArgs* args)
 		}
 		else
 		{
+			struct MeshInstanceHeader* instance = &(*args->world_data).instances[hit_header_idx];
+			struct MeshHeader* mesh = &args->mesh_headers[instance->mesh_idx];	
+
 			float3 hit_pos = current_ray.O + (current_ray.D * current_ray.t);
-			float3 normal = interpolate_tri_normal(&args->normals[args->mesh_headers[hit_header_idx].normals_offset], &current_ray);
+			float3 normal = interpolate_tri_normal(&args->normals[mesh->normals_offset], &current_ray);
 			
 			// We have to apply transform so normals are world-space
-			normal = transform((float4)(normal, 0.0f), args->mesh_headers[hit_header_idx].transform).xyz;
+			normal = transform((float4)(normal, 0.0f), instance->transform).xyz;
+			normal = normalize(normal);
 
 			bool inner_normal = dot(normal, current_ray.D) > 0.0f;
 
@@ -331,10 +351,10 @@ float3 trace(struct TraceArgs* args)
 			new_ray.depth = current_ray.depth - 1;
 			new_ray.ray_parent = ray_stack_idx;
 
-			bool is_mirror = false;
+			bool is_mirror = true;
 			bool is_dielectric = false;
 
-			float3 albedo = (float3)(1.0f, 0.9f, 1.0f);
+			float3 albedo = (float3)(0.7f, 0.5f, 1.0f);
 			float ior = 1.66f;
 			float absorbtion_coefficient = 0.1f;
 
@@ -392,7 +412,7 @@ float3 trace(struct TraceArgs* args)
 	return color;
 }
 
-void kernel raytrace(global float* accumulation_buffer, global int* mouse, global float4* normals, global struct Tri* tris, global struct BVHNode* nodes, global uint* trisIdx, global struct MeshHeader* mesh_headers, global struct SceneData* sceneData, global float* exr)
+void kernel raytrace(global float* accumulation_buffer, global int* mouse, global float4* normals, global struct Tri* tris, global struct BVHNode* nodes, global uint* trisIdx, global struct MeshHeader* mesh_headers, global struct SceneData* sceneData, global float* exr, global struct WorldManagerDeviceData* world_manager_data)
 {     
 	int width = sceneData->resolution_x;
 	int height = sceneData->resolution_y;
@@ -432,6 +452,7 @@ void kernel raytrace(global float* accumulation_buffer, global int* mouse, globa
 	trace_args.exr = exr;
 	trace_args.exr_width = sceneData->exr_width;
 	trace_args.exr_height = sceneData->exr_height;
+	trace_args.world_data = world_manager_data;
 
 	float3 color = trace(&trace_args);
 

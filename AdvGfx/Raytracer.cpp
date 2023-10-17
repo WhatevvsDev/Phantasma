@@ -10,6 +10,7 @@
 #include "Utilities.h"
 #include "Timer.h"
 #include "AssetManager.h"
+#include "WorldManager.h"
 
 
 #include <fstream>
@@ -294,9 +295,10 @@ namespace Raytracer
 		// TODO: make this "automatic", keep track of things in asset folder
 		// make them loadable to CPU, and then also optionally GPU using a free list or sm
 		AssetManager::init();
-		//AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\stanfordbunny.gltf");
+		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\stanfordbunny.gltf");
 		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\flat_vs_smoothed.gltf");
-		//AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\mid_poly_sphere.gltf");
+		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\mid_poly_sphere.gltf");
+		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\sah_test.gltf");
 	}
 
 	// Saves data such as settings, or world state to phantasma.data.json
@@ -507,6 +509,7 @@ namespace Raytracer
 			.write(AssetManager::get_mesh_header_buffer())
 			.write({&sceneData, 1})
 			.write(*exr_buffer)
+			.write({&WorldManager::get_world_device_data(), 1})
 			.global_dispatch({internal.render_width, internal.render_height, 1})
 			.execute();
 
@@ -533,6 +536,7 @@ namespace Raytracer
 			if(clicked_on_non_gizmo)
 			{
 				internal.mouse_click_tri = internal.mouse_over_idx;
+				printf("Clicked on: %u\n", internal.mouse_click_tri);
 			}
 		}
 
@@ -697,6 +701,29 @@ namespace Raytracer
 			}
 			sceneData.mesh_idx = (unsigned int)glm::clamp(mesh_idx_proxy, 0, glm::max(AssetManager::loaded_mesh_count() - 1, 0));
 			ImGui::EndTabItem();
+
+			static u32 mesh_instances_idx = 0;
+
+			if(ImGui::BeginCombo("Mesh Instances", std::to_string(mesh_instances_idx).c_str()))
+			{
+				uint idx = 0;
+				for(auto& mesh_header : AssetManager::get_mesh_headers())
+				{
+					if (ImGui::Selectable(std::to_string(idx).c_str(), idx == mesh_instances_idx))
+					{
+						mesh_instances_idx = idx;
+					}
+
+					idx++;
+				}
+
+				ImGui::EndCombo();
+			}
+
+			if(ImGui::Button("Add Instance"))
+			{
+				WorldManager::add_instance_of_mesh(mesh_instances_idx);
+			}
 		}
 
 		ImGui::EndTabBar();
@@ -732,13 +759,16 @@ namespace Raytracer
 		if(internal.mouse_click_tri != -1)
 		{
 			auto& mesh_headers = AssetManager::get_mesh_headers();
-			int header_idx = internal.mouse_click_tri;
+			int transform_idx = internal.mouse_click_tri;
+
+			MeshInstanceHeader& instance = WorldManager::get_world_device_data().instances[transform_idx];
+			glm::mat4& transform = instance.transform;
 
 			glm::mat4 projection = glm::perspectiveRH(glm::radians(90.0f), (float)internal.render_width / (float)internal.render_height, 0.1f, 1000.0f);
 
-			if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection), internal.current_gizmo_operation, ImGuizmo::LOCAL, glm::value_ptr(mesh_headers[header_idx].transform)))
+			if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection), internal.current_gizmo_operation, ImGuizmo::LOCAL, glm::value_ptr(transform)))
 			{
-				mesh_headers[header_idx].inverse_transform = glm::inverse(mesh_headers[header_idx].transform);
+				instance.inverse_transform = glm::inverse(transform);
 				internal.camera_dirty = true;
 			}
 		}

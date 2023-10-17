@@ -2,16 +2,25 @@
 #include "PrimitiveTypes.h"
 
 #include <vector>
+#include "Math.h"
+
+struct MeshInstanceHeader
+{
+	glm::mat4 transform;
+	glm::mat4 inverse_transform;
+		
+	u32 mesh_idx;
+};
+
+struct WorldManagerDeviceData
+{
+	u32 mesh_count;
+	MeshInstanceHeader instances[256];
+};
 
 namespace WorldManager
 {
-	struct MeshInstanceHeader
-	{
-		f32 transform[16];
-		f32 inverse_transform[16];
-		
-		u32 mesh_id;
-	};
+	void add_instance_of_mesh(u32 mesh_idx);
 
-	std::vector<MeshInstanceHeader> world_mesh_instances;
+	WorldManagerDeviceData& get_world_device_data();
 }

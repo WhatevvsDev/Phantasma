@@ -16,9 +16,6 @@ struct MeshHeader
 
 	uint tri_idx_offset {};
 	uint tri_idx_count {};
-
-	glm::mat4 transform = glm::identity<glm::mat4>();
-	glm::mat4 inverse_transform = glm::identity<glm::mat4>();
 };
 
 namespace AssetManager
