@@ -153,7 +153,7 @@ void ComputeKernel::compile()
     }
     else
     {
-        LOGDEBUG(std::format("Created kernel: {} {}", path, common_shader_source_exists ? " - With common source" : ""));
+        LOGDEBUG(std::format("Created kernel: {} {}", get_file_name_from_path_string(path), common_shader_source_exists ? " - With common source" : ""));
     }
 
     cl_kernel = cl::Kernel(created_program, entry_point.c_str(), &error);

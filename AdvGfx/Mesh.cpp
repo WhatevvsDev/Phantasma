@@ -19,6 +19,13 @@
 #include "json.hpp"
 #include "tiny_gltf.h"
 
+#include "Timer.h"
+#include "LogUtility.h"
+#include "PrimitiveTypes.h"
+#include "IOUtility.h"
+
+Timer build_timer;
+
 Mesh::Mesh(const std::string& path)
 {
 	tinygltf::Model model;
@@ -95,7 +102,10 @@ Mesh::Mesh(const std::string& path)
 		normals[i + 2] = glm::vec4(normal_buf[tri_indices[2]], 0);
 	}
 
+	build_timer.start();
 	bvh = new BVH(tris);
+	LOGDEBUG(std::format("Built BVH for {} in {} ms", get_file_name_from_path_string(path), (u32)build_timer.to_now()));
+
 }
 
 void Mesh::reconstruct_bvh()

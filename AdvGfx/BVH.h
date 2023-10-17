@@ -21,6 +21,8 @@ struct BVH
 	std::vector<BVHNode>    bvhNodes;
 	std::vector<glm::vec3>  centroids;
 	uint nodes_used = 1;
+
+	float build_time = 0.0f;
 };
 
 void update_node_bounds( uint nodeIdx, BVH& bvh, const std::vector<Tri>& tris);
