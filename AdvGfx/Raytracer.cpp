@@ -89,7 +89,7 @@ namespace Raytracer
 
 		bool world_dirty { false };
 		bool camera_dirty { true };
-		int mouse_over_idx { - 1};
+		int mouse_over_idx { -1 };
 
 		int accumulated_samples { 0 };
 		int render_width { 0 };
@@ -167,8 +167,6 @@ namespace Raytracer
 	ComputeReadBuffer* screen_compute_buffer	{ nullptr };
 
 	ComputeWriteBuffer* exr_buffer	{ nullptr };
-
-	glm::mat4 object_transform = glm::mat4(1);
 
 	// Resizes buffers and sets internal state
 	void resize(const RaytracerResizeDesc& desc)
@@ -296,12 +294,9 @@ namespace Raytracer
 		// TODO: make this "automatic", keep track of things in asset folder
 		// make them loadable to CPU, and then also optionally GPU using a free list or sm
 		AssetManager::init();
-		//AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\stanfordbunny.gltf");
-		//AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\flat_vs_smoothed.gltf");
-		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\mid_poly_sphere.gltf");
-
-		// TODO: this should be created on new mesh instance (DOESNT EXIST YET);
-		sceneData.object_inverse_transform = glm::inverse(object_transform);
+		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\stanfordbunny.gltf");
+		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\flat_vs_smoothed.gltf");
+		//AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\mid_poly_sphere.gltf");
 	}
 
 	// Saves data such as settings, or world state to phantasma.data.json
@@ -500,6 +495,8 @@ namespace Raytracer
 
 		internal.accumulated_samples++;
 
+		AssetManager::get_mesh_header_buffer().update(AssetManager::get_mesh_headers());
+
 		ComputeOperation("raytrace.cl")
 			.read_write(*internal.gpu_accumulation_buffer)
 			.read(ComputeReadBuffer({internal.buffer, (size_t)(render_area)}))
@@ -531,8 +528,8 @@ namespace Raytracer
 
 			auto cursor_pos = ImGui::GetIO().MousePos;
 
-			sceneData.mouse_pos[0] = glm::clamp((int)cursor_pos.x, 0, internal.render_width);
-			sceneData.mouse_pos[1] = glm::clamp((int)cursor_pos.y, 0, internal.render_height);
+			sceneData.mouse_pos[0] = glm::clamp((int)cursor_pos.x, 0, internal.render_width - 1);
+			sceneData.mouse_pos[1] = glm::clamp((int)cursor_pos.y, 0, internal.render_height - 1);
 
 			if(clicked_on_non_gizmo)
 			{
@@ -547,6 +544,13 @@ namespace Raytracer
 			internal.screenshot = false;
 		}
 	}
+
+
+	// TODO: replace this with an actual list of mesh instances, each with their own transform and header index
+	glm::mat4 test_transforms[2] = {
+		glm::identity<glm::mat4>(),
+		glm::identity<glm::mat4>()
+	};
 
 	void ui()
 	{
@@ -707,7 +711,6 @@ namespace Raytracer
 		
 		ImGui::End();
 
-		/*
 		ImGui::SetNextWindowPos({});
 		ImGui::Begin("Transform tools", 0, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
 
@@ -731,6 +734,27 @@ namespace Raytracer
 		ImGui::SetWindowFontScale(1.0f);
 
 		ImGui::End();
+
+		auto view = glm::lookAtRH(glm::vec3(sceneData.cam_pos), glm::vec3(sceneData.cam_pos) + glm::vec3(sceneData.cam_forward), glm::vec3(0.0f, 1.0f, 0.0f));
+
+		if(internal.mouse_click_tri != -1)
+		{
+			auto& mesh_headers = AssetManager::get_mesh_headers();
+			int header_idx = internal.mouse_click_tri;
+
+			glm::mat4 object_transform = test_transforms[internal.mouse_click_tri];
+
+			glm::mat4 projection = glm::perspectiveRH(glm::radians(90.0f), (float)internal.render_width / (float)internal.render_height, 0.1f, 1000.0f);
+
+			if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection), internal.current_gizmo_operation, ImGuizmo::LOCAL, glm::value_ptr(object_transform)))
+			{
+				mesh_headers[header_idx].inverse_transform = glm::inverse(object_transform);
+				test_transforms[internal.mouse_click_tri] = object_transform;
+				internal.camera_dirty = true;
+			}
+		}
+
+		/*
 
 		// Bless this mess
 		auto& draw_list = *ImGui::GetForegroundDrawList();
@@ -799,18 +823,7 @@ namespace Raytracer
 		if(!internal.show_debug_ui)
 			return;
 
-		auto view = glm::lookAtRH(glm::vec3(sceneData.cam_pos), glm::vec3(sceneData.cam_pos) + glm::vec3(sceneData.cam_forward), glm::vec3(0.0f, 1.0f, 0.0f));
-
-		glm::mat4 projection = glm::perspectiveRH(glm::radians(90.0f), (float)internal.render_width / (float)internal.render_height, 0.1f, 1000.0f);
-
-		if(internal.mouse_click_tri != -1)
-		{
-			if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection), internal.current_gizmo_operation, ImGuizmo::LOCAL, glm::value_ptr(object_transform)))
-			{
-				internal.world_dirty = true;
-				sceneData.object_inverse_transform = glm::inverse(object_transform);
-			}
-		}
+		
 
 		if(settings.show_onscreen_log)
 		{

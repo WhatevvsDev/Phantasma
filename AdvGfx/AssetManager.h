@@ -16,6 +16,8 @@ struct MeshHeader
 
 	uint tri_idx_offset {};
 	uint tri_idx_count {};
+
+	glm::mat4 inverse_transform = glm::identity<glm::mat4>();
 };
 
 namespace AssetManager
@@ -33,4 +35,6 @@ namespace AssetManager
 	ComputeWriteBuffer& get_bvh_compute_buffer();
 	ComputeWriteBuffer& get_tri_idx_compute_buffer();
 	ComputeWriteBuffer& get_mesh_header_buffer();
+
+	std::vector<MeshHeader>& get_mesh_headers();
 }

@@ -11,6 +11,7 @@ struct RayIntersection
 	float u;
 	float v;
 	int tri_hit;
+	int header_tri_count;
 };
 
 struct Ray 
@@ -47,6 +48,8 @@ struct MeshHeader
 
 	uint tri_idx_offset;
 	uint tri_idx_count;
+
+	float inverse_transform[16];
 };
 
 #define PI 3.14159265359f
@@ -94,6 +97,7 @@ void intersect_tri(struct Ray* ray, struct Tri* tris, uint triIdx, struct MeshHe
 		ray->intersection.tri_hit = triIdx;
 		ray->intersection.u = u;
 		ray->intersection.v = v;
+		ray->intersection.header_tri_count = header[0].tris_count;
 	}
 }
 
@@ -116,8 +120,18 @@ void intersect_bvh( struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct
 	struct BVHNode* traversal_stack[32];
 	uint stack_ptr = 0; 
 
+	float3 org_dir = ray->D;
+	float3 org_pos = ray->O;
+	ray->D = transform((float4)(ray->D, 0), mesh_header[0].inverse_transform).xyz;
+	ray->O = transform((float4)(ray->O, 1), mesh_header[0].inverse_transform).xyz;
+	ray->D_reciprocal = 1.0f / ray->D;
+
 	if (intersect_aabb( ray, node ) == 1e30f)
+	{
+		ray->D = org_dir;
+		ray->O = org_pos;
 		return;
+	}
 
 	while(1)
 	{
@@ -164,22 +178,9 @@ void intersect_bvh( struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct
 			}
 		}
 	}
-}
 
-float3 sky_color(struct Ray* ray, float3* sun_dir)
-{
-	float3 sky_color = (float3)(0.333f, 0.61f, 0.84f);
-	float3 horizon_color = (float3)(0.9f, 0.9f, 0.92f);
-
-	float rd = (ray->D.y + 1.0f) * 0.5f;
-	float horizont = smoothstep(0.3f, 0.75f, 1.0f - rd);
-	
-	float3 sky = lerp(sky_color, horizon_color, horizont);
-
-	float sunp = min(dot(ray->D, -*sun_dir), 0.0f);
-	float sun = smoothstep(0.99f, 1.0f, sunp * sunp * sunp * sunp);
-	float sun_intensity = 1.0f;
-	return lerp(sky, (float3)(sun_intensity), sun);
+	ray->D = org_dir;
+	ray->O = org_pos;
 }
 
 #define DEPTH 32
@@ -252,7 +253,6 @@ struct TraceArgs
 float3 trace(struct TraceArgs* args)
 {
 	float3 sun_dir = normalize((float3)(1.0f, 0.8f, -0.7f));
-	struct MeshHeader header = args->mesh_headers[args->mesh_idx];
 
 	// Keeping track of current ray in the stack
 	const int ray_stack_size = 32;
@@ -280,8 +280,29 @@ float3 trace(struct TraceArgs* args)
 		}
 
 		// Do raytracing bits
-		current_ray.D_reciprocal = 1.0f / current_ray.D;
-		intersect_bvh(&current_ray, header.root_bvh_node_idx, args->nodes, args->tris, args->trisIdx, &header);
+		intersect_bvh(&current_ray, args->mesh_headers[0].root_bvh_node_idx, args->nodes, args->tris, args->trisIdx, &args->mesh_headers[0]);
+		intersect_bvh(&current_ray, args->mesh_headers[1].root_bvh_node_idx, args->nodes, args->tris, args->trisIdx, &args->mesh_headers[1]);
+
+		int hit_header_idx;
+
+		if(current_ray.intersection.header_tri_count == args->mesh_headers[0].tris_count)
+		{
+			hit_header_idx = 0;
+			if(current_ray.depth == DEPTH)
+			{
+				args->primary_ray->t = current_ray.t;
+				args->primary_ray->intersection.header_tri_count = 0;
+			}
+		}
+		else
+		{
+			hit_header_idx = 1;
+			if(current_ray.depth == DEPTH)
+			{
+				args->primary_ray->t = current_ray.t;
+				args->primary_ray->intersection.header_tri_count = 1;
+			}
+		}
 
 		if(current_ray.depth == DEPTH)
 		{
@@ -298,8 +319,10 @@ float3 trace(struct TraceArgs* args)
 		else
 		{
 			float3 hit_pos = current_ray.O + (current_ray.D * current_ray.t);
-			float3 normal = interpolate_tri_normal(&args->normals[header.normals_offset], &current_ray);
-			bool inner_normal = (dot(normal, current_ray.D) > 0.5f);
+			float3 normal = interpolate_tri_normal(&args->normals[args->mesh_headers[hit_header_idx].normals_offset], &current_ray);
+			
+			// Temporary solution, normals are in local space, so ray should be as well
+			bool inner_normal = (dot(normal, transform((float4)(current_ray.D, 1.0f), args->mesh_headers[hit_header_idx].inverse_transform).xyz) > 0.0f);
 
 			if(inner_normal)
 				normal = -normal;
@@ -315,7 +338,7 @@ float3 trace(struct TraceArgs* args)
 			new_ray.ray_parent = ray_stack_idx;
 
 			bool is_mirror = false;
-			bool is_dielectric = true;
+			bool is_dielectric = false;
 
 			float3 albedo = (float3)(1.0f, 0.9f, 1.0f);
 			float ior = 1.66f;
@@ -404,7 +427,6 @@ void kernel raytrace(global float* accumulation_buffer, global uint* buffer, glo
 	ray.depth = DEPTH;
 
 	struct TraceArgs trace_args;
-	trace_args.primary_ray = &ray;
 	trace_args.nodes = nodes;
 	trace_args.normals = normals;
 	trace_args.tris = tris;
@@ -417,6 +439,10 @@ void kernel raytrace(global float* accumulation_buffer, global uint* buffer, glo
 	trace_args.exr_width = sceneData->exr_width;
 	trace_args.exr_height = sceneData->exr_height;
 
+
+
+	trace_args.primary_ray = &ray;
+
 	float3 color = trace(&trace_args);
 
 	//color = ray.bvh_hits * 0.031f;
@@ -426,9 +452,14 @@ void kernel raytrace(global float* accumulation_buffer, global uint* buffer, glo
 
 	if(is_mouse_ray)
 	{
-		*mouse = ray_hit_anything
-		 ? ray.intersection.tri_hit
-		 : -1;
+		accumulation_buffer[pixel_dest * 4 + 0] = 1.0f;
+		accumulation_buffer[pixel_dest * 4 + 1] = 0.0f;
+		accumulation_buffer[pixel_dest * 4 + 2] = 0.0f;
+
+		*mouse = trace_args.primary_ray->intersection.header_tri_count;
+
+		if(!ray_hit_anything)
+			*mouse = -1;
 	}
 
 	//color = ray.bvh_hits / 10.0f;

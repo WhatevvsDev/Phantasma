@@ -112,6 +112,11 @@ ComputeWriteBuffer& AssetManager::get_mesh_header_buffer()
 {
 	return *internal.header_compute_buffer;
 }
+
+std::vector<MeshHeader>& AssetManager::get_mesh_headers()
+{
+	return internal.headers;
+}
 	
 int AssetManager::loaded_mesh_count()
 {
