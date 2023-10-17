@@ -47,8 +47,9 @@ namespace Raytracer
 		bool orbit_camera_enabled { false };
 		glm::vec3 orbit_camera_position { 0.0f };
 		float orbit_camera_distance { 10.0f };
-		float orbit_camera_height { 5.0f };
+		float orbit_camera_angle { 0.0f };
 		float orbit_camera_rotations_per_second { 0.1f };
+		bool orbit_automatically { true };
 
 		glm::vec3 saved_camera_position { 0.0f };
 
@@ -216,7 +217,7 @@ namespace Raytracer
 			TryFromJSONVal(save_data, settings, orbit_camera_enabled);
 			TryFromJSONVal(save_data, settings, orbit_camera_position);
 			TryFromJSONVal(save_data, settings, orbit_camera_distance);
-			TryFromJSONVal(save_data, settings, orbit_camera_height);
+			TryFromJSONVal(save_data, settings, orbit_camera_angle);
 			TryFromJSONVal(save_data, settings, orbit_camera_rotations_per_second);
 
 			TryFromJSONVal(save_data, settings, accumulate_frames);
@@ -313,7 +314,7 @@ namespace Raytracer
 		ToJSONVal(save_data, settings, orbit_camera_enabled);
 		ToJSONVal(save_data, settings, orbit_camera_position);
 		ToJSONVal(save_data, settings, orbit_camera_distance);
-		ToJSONVal(save_data, settings, orbit_camera_height);
+		ToJSONVal(save_data, settings, orbit_camera_angle);
 		ToJSONVal(save_data, settings, orbit_camera_rotations_per_second);
 
 		ToJSONVal(save_data, settings, accumulate_frames);
@@ -335,21 +336,21 @@ namespace Raytracer
 	{
 		static float orbit_cam_t = 0.0f;
 
-		orbit_cam_t += (delta_time_ms / 1000.0f) * settings.orbit_camera_rotations_per_second;
+		if(settings.orbit_automatically)
+		{
+			orbit_cam_t += (delta_time_ms / 1000.0f) * -settings.orbit_camera_rotations_per_second;
+			internal.camera_dirty = true;
+		}
 
-		glm::vec3 offset = glm::vec3(0.0f, settings.orbit_camera_height, settings.orbit_camera_distance);
-		glm::mat3 rotation = glm::eulerAngleY(glm::radians(orbit_cam_t * 360.0f));
+		glm::vec3 offset = glm::vec3(0.0f, 0.0f, 1.0f);
+		glm::mat3 rotation = glm::eulerAngleXY(glm::radians(settings.orbit_camera_angle), glm::radians(orbit_cam_t * 360.0f));
 
 		offset = offset * rotation; // Rotate it
-		offset += settings.orbit_camera_position; // Position it
 
-		glm::vec3 to_center = glm::normalize(settings.orbit_camera_position - offset);
-
-		sceneData.cam_forward = to_center;
-		sceneData.cam_right = glm::cross(sceneData.cam_forward, glm::vec3(0.0f, 1.0f, 0.0f));
-		sceneData.cam_up = glm::cross(sceneData.cam_right, sceneData.cam_forward);
-		sceneData.cam_pos = offset;
-		internal.camera_dirty = true;
+		sceneData.cam_forward = -glm::normalize(offset);
+		sceneData.cam_right = glm::normalize(glm::cross(sceneData.cam_forward, glm::vec3(0.0f, 1.0f, 0.0f)));
+		sceneData.cam_up = glm::normalize(glm::cross(sceneData.cam_right, sceneData.cam_forward));
+		sceneData.cam_pos = offset * settings.orbit_camera_distance + settings.orbit_camera_position;
 	}
 
 	void update_free_float_camera_behavior(float delta_time_ms)
@@ -549,8 +550,8 @@ namespace Raytracer
 		ImGui::DockSpaceOverViewport(0, ImGuiDockNodeFlags_PassthruCentralNode | ImGuiDockNodeFlags_AutoHideTabBar | ImGuiDockNodeFlags_NoDockingInCentralNode);
 		ImGui::PopStyleColor();
 
-		ImGui::Begin("Debug window 1", 0, ImGuiWindowFlags_NoTitleBar);
-		ImGui::BeginTabBar("my tab bar :)");
+		ImGui::Begin("Controls Window", 0, ImGuiWindowFlags_NoTitleBar);
+		ImGui::BeginTabBar("Controls Window Tab Bar");
 
 		if(ImGui::BeginTabItem("Settings"))
 		{
@@ -570,21 +571,32 @@ namespace Raytracer
 				if (ImGui::Selectable("Freecam", !settings.orbit_camera_enabled))
 				{
 					settings.orbit_camera_enabled = false;
+					internal.camera_dirty = true;
 				}
 
 				if (ImGui::Selectable("Orbit", settings.orbit_camera_enabled))
 				{
 					settings.orbit_camera_enabled = true;
+					internal.camera_dirty = true;
 				}
 				ImGui::EndCombo();
 			}
 
 			if(settings.orbit_camera_enabled)
 			{
-				ImGui::DragFloat3("Position", glm::value_ptr(settings.orbit_camera_position));
-				ImGui::DragFloat("Distance", &settings.orbit_camera_distance, 0.1f);
-				ImGui::DragFloat("Height", &settings.orbit_camera_height, 0.1f);
+				internal.camera_dirty |= ImGui::DragFloat3("Position", glm::value_ptr(settings.orbit_camera_position), 0.1f);
+				internal.camera_dirty |= ImGui::DragFloat("Distance", &settings.orbit_camera_distance, 0.1f);
+				internal.camera_dirty |= ImGui::DragFloat("Angle", &settings.orbit_camera_angle, 0.25f);
+				settings.orbit_camera_angle = glm::clamp(settings.orbit_camera_angle, -89.9f, 89.9f);
+				
+				ImGui::Checkbox("Orbit automatically?", &settings.orbit_automatically);
+				if(!settings.orbit_automatically)
+					ImGui::BeginDisabled();
+
 				ImGui::DragFloat("Rotations/s", &settings.orbit_camera_rotations_per_second, 0.001f, -1.0f, 1.0f);
+				
+				if(!settings.orbit_automatically)
+					ImGui::EndDisabled();
 			}
 
 			ImGui::Unindent();
@@ -670,7 +682,6 @@ namespace Raytracer
 		ImGui::EndTabBar();
 		
 		ImGui::End();
-
 
 		/*
 		ImGui::SetNextWindowPos({});
