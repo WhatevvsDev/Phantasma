@@ -264,7 +264,10 @@ namespace Raytracer
 	void load_exr(uint index = 0)
 	{
 		std::string exr_path = internal.exr_assets_on_disk[index].path.string();
-	
+		std::string file_name_with_extension = exr_path.substr(exr_path.find_last_of("/\\") + 1);
+
+		internal.current_exr = file_name_with_extension;
+
 		int width;
 		int height;
 		const char* err = NULL; // or nullptr in C++11
@@ -339,7 +342,11 @@ namespace Raytracer
 		if(settings.orbit_automatically)
 		{
 			orbit_cam_t += (delta_time_ms / 1000.0f) * -settings.orbit_camera_rotations_per_second;
-			internal.camera_dirty = true;
+
+			bool camera_is_orbiting = (settings.orbit_camera_rotations_per_second != 0.0f);
+
+			if(camera_is_orbiting)
+				internal.camera_dirty = true;
 		}
 
 		glm::vec3 offset = glm::vec3(0.0f, 0.0f, 1.0f);
@@ -639,7 +646,7 @@ namespace Raytracer
 		{
 			ImGui::PushStyleColor(ImGuiCol_FrameBg, {0, 0, 0, 0});
 			ImPlot::SetNextAxisToFit(ImAxis_Y1);
-			if (ImPlot::BeginPlot("Performance plot", {-1, 0}, ImPlotFlags_NoInputs))
+			if (ImPlot::BeginPlot("Performance plot (last 512 frames)", {-1, 0}, ImPlotFlags_NoInputs))
 			{
 				ImPlot::SetNextFillStyle({0, 0, 0, -1}, 0.2f);
 				ImPlot::PlotLine("Update time (ms)", internal.performance.update_times_ms, internal.performance.data_samples, 1.0f, 0.0f, ImPlotLineFlags_Shaded);
@@ -649,6 +656,23 @@ namespace Raytracer
 			}
 			ImGui::PopStyleColor();
 			ImGui::EndTabItem();
+
+			float min = 1e34f;
+			float max = -1e34f;
+			float avg = 0.0f;
+
+			for(auto& value : internal.performance.render_times_ms)
+			{
+				min = glm::fmin(min, value);
+				max = glm::fmax(max, value);
+				avg += value;
+			}
+
+			avg /= (float)internal.performance.data_samples;
+
+			ImGui::Text("Average: %.2fms", avg);
+			ImGui::Text("Min: %.2fms", min);
+			ImGui::Text("Max: %.2fms", max);
 		}
 
 		if(ImGui::BeginTabItem("Scene Settings"))
