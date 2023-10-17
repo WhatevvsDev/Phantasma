@@ -20,7 +20,8 @@ struct WorldManagerDeviceData
 
 namespace WorldManager
 {
-	void add_instance_of_mesh(u32 mesh_idx);
+	// Returns index of object
+	int add_instance_of_mesh(u32 mesh_idx);
 
 	WorldManagerDeviceData& get_world_device_data();
 }

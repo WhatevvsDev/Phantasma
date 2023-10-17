@@ -6,7 +6,7 @@ struct
 	WorldManagerDeviceData device_data;
 } internal;
 
-void WorldManager::add_instance_of_mesh(u32 mesh_idx)
+int WorldManager::add_instance_of_mesh(u32 mesh_idx)
 {
 	MeshInstanceHeader new_mesh_instance;
 	new_mesh_instance.transform = glm::identity<glm::mat4>();
@@ -18,6 +18,8 @@ void WorldManager::add_instance_of_mesh(u32 mesh_idx)
 	internal.device_data.instances[idx] = new_mesh_instance;
 
 	internal.device_data.mesh_count++;
+
+	return (internal.device_data.mesh_count - 1);
 }
 
 WorldManagerDeviceData& WorldManager::get_world_device_data()

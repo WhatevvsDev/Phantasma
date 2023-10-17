@@ -722,7 +722,8 @@ namespace Raytracer
 
 			if(ImGui::Button("Add Instance"))
 			{
-				WorldManager::add_instance_of_mesh(mesh_instances_idx);
+				internal.mouse_click_tri = WorldManager::add_instance_of_mesh(mesh_instances_idx);
+				internal.camera_dirty = true;
 			}
 		}
 

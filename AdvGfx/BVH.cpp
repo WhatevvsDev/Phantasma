@@ -26,6 +26,14 @@ float aabb_area(const glm::vec3& extent)
 	return extent.x * extent.y + extent.y * extent.z + extent.x * extent.z;
 }
 
+float get_node_cost(BVHNode& node)
+{
+	glm::vec3 extent = node.max - node.min;
+	float area = aabb_area(extent);
+	float cost = node.tri_count * area;
+	return cost > 0 ? cost : 1e30f;
+}
+
 float evaluate_sah( BVHNode& node, int axis, float pos, BVH& bvh, const std::vector<Tri>& tris )
 {
 	// determine triangle counts and bounds for this split candidate
@@ -68,26 +76,66 @@ float evaluate_sah( BVHNode& node, int axis, float pos, BVH& bvh, const std::vec
 	return cost > 0 ? cost : 1e30f;
 }
 
+float find_best_split_plane( BVHNode& node, int& axis, float& splitPos, BVH& bvh, const std::vector<Tri>& tris )
+{
+	/*
+	float bestCost = 1e30f;
+	for (int a = 0; a < 3; a++) for (uint i = 0; i < node.tri_count; i++)
+	{
+		const Tri& triangle = tris[bvh.triIdx[node.left_first + i]];
+		float candidatePos = bvh.centroids[bvh.triIdx[i]][axis];
+		float cost = evaluate_sah( node, a, candidatePos, bvh, tris);
+		if (cost < bestCost) 
+		{
+			splitPos = candidatePos;
+			axis = a;
+			bestCost = cost;
+		}
+	}
+
+	return bestCost;
+	*/
+
+	float bestCost = 1e30f;
+	for (int a = 0; a < 3; a++) 
+	{
+		float boundsMin = node.min[a];
+		float boundsMax = node.max[a];
+
+		if (boundsMin == boundsMax) 
+			continue;
+
+		int split_planes = 8;
+
+		float scale = (boundsMax - boundsMin) / split_planes;
+		for (uint i = 1; i < split_planes; i++)
+		{
+			float candidatePos = boundsMin + i * scale;
+			float cost = evaluate_sah( node, a, candidatePos, bvh, tris);
+
+			if (cost < bestCost)
+			{
+				splitPos = candidatePos;
+				axis = a;
+				bestCost = cost;
+			}
+		}
+	}
+	return bestCost;
+}
+
 void subdivide( uint nodeIdx, BVH& bvh, const std::vector<Tri>& tris)
 {
 	BVHNode& node = bvh.bvhNodes[nodeIdx];
-	// determine split axis using SAH
-	int bestAxis = -1;
-	float bestPos = 0, bestCost = 1e30f;
-	for (int axis = 0; axis < 3; axis++) for (uint i = 0; i < node.tri_count; i++)
-	{
-		float candidatePos = bvh.centroids[bvh.triIdx[i]][axis];
-		float cost = evaluate_sah( node, axis, candidatePos , bvh, tris);
-		if (cost < bestCost)
-			bestPos = candidatePos, bestAxis = axis, bestCost = cost;
-	}
-	int axis = bestAxis;
-	float splitPos = bestPos;
-	glm::vec3 e = node.max - node.min; // extent of parent
-	float parentArea = aabb_area(e);
-	float parentCost = node.tri_count * parentArea;
 
-	if (bestCost >= parentCost) return;
+	// determine split axis using SAH
+	int axis;
+	float splitPos;
+
+	float parentCost = get_node_cost(node);
+	float splitCost = find_best_split_plane( node, axis, splitPos, bvh, tris );
+
+	if (splitCost >= parentCost) return;
 	// in-place partition
 	int i = node.left_first;
 	int j = i + node.tri_count - 1;

@@ -351,7 +351,7 @@ float3 trace(struct TraceArgs* args)
 			new_ray.depth = current_ray.depth - 1;
 			new_ray.ray_parent = ray_stack_idx;
 
-			bool is_mirror = true;
+			bool is_mirror = false;
 			bool is_dielectric = false;
 
 			float3 albedo = (float3)(0.7f, 0.5f, 1.0f);
