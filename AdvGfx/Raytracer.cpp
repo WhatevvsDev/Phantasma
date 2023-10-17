@@ -294,7 +294,7 @@ namespace Raytracer
 		// TODO: make this "automatic", keep track of things in asset folder
 		// make them loadable to CPU, and then also optionally GPU using a free list or sm
 		AssetManager::init();
-		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\stanfordbunny.gltf");
+		//AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\stanfordbunny.gltf");
 		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\flat_vs_smoothed.gltf");
 		//AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\mid_poly_sphere.gltf");
 	}
@@ -499,7 +499,6 @@ namespace Raytracer
 
 		ComputeOperation("raytrace.cl")
 			.read_write(*internal.gpu_accumulation_buffer)
-			.read(ComputeReadBuffer({internal.buffer, (size_t)(render_area)}))
 			.read(ComputeReadBuffer({&internal.mouse_over_idx, 1}))
 			.write(AssetManager::get_normals_compute_buffer())
 			.write(AssetManager::get_tris_compute_buffer())
@@ -544,13 +543,6 @@ namespace Raytracer
 			internal.screenshot = false;
 		}
 	}
-
-
-	// TODO: replace this with an actual list of mesh instances, each with their own transform and header index
-	glm::mat4 test_transforms[2] = {
-		glm::identity<glm::mat4>(),
-		glm::identity<glm::mat4>()
-	};
 
 	void ui()
 	{
@@ -742,14 +734,11 @@ namespace Raytracer
 			auto& mesh_headers = AssetManager::get_mesh_headers();
 			int header_idx = internal.mouse_click_tri;
 
-			glm::mat4 object_transform = test_transforms[internal.mouse_click_tri];
-
 			glm::mat4 projection = glm::perspectiveRH(glm::radians(90.0f), (float)internal.render_width / (float)internal.render_height, 0.1f, 1000.0f);
 
-			if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection), internal.current_gizmo_operation, ImGuizmo::LOCAL, glm::value_ptr(object_transform)))
+			if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection), internal.current_gizmo_operation, ImGuizmo::LOCAL, glm::value_ptr(mesh_headers[header_idx].transform)))
 			{
-				mesh_headers[header_idx].inverse_transform = glm::inverse(object_transform);
-				test_transforms[internal.mouse_click_tri] = object_transform;
+				mesh_headers[header_idx].inverse_transform = glm::inverse(mesh_headers[header_idx].transform);
 				internal.camera_dirty = true;
 			}
 		}

@@ -188,6 +188,7 @@
     <ClCompile Include="Source.cpp" />
     <ClCompile Include="Timer.cpp" />
     <ClCompile Include="Utilities.cpp" />
+    <ClCompile Include="WorldManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="App.h" />
@@ -200,10 +201,12 @@
     <ClInclude Include="LogUtility.h" />
     <ClInclude Include="Math.h" />
     <ClInclude Include="Mesh.h" />
+    <ClInclude Include="PrimitiveTypes.h" />
     <ClInclude Include="Raytracer.h" />
     <ClInclude Include="strippedwindows.h" />
     <ClInclude Include="Timer.h" />
     <ClInclude Include="Utilities.h" />
+    <ClInclude Include="WorldManager.h" />
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="assets\compute\average_accumulated.cl">
