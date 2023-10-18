@@ -29,6 +29,7 @@
 #define TINYEXR_IMPLEMENTATION
 #include "tinyexr.h"
 
+// Implicit casting as error
 #pragma warning(error:4244)
 
 /*

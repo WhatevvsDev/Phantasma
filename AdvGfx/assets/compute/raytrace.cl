@@ -214,14 +214,14 @@ float3 tri_normal(struct Tri* tri)
 	return normalize(cross(a - b, a - c));
 }
 
-float3 random_unit_vector( uint* rand_seed)
+float3 random_unit_vector( uint* rand_seed, float3 normal)
 {
 	float3 result = (float3)(RandomFloat(rand_seed), RandomFloat(rand_seed), RandomFloat(rand_seed));
 
 	result *= 2;
 	result -= 1;
 
-	int failsafe = 100;
+	int failsafe = 8;
 	while(failsafe--)
 	{
 		if(dot(result,result) < 1.0f)
@@ -233,7 +233,7 @@ float3 random_unit_vector( uint* rand_seed)
 		result -= 1;
 	}
 
-	return normalize(result);
+	return normal;
 }
 
 float beers_law(float thickness, float absorbtion_coefficient)
@@ -344,7 +344,7 @@ float3 trace(struct TraceArgs* args)
 
 			bool inner_normal = dot(normal, current_ray.D) > 0.0f;
 
-			float3 hemisphere_normal = random_unit_vector(args->rand_seed);
+			float3 hemisphere_normal = random_unit_vector(args->rand_seed, normal);
 			if(dot(hemisphere_normal, normal) < 0.0f)
 				hemisphere_normal = -hemisphere_normal;
 
