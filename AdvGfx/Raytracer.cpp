@@ -29,6 +29,21 @@
 #define TINYEXR_IMPLEMENTATION
 #include "tinyexr.h"
 
+#pragma warning(error:4244)
+
+/*
+
+	// Main TODO
+
+	// 1. Camera system
+	//		- A proper system for managing camera, with various settings and options (DoF, FoV, etc.)
+
+	// 2. Asset browser/manager
+	//		- A system that automatically detects, sorts and shows the state of various assets (whether its loaded to CPU/GPU or still on disk, etc.)
+
+
+*/
+
 namespace Raytracer
 {	
 	struct DiskAsset
@@ -37,86 +52,88 @@ namespace Raytracer
 		std::string filename;
 	};
 
+	enum class CameraMovementType
+	{
+		Freecam,
+		Orbit
+	};
+
 	struct
 	{
-		bool recompile_changed_shaders_automatically { true };
-		bool fps_limit_enabled { true };
-		int fps_limit_value { 80 }; // TODO: this is sometimes very inaccurate in practice?
+		i32 accumulated_frame_limit { 32 };
+		i32 fps_limit				{ 80 };
 
-		float camera_speed_t {0.5f};
-
-		bool orbit_camera_enabled { false };
-		glm::vec3 orbit_camera_position { 0.0f };
-		float orbit_camera_distance { 10.0f };
-		float orbit_camera_angle { 0.0f };
-		float orbit_camera_rotations_per_second { 0.1f };
-		bool orbit_automatically { true };
-
-		glm::vec3 saved_camera_position { 0.0f };
-
-		bool show_onscreen_log { false };
-
-		bool accumulate_frames { true };
-		bool limit_accumulated_frames { true };
-		int accumulated_frame_limit { 32 };
+		bool show_onscreen_log							{ true };
+		bool orbit_automatically						{ true };
+		bool accumulate_frames							{ true };
+		bool limit_accumulated_frames					{ true };
+		bool fps_limit_enabled							{ true };
+		bool recompile_changed_shaders_automatically	{ true };
+		 
+		// TODO: Replace this with an actual camera [1]
+		CameraMovementType camera_movement_type { CameraMovementType::Freecam };
+		glm::vec3 orbit_camera_position			{ 0.0f };
+		f32 orbit_camera_distance				{ 10.0f };
+		f32 orbit_camera_angle					{ 0.0f };
+		f32 orbit_camera_rotations_per_second	{ 0.1f };
+		f32 camera_speed_t						{ 0.5f };
+		glm::vec3 saved_camera_position			{ 0.0f };
 	} settings;
 
 	struct SceneData
 	{
-		uint resolution[2] { 0, 0 };
-		uint mouse_pos[2] {};
+		u32 resolution[2] { 0, 0 };
+		u32 mouse_pos[2] {};
 		glm::vec3 cam_pos { 0.0f, 10.0f, 0.0f };
-		int frame_number { 0 };
+		u32 frame_number { 0 };
 		glm::vec3 cam_forward { 0.0f };
-		float pad_1 { 0.0f };
+		f32 pad_1 { 0.0f };
 		glm::vec3 cam_right { 0.0f };
-		float pad_2 { 0.0f };
+		f32 pad_2 { 0.0f };
 		glm::vec3 cam_up { 0.0f };
-		float pad_3 { 0.0f };
+		f32 pad_3 { 0.0f };
 		glm::mat4 object_inverse_transform { glm::mat4(1) };
-		bool reset_accumulator { false };
-		uint mesh_idx { 0 };
-		uint exr_width;
-		uint exr_height;
+		u32 reset_accumulator { false };
+		u32 exr_width { 0 };
+		u32 exr_height { 0 };
 	} sceneData;
 
 	struct
 	{
-		uint32_t  mouse_click_tri = 0; // TODO: Purely for testing ImGuizmo, backing code should be changed later
-		uint32_t* buffer { nullptr };
-		float show_move_speed_bar_time { 0.0f };
+		i32 selected_instance_idx { -1 }; // Signed so we can easily tell if they are valid or not
+		i32 hovered_instance_idx { -1 };
+
+		u32* buffer { nullptr };
+
 		bool show_debug_ui { false };
-		bool screenshot { false };
+		bool save_render_to_file { false };
+		bool render_dirty { true };
 
-		bool world_dirty { false };
-		bool camera_dirty { true };
-		int mouse_over_idx { -1 };
-
-		int accumulated_samples { 0 };
-		int render_width { 0 };
-		int render_height { 0 };
-		const int render_channel_count { 4 };
+		u32 accumulated_frames { 0 };
+		u32 render_width_px { 0 };
+		u32 render_height_px { 0 };
+		const u32 render_channel_count { 4 };
 		
 		ImGuizmo::OPERATION current_gizmo_operation { ImGuizmo::TRANSLATE };
 		ComputeGPUOnlyBuffer* gpu_accumulation_buffer { nullptr };
 
 		std::vector<DiskAsset> exr_assets_on_disk;
-		float* loaded_exr_data { nullptr };
+		f32* loaded_exr_data { nullptr };
 		std::string current_exr { "None" };
 
 		struct
 		{
 			Timer timer;
-			static const int data_samples { 256 };
-			float update_times_ms[data_samples] {};
-			float render_times_ms[data_samples] {};
-			float max_time = 0.0f;
+			static const u32 data_samples { 256 };
+			f32 update_times_ms[data_samples] {};
+			f32 render_times_ms[data_samples] {};
+			f32 max_time = 0.0f;
 		} performance;
 	} internal;
 
 	namespace Input
 	{
-		// Temporary scuffed input
+		// TODO: Replace this with an actual camera [1]
 		glm::vec3 cam_rotation;
 
 		void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -135,7 +152,7 @@ namespace Raytracer
 			switch(key)
 			{
 				case GLFW_KEY_P:
-					internal.screenshot = true;
+					internal.save_render_to_file = true;
 				break;
 				case GLFW_KEY_ESCAPE:
 					Raytracer::terminate();
@@ -151,8 +168,8 @@ namespace Raytracer
 
 	float camera_speed_t_to_m_per_second()
 	{
-		float adjusted_t = settings.camera_speed_t * 2.0f - 1.0f;
-		float value = pow(adjusted_t * 9.95f, 2.0f) * sgn(adjusted_t);
+		f32 adjusted_t = settings.camera_speed_t * 2.0f - 1.0f;
+		f32 value = pow(adjusted_t * 9.95f, 2.0f) * sgn(adjusted_t);
 
 		if(settings.camera_speed_t > 0.5f)
 		{
@@ -166,7 +183,6 @@ namespace Raytracer
 
 	// TODO: Temporary variables, will be consolidated into one system later
 	ComputeReadBuffer* screen_compute_buffer	{ nullptr };
-
 	ComputeWriteBuffer* exr_buffer	{ nullptr };
 
 	// Resizes buffers and sets internal state
@@ -179,8 +195,10 @@ namespace Raytracer
 			internal.buffer = desc.new_buffer_ptr;
 		}
 
-		internal.render_width = desc.width_px;
-		internal.render_height = desc.height_px;
+		internal.render_width_px = desc.width_px;
+		internal.render_height_px = desc.height_px;
+		sceneData.resolution[0] = desc.width_px;
+		sceneData.resolution[1] = desc.height_px;
 	}
 
 	// Creates the necessary buffers and sets internal state
@@ -210,10 +228,10 @@ namespace Raytracer
 
 			TryFromJSONVal(save_data, settings, camera_speed_t);
 			TryFromJSONVal(save_data, settings, fps_limit_enabled);
-			TryFromJSONVal(save_data, settings, fps_limit_value);
+			TryFromJSONVal(save_data, settings, fps_limit);
 			TryFromJSONVal(save_data, settings, recompile_changed_shaders_automatically);
 
-			TryFromJSONVal(save_data, settings, orbit_camera_enabled);
+			TryFromJSONVal(save_data, settings, camera_movement_type);
 			TryFromJSONVal(save_data, settings, orbit_camera_position);
 			TryFromJSONVal(save_data, settings, orbit_camera_distance);
 			TryFromJSONVal(save_data, settings, orbit_camera_angle);
@@ -239,10 +257,10 @@ namespace Raytracer
 			std::string file_name = file_name_with_extension.substr(0, file_name_with_extension.length() - file_extension.length() - 1);
 
 			bool wrong_file_extension = (file_extension != "cl") && (file_extension != "exr");
-			bool already_exists = (file_extension == "cl") && Compute::kernel_exists(file_name);
+			bool kernel_already_exists = (file_extension == "cl") && Compute::kernel_exists(file_name);
 			bool file_is_common_source = (file_name == "common");
 
-			if(wrong_file_extension || already_exists || file_is_common_source)
+			if(wrong_file_extension || kernel_already_exists || file_is_common_source)
 				continue;
 
 			if(file_extension == "cl")
@@ -254,31 +272,36 @@ namespace Raytracer
 			if(file_extension == "exr")
 			{
 				internal.exr_assets_on_disk.push_back({asset_path, file_name});
-				printf("Found exr file: %s\n", file_name.c_str());
 				continue;
 			}
 		}
 	}
 
-	void load_exr(uint index = 0)
+	// TODO: This should probably not be in Raytracer.cpp
+	void load_exr(u32 index = 0)
 	{
 		std::string exr_path = internal.exr_assets_on_disk[index].path.string();
 		std::string file_name_with_extension = exr_path.substr(exr_path.find_last_of("/\\") + 1);
 
 		internal.current_exr = file_name_with_extension;
 
-		int width;
-		int height;
-		const char* err = NULL; // or nullptr in C++11
+		i32 width;
+		i32 height;
+		const char* err = nullptr;
 
 		delete[] internal.loaded_exr_data;
-		int ret = LoadEXR(&internal.loaded_exr_data, &width, &height, exr_path.c_str(), &err);
+		LoadEXR(&internal.loaded_exr_data, &width, &height, exr_path.c_str(), &err);
 
-		sceneData.exr_width = (uint)width;
-		sceneData.exr_height = (uint)height;
+		if(err)
+		{
+			LOGERROR(err);
+		}
+		
+		sceneData.exr_width = (u32)width;
+		sceneData.exr_height = (u32)height;
 
-		exr_buffer = new ComputeWriteBuffer({internal.loaded_exr_data, (size_t)(width * height * 4)});
-		internal.camera_dirty = true;
+		exr_buffer = new ComputeWriteBuffer({internal.loaded_exr_data, (usize)(width * height * 4)});
+		internal.render_dirty = true;
 	}
 
 	void init(const RaytracerInitDesc& desc)
@@ -288,12 +311,14 @@ namespace Raytracer
 		init_find_assets();
 		load_exr();
 
-		internal.gpu_accumulation_buffer = new ComputeGPUOnlyBuffer((size_t)(internal.render_width * internal.render_height * internal.render_channel_count * sizeof(float)));
+		u32 render_area_px = internal.render_width_px * internal.render_height_px;
+
+		internal.gpu_accumulation_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * internal.render_channel_count * sizeof(float)));
 
 		internal.performance.timer.start();
 
 		// TODO: make this "automatic", keep track of things in asset folder
-		// make them loadable to CPU, and then also optionally GPU using a free list or sm
+		// make them loadable to CPU, and then also optionally GPU using a free list or sm [2]
 		AssetManager::init();
 		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\stanfordbunny.gltf");
 		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\flat_vs_smoothed.gltf");
@@ -308,10 +333,10 @@ namespace Raytracer
 
 		ToJSONVal(save_data, settings, camera_speed_t);
 		ToJSONVal(save_data, settings, fps_limit_enabled);
-		ToJSONVal(save_data, settings, fps_limit_value);
+		ToJSONVal(save_data, settings, fps_limit);
 		ToJSONVal(save_data, settings, recompile_changed_shaders_automatically);
 
-		ToJSONVal(save_data, settings, orbit_camera_enabled);
+		ToJSONVal(save_data, settings, camera_movement_type);
 		ToJSONVal(save_data, settings, orbit_camera_position);
 		ToJSONVal(save_data, settings, orbit_camera_distance);
 		ToJSONVal(save_data, settings, orbit_camera_angle);
@@ -332,9 +357,9 @@ namespace Raytracer
 		terminate_save_data();
 	}
 
-	void update_orbit_camera_behavior(float delta_time_ms)
+	void update_orbit_camera_behavior(f32 delta_time_ms)
 	{
-		static float orbit_cam_t = 0.0f;
+		static f32 orbit_cam_t = 0.0f;
 
 		if(settings.orbit_automatically)
 		{
@@ -342,26 +367,25 @@ namespace Raytracer
 
 			bool camera_is_orbiting = (settings.orbit_camera_rotations_per_second != 0.0f);
 
-			if(camera_is_orbiting)
-				internal.camera_dirty = true;
+			internal.render_dirty |= camera_is_orbiting;
 		}
 
-		glm::vec3 offset = glm::vec3(0.0f, 0.0f, 1.0f);
 		glm::mat3 rotation = glm::eulerAngleXY(glm::radians(settings.orbit_camera_angle), glm::radians(orbit_cam_t * 360.0f));
+		glm::vec3 offset = glm::vec3(0.0f, 0.0f, 1.0f) * rotation;
 
-		offset = offset * rotation; // Rotate it
+		offset *= settings.orbit_camera_distance;
 
-		sceneData.cam_forward = -glm::normalize(offset);
+		sceneData.cam_forward = glm::normalize(-offset);
 		sceneData.cam_right = glm::normalize(glm::cross(sceneData.cam_forward, glm::vec3(0.0f, 1.0f, 0.0f)));
 		sceneData.cam_up = glm::normalize(glm::cross(sceneData.cam_right, sceneData.cam_forward));
-		sceneData.cam_pos = offset * settings.orbit_camera_distance + settings.orbit_camera_position;
+		sceneData.cam_pos = offset + settings.orbit_camera_position;
 	}
 
 	void update_free_float_camera_behavior(float delta_time_ms)
 	{
-		int moveHor =	(ImGui::IsKeyDown(ImGuiKey_D))		- (ImGui::IsKeyDown(ImGuiKey_A));
-		int moveVer =	(ImGui::IsKeyDown(ImGuiKey_Space))	- (ImGui::IsKeyDown(ImGuiKey_LeftCtrl));
-		int moveWard =	(ImGui::IsKeyDown(ImGuiKey_W))		- (ImGui::IsKeyDown(ImGuiKey_S));
+		i32 moveHor =	(ImGui::IsKeyDown(ImGuiKey_D))		- (ImGui::IsKeyDown(ImGuiKey_A));
+		i32 moveVer =	(ImGui::IsKeyDown(ImGuiKey_Space))	- (ImGui::IsKeyDown(ImGuiKey_LeftCtrl));
+		i32 moveWard =	(ImGui::IsKeyDown(ImGuiKey_W))		- (ImGui::IsKeyDown(ImGuiKey_S));
 
 		glm::mat3 rotation = glm::eulerAngleXYZ(glm::radians(Input::cam_rotation.x), glm::radians(Input::cam_rotation.y), glm::radians(Input::cam_rotation.z));
 
@@ -369,19 +393,19 @@ namespace Raytracer
 		sceneData.cam_right = glm::vec3(-1.0f, 0, 0) * rotation;
 		sceneData.cam_up = glm::vec3(0, 1.0f, 0) * rotation;
 
-		glm::vec3 dir = 
+		glm::vec3 move_dir = 
 			sceneData.cam_forward * moveWard + 
 			sceneData.cam_up * moveVer + 
 			sceneData.cam_right * moveHor;
 
-		glm::normalize(dir);
-		glm::vec3 camera_move_delta = glm::vec3(dir * delta_time_ms * 0.01f) * camera_speed_t_to_m_per_second();
+		glm::normalize(move_dir);
+		glm::vec3 camera_move_delta = glm::vec3(move_dir * delta_time_ms * 0.01f) * camera_speed_t_to_m_per_second();
 
 		bool camera_is_moving = (glm::dot(camera_move_delta, camera_move_delta) != 0.0f);
 
 		if(camera_is_moving)
 		{
-			internal.camera_dirty = true;
+			internal.render_dirty = true;
 				
 			sceneData.cam_pos += camera_move_delta;
 		}
@@ -392,59 +416,61 @@ namespace Raytracer
 		{
 			auto mouse_delta = ImGui::GetIO().MouseDelta;
 
-			glm::vec3 camera_angular_delta = glm::vec3(-mouse_delta.y, mouse_delta.x, 0) * 0.1f;
+			glm::vec3 camera_angular_delta = glm::vec3(-mouse_delta.y, mouse_delta.x, 0);
 
 			bool camera_is_rotating = (glm::dot(camera_angular_delta, camera_angular_delta) != 0.0f);
 
 			if(camera_is_rotating)
 			{
-				Input::cam_rotation += camera_angular_delta;
+				Input::cam_rotation += camera_angular_delta * 0.1f;
+
 				bool pitch_exceeds_limit = (fabs(Input::cam_rotation.x) > 89.9f);
 
 				if(pitch_exceeds_limit)
 					Input::cam_rotation.x = 89.9f * sgn(Input::cam_rotation.x);
 
-				internal.camera_dirty = true;
+				internal.render_dirty = true;
 			}
 		}
 	}
 
-	void update(const float delta_time_ms)
+	void update_instance_selection_behavior()
+	{
+		if(!internal.show_debug_ui)
+			return;
+		
+		bool clicked_on_non_gizmo = (ImGui::GetIO().MouseReleased[0] && !ImGuizmo::IsOver() && !ImGui::IsAnyItemHovered());
+
+		auto cursor_pos = ImGui::GetIO().MousePos;
+
+		sceneData.mouse_pos[0] = glm::clamp((u32)cursor_pos.x, 0u, internal.render_width_px - 1);
+		sceneData.mouse_pos[1] = glm::clamp((u32)cursor_pos.y, 0u, internal.render_height_px - 1);
+
+		if(clicked_on_non_gizmo)
+		{
+			internal.selected_instance_idx = internal.hovered_instance_idx;
+		}
+	}
+
+	void update(const f32 delta_time_ms)
 	{
 		internal.performance.timer.reset();
-
-		internal.show_move_speed_bar_time -= (delta_time_ms / 1000.0f);
 		
-		settings.orbit_camera_enabled
+		settings.camera_movement_type == CameraMovementType::Orbit
 			? update_orbit_camera_behavior(delta_time_ms)
 			: update_free_float_camera_behavior(delta_time_ms);
+
+		update_instance_selection_behavior();
 
 		if(settings.recompile_changed_shaders_automatically)
 		{
 			bool recompiled_any_shaders = Compute::recompile_kernels(ComputeKernelRecompilationCondition::SourceChanged);
 			 
-			if(recompiled_any_shaders)
-			{
-				internal.camera_dirty = true;
-			}
+			internal.render_dirty |= recompiled_any_shaders;
 		}
 
-		float old_camera_speed_t = settings.camera_speed_t;
 		settings.camera_speed_t += ImGui::GetIO().MouseWheel * 0.01f;
 		settings.camera_speed_t = glm::fclamp(settings.camera_speed_t, 0.0f, 1.0f);
-		if(settings.camera_speed_t != old_camera_speed_t)
-			internal.show_move_speed_bar_time = 2.0f;
-
-		if(internal.world_dirty)
-		{
-			/*loaded_model->reconstruct_bvh();
-
-			tris_compute_buffer->update(loaded_model->tris);
-			bvh_compute_buffer->update(loaded_model->bvh->bvhNodes);
-			tri_idx_compute_buffer->update(loaded_model->bvh->triIdx);*/
-
-			internal.world_dirty = false;
-		}
 
 		rotate_array_right(internal.performance.update_times_ms, internal.performance.data_samples);
 		internal.performance.update_times_ms[0] = internal.performance.timer.to_now();
@@ -454,7 +480,7 @@ namespace Raytracer
 	// Averages out acquired samples, and renders them to the screen
 	void raytrace_average_samples(const ComputeReadWriteBuffer& screen_buffer, const ComputeGPUOnlyBuffer& accumulated_samples)
 	{
-		float samples_reciprocal = 1.0f / (float)internal.accumulated_samples;
+		f32 samples_reciprocal = 1.0f / (f32)internal.accumulated_frames;
 
 		// TODO: pass this a buffer of heatmap colors, instead of hardcoding it into the shader
 		ComputeOperation("average_accumulated.cl")
@@ -462,46 +488,46 @@ namespace Raytracer
 			.read_write(screen_buffer)
 			.write({&samples_reciprocal, 1})
 			.write({&sceneData, 1})
-			.global_dispatch({internal.render_width, internal.render_height, 1})
+			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
 			.execute();
+	}
+
+	void raytrace_save_render_to_file() 
+	{
+		if(!internal.save_render_to_file)
+			return;
+
+		stbi_write_jpg("render.jpg", internal.render_width_px, internal.render_height_px, internal.render_channel_count, internal.buffer, 100);
+		LOGDEBUG("Saved screenshot.");
+		internal.save_render_to_file = false;
 	}
 
 	void raytrace()
 	{
 		internal.performance.timer.reset();
-
-		sceneData.resolution[0] = internal.render_width;
-		sceneData.resolution[1] = internal.render_height;
 		sceneData.frame_number++;
 
-		if(!settings.accumulate_frames)
-			internal.camera_dirty = true;
-
 		// TODO: we currently don't take into account world changes!
-		if(internal.camera_dirty)
+		if(internal.render_dirty || !settings.accumulate_frames)
 		{
 			sceneData.reset_accumulator = true;
-			internal.camera_dirty = false;
-			internal.accumulated_samples = 0;
+			internal.render_dirty = false;
+			internal.accumulated_frames = 0;
 		}
 
-		unsigned int render_area = internal.render_width * internal.render_height;
-		ComputeReadWriteBuffer screen_buffer({internal.buffer, (size_t)(render_area)});
+		u32 render_area = internal.render_width_px * internal.render_height_px;
+		ComputeReadWriteBuffer screen_buffer({internal.buffer, (usize)(render_area)});
 		
-		bool accumulated_enough_frames = (internal.accumulated_samples > settings.accumulated_frame_limit);
+		bool stop_accumulating_frames = settings.limit_accumulated_frames && (internal.accumulated_frames > (u32)settings.accumulated_frame_limit);
 
-		if(settings.limit_accumulated_frames && accumulated_enough_frames)
-		{
+		if(stop_accumulating_frames)
 			goto skip_rendering_goto;
-		}
 
-		internal.accumulated_samples++;
-
-		AssetManager::get_mesh_header_buffer().update(AssetManager::get_mesh_headers());
+		internal.accumulated_frames++;
 
 		ComputeOperation("raytrace.cl")
 			.read_write(*internal.gpu_accumulation_buffer)
-			.read(ComputeReadBuffer({&internal.mouse_over_idx, 1}))
+			.read(ComputeReadBuffer({&internal.hovered_instance_idx, 1}))
 			.write(AssetManager::get_normals_compute_buffer())
 			.write(AssetManager::get_tris_compute_buffer())
 			.write(AssetManager::get_bvh_compute_buffer())
@@ -510,7 +536,7 @@ namespace Raytracer
 			.write({&sceneData, 1})
 			.write(*exr_buffer)
 			.write({&WorldManager::get_world_device_data(), 1})
-			.global_dispatch({internal.render_width, internal.render_height, 1})
+			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
 			.execute();
 
 		raytrace_average_samples(screen_buffer, (*internal.gpu_accumulation_buffer));
@@ -524,28 +550,7 @@ namespace Raytracer
 		internal.performance.render_times_ms[0] = internal.performance.timer.to_now();
 		internal.performance.max_time = glm::max(internal.performance.max_time, internal.performance.render_times_ms[0]);
 
-		if(internal.show_debug_ui)
-		{
-			bool clicked_on_non_gizmo = (ImGui::GetIO().MouseReleased[0] && !ImGuizmo::IsOver() && !ImGui::IsAnyItemHovered());
-
-			auto cursor_pos = ImGui::GetIO().MousePos;
-
-			sceneData.mouse_pos[0] = glm::clamp((int)cursor_pos.x, 0, internal.render_width - 1);
-			sceneData.mouse_pos[1] = glm::clamp((int)cursor_pos.y, 0, internal.render_height - 1);
-
-			if(clicked_on_non_gizmo)
-			{
-				internal.mouse_click_tri = internal.mouse_over_idx;
-				printf("Clicked on: %u\n", internal.mouse_click_tri);
-			}
-		}
-
-		if(internal.screenshot)
-		{
-			stbi_write_jpg("render.jpg", internal.render_width, internal.render_height, internal.render_channel_count, internal.buffer, 100);
-			LOGDEBUG("Saved screenshot.");
-			internal.screenshot = false;
-		}
+		raytrace_save_render_to_file();
 	}
 
 	void ui()
@@ -564,7 +569,6 @@ namespace Raytracer
 		{
 			ImGui::SeparatorText("General");
 			ImGui::Indent();
-
 			
 			ImGui::Checkbox("Show onscreen log?", &settings.show_onscreen_log);
 
@@ -573,27 +577,27 @@ namespace Raytracer
 			ImGui::SeparatorText("Camera");
 			ImGui::Indent();
 
-			if (ImGui::BeginCombo("Camera Movement", settings.orbit_camera_enabled ? "Orbit" : "Free"))
+			if (ImGui::BeginCombo("Camera Movement", settings.camera_movement_type == CameraMovementType::Orbit ? "Orbit" : "Free"))
 			{
-				if (ImGui::Selectable("Freecam", !settings.orbit_camera_enabled))
+				if (ImGui::Selectable("Freecam", settings.camera_movement_type == CameraMovementType::Freecam))
 				{
-					settings.orbit_camera_enabled = false;
-					internal.camera_dirty = true;
+					settings.camera_movement_type = CameraMovementType::Freecam;
+					internal.render_dirty = true;
 				}
 
-				if (ImGui::Selectable("Orbit", settings.orbit_camera_enabled))
+				if (ImGui::Selectable("Orbit", settings.camera_movement_type == CameraMovementType::Orbit))
 				{
-					settings.orbit_camera_enabled = true;
-					internal.camera_dirty = true;
+					settings.camera_movement_type = CameraMovementType::Orbit;
+					internal.render_dirty = true;
 				}
 				ImGui::EndCombo();
 			}
 
-			if(settings.orbit_camera_enabled)
+			if(settings.camera_movement_type == CameraMovementType::Orbit)
 			{
-				internal.camera_dirty |= ImGui::DragFloat3("Position", glm::value_ptr(settings.orbit_camera_position), 0.1f);
-				internal.camera_dirty |= ImGui::DragFloat("Distance", &settings.orbit_camera_distance, 0.1f);
-				internal.camera_dirty |= ImGui::DragFloat("Angle", &settings.orbit_camera_angle, 0.25f);
+				internal.render_dirty |= ImGui::DragFloat3("Position", glm::value_ptr(settings.orbit_camera_position), 0.1f);
+				internal.render_dirty |= ImGui::DragFloat("Distance", &settings.orbit_camera_distance, 0.1f);
+				internal.render_dirty |= ImGui::DragFloat("Angle", &settings.orbit_camera_angle, 0.25f);
 				settings.orbit_camera_angle = glm::clamp(settings.orbit_camera_angle, -89.9f, 89.9f);
 				
 				ImGui::Checkbox("Orbit automatically?", &settings.orbit_automatically);
@@ -624,7 +628,7 @@ namespace Raytracer
 			ImGui::Text("Framerate Limit");
 			ImGui::Checkbox("##Limit framerate checkbox", &settings.fps_limit_enabled);
 			ImGui::SameLine();
-			ImGui::InputInt("##Framerate limit", &settings.fps_limit_value, 0, 0);
+			ImGui::InputInt("##Framerate limit", &settings.fps_limit, 0, 0);
 
 			ImGui::Unindent();
 			ImGui::Dummy({20, 20});
@@ -657,9 +661,9 @@ namespace Raytracer
 			ImGui::PopStyleColor();
 			ImGui::EndTabItem();
 
-			float min = 1e34f;
-			float max = -1e34f;
-			float avg = 0.0f;
+			f32 min = 1e34f;
+			f32 max = -1e34f;
+			f32 avg = 0.0f;
 
 			for(auto& value : internal.performance.render_times_ms)
 			{
@@ -668,7 +672,7 @@ namespace Raytracer
 				avg += value;
 			}
 
-			avg /= (float)internal.performance.data_samples;
+			avg /= (f32)internal.performance.data_samples;
 
 			ImGui::Text("Average: %.2fms", avg);
 			ImGui::Text("Min: %.2fms", min);
@@ -679,7 +683,7 @@ namespace Raytracer
 		{
 			if(ImGui::BeginCombo("EXRs", internal.current_exr.c_str()))
 			{
-				uint idx = 0;
+				u32 idx = 0;
 				for(auto& exr : internal.exr_assets_on_disk)
 				{
 					if (ImGui::Selectable((exr.filename + ".exr").c_str(), exr.filename == internal.current_exr))
@@ -694,24 +698,18 @@ namespace Raytracer
 				ImGui::EndCombo();
 			}
 
-			int mesh_idx_proxy = (int)sceneData.mesh_idx;
-			if (ImGui::DragInt("Mesh index", &mesh_idx_proxy, 1.0f, 0, AssetManager::loaded_mesh_count() - 1))
-			{
-				internal.camera_dirty = true;
-			}
-			sceneData.mesh_idx = (unsigned int)glm::clamp(mesh_idx_proxy, 0, glm::max(AssetManager::loaded_mesh_count() - 1, 0));
 			ImGui::EndTabItem();
 
-			static u32 mesh_instances_idx = 0;
+			static u32 selected_mesh_idx_to_instance = 0;
 
-			if(ImGui::BeginCombo("Mesh Instances", std::to_string(mesh_instances_idx).c_str()))
+			if(ImGui::BeginCombo("Mesh Instances", std::to_string(selected_mesh_idx_to_instance).c_str()))
 			{
 				uint idx = 0;
 				for(auto& mesh_header : AssetManager::get_mesh_headers())
 				{
-					if (ImGui::Selectable(std::to_string(idx).c_str(), idx == mesh_instances_idx))
+					if (ImGui::Selectable(std::to_string(idx).c_str(), idx == selected_mesh_idx_to_instance))
 					{
-						mesh_instances_idx = idx;
+						selected_mesh_idx_to_instance = idx;
 					}
 
 					idx++;
@@ -722,8 +720,8 @@ namespace Raytracer
 
 			if(ImGui::Button("Add Instance"))
 			{
-				internal.mouse_click_tri = WorldManager::add_instance_of_mesh(mesh_instances_idx);
-				internal.camera_dirty = true;
+				internal.selected_instance_idx = WorldManager::add_instance_of_mesh(selected_mesh_idx_to_instance);
+				internal.render_dirty = true;
 			}
 		}
 
@@ -732,9 +730,9 @@ namespace Raytracer
 		ImGui::End();
 
 		ImGui::SetNextWindowPos({});
-		ImGui::Begin("Transform tools", 0, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
+		ImGui::Begin("Transform tools", 0, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoMouseInputs);
 
-		float icon_font_size = 50.0f;	
+		f32 icon_font_size = 50.0f;	
 
 		ImGui::SetWindowFontScale(0.9f);
 		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {0, 0});
@@ -757,113 +755,37 @@ namespace Raytracer
 
 		auto view = glm::lookAtRH(glm::vec3(sceneData.cam_pos), glm::vec3(sceneData.cam_pos) + glm::vec3(sceneData.cam_forward), glm::vec3(0.0f, 1.0f, 0.0f));
 
-		if(internal.mouse_click_tri != -1)
+		if(internal.selected_instance_idx != -1)
 		{
-			auto& mesh_headers = AssetManager::get_mesh_headers();
-			int transform_idx = internal.mouse_click_tri;
+			i32 transform_idx = internal.selected_instance_idx;
 
 			MeshInstanceHeader& instance = WorldManager::get_world_device_data().instances[transform_idx];
 			glm::mat4& transform = instance.transform;
 
-			glm::mat4 projection = glm::perspectiveRH(glm::radians(90.0f), (float)internal.render_width / (float)internal.render_height, 0.1f, 1000.0f);
+			glm::mat4 projection = glm::perspectiveRH(glm::radians(90.0f), (f32)internal.render_width_px / (f32)internal.render_height_px, 0.1f, 1000.0f);
 
 			if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection), internal.current_gizmo_operation, ImGuizmo::LOCAL, glm::value_ptr(transform)))
 			{
 				instance.inverse_transform = glm::inverse(transform);
-				internal.camera_dirty = true;
+				internal.render_dirty = true;
 			}
 		}
-
-		/*
-
-		// Bless this mess
-		auto& draw_list = *ImGui::GetForegroundDrawList();
-
-		bool move_speed_bar_visible = (internal.show_move_speed_bar_time > 0 || internal.show_debug_ui);
-
-		if(move_speed_bar_visible)
-		{
-			{ // Movement speed bar
-
-				static float camera_speed_visual_t;
-
-				camera_speed_visual_t = glm::lerp(camera_speed_visual_t, settings.camera_speed_t, 0.65f);
-
-				float move_bar_width = (float)sceneData.resolution[0] * 0.35f;
-				float move_bar_padding = ((float)sceneData.resolution[0] - move_bar_width) * 0.5f;
-				float move_bar_height = 3;
-				{
-					auto minpos = ImVec2(move_bar_padding, (float)sceneData.resolution[1] - move_bar_height - 32);
-					auto maxpos = ImVec2(move_bar_padding + move_bar_width, (float)sceneData.resolution[1] - 32);
-
-					draw_list.AddRectFilled(minpos, maxpos, IM_COL32(223, 223, 223, 255), 0.0f);
-					draw_list.AddRect(ImVec2(minpos.x - 1, minpos.y - 1), ImVec2(maxpos.x + 1, maxpos.y + 1), IM_COL32(32, 32, 32, 255), 0.0f, 2.0f);
-							
-					std::string text = std::format("Camera speed: {} m/s", camera_speed_t_to_m_per_second());
-					auto text_size = ImGui::CalcTextSize(text.c_str());
-					draw_list.AddText(ImVec2(minpos.x + move_bar_width * 0.5f - text_size.x * 0.5f, minpos.y - 32 - text_size.y), IM_COL32(223, 223, 223, 255), text.data() ,text.data() + text.length());
-				}
-				// Movement speed bar, divisions
-				int divisior_count = 5;
-				for(int i = 0; i < divisior_count + 2; i++)
-				{
-					float cap_extra_height = 5;
-					float cap_extra_width = 0;
-					float divisor_extra_height = 7;
-
-					if(i == 0 || i == divisior_count + 1){}
-					else
-					{
-						cap_extra_height = 0;
-						cap_extra_width = 0;
-					}
-
-					float hor_offset = move_bar_width * (float(i) / ((float)divisior_count + 1.0f));
-					float width_half_extent = 2;
-
-					auto minpos = ImVec2(move_bar_padding + hor_offset - width_half_extent - cap_extra_width, sceneData.resolution[1] - move_bar_height - 32 - cap_extra_height - divisor_extra_height *0.5f);
-					auto maxpos = ImVec2(move_bar_padding + hor_offset + width_half_extent + cap_extra_width, sceneData.resolution[1] - 32 + cap_extra_height + divisor_extra_height *0.5f);
-
-					draw_list.AddRectFilled(minpos, maxpos, IM_COL32(223, 223, 223, 255), 0.0f);
-					draw_list.AddRect(ImVec2(minpos.x - 1, minpos.y - 1), ImVec2(maxpos.x + 1, maxpos.y + 1), IM_COL32(0, 0, 0, 255), 0.0f, 2.0f);
-				}
-				{
-					float t_bar_half_width = 4;
-					float t_bar_half_height = 10;
-
-					auto minpos = ImVec2(move_bar_padding - t_bar_half_width + move_bar_width * camera_speed_visual_t, sceneData.resolution[1] - move_bar_height - 32 - t_bar_half_height);
-					auto maxpos = ImVec2(move_bar_padding + t_bar_half_width + move_bar_width * camera_speed_visual_t, sceneData.resolution[1] - 32 + t_bar_half_height);
-
-					draw_list.AddRectFilled(minpos, maxpos, IM_COL32(223, 223, 223, 255), 0.0f);
-					draw_list.AddRect(ImVec2(minpos.x - 1, minpos.y - 1), ImVec2(maxpos.x + 1, maxpos.y + 1), IM_COL32(32, 32, 32, 255), 0.0f, 2.0f);
-				}
-			}
-		}
-
-		if(!internal.show_debug_ui)
-			return;
-
-		
 
 		if(settings.show_onscreen_log)
 		{
 			auto latest_msg = Log::get_latest_msg();
 			auto message_color = (latest_msg.second == Log::MessageType::Error) ? IM_COL32(255, 0, 0, 255) : IM_COL32(255, 255, 255, 255);
 
-			ImGui::GetForegroundDrawList()->AddText(ImVec2(10, 10), message_color,latest_msg.first.data() ,latest_msg.first.data() + latest_msg.first.length());
+			auto text_size = ImGui::CalcTextSize(latest_msg.first.data());
+
+			ImGui::GetForegroundDrawList()->AddText(ImVec2(internal.render_width_px / 2 - text_size.x / 2, 10), message_color, latest_msg.first.data() ,latest_msg.first.data() + latest_msg.first.length());
 		}
-
-		// Debug settings window
-		// TODO: Remake this as not just a standard debug window, but something more user friendly
-
-		ImGui::Begin(" Debug settings window");
-		*/
 	}
 
-	int Raytracer::get_target_fps()
+	u32 Raytracer::get_target_fps()
 	{
 		return settings.fps_limit_enabled ? 
-			settings.fps_limit_value :
+			settings.fps_limit :
 			1000;
 	}
 }

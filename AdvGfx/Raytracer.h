@@ -2,6 +2,8 @@
 #include <cstdint>
 #include <string>
 
+#include "PrimitiveTypes.h"
+
 #include "LogUtility.h"
 #include <assert.h>
 
@@ -14,9 +16,9 @@ namespace Raytracer::Input
 
 struct RaytracerInitDesc
 {
-	unsigned int width_px { 0 };
-	unsigned int height_px { 0 };
-	uint32_t* screen_buffer_ptr { nullptr };
+	u32 width_px { 0 };
+	u32 height_px { 0 };
+	u32* screen_buffer_ptr { nullptr };
 
 	inline bool validate() const
 	{
@@ -42,9 +44,9 @@ struct RaytracerInitDesc
 
 struct RaytracerResizeDesc
 {
-	unsigned int width_px { 0 };
-	unsigned int height_px { 0 };
-	uint32_t* new_buffer_ptr { nullptr }; // Optional
+	u32 width_px { 0 };
+	u32 height_px { 0 };
+	u32* new_buffer_ptr { nullptr }; // Optional
 
 	inline bool validate() const
 	{
@@ -72,8 +74,8 @@ namespace Raytracer
 	void terminate();
 	void resize(const RaytracerResizeDesc& desc);
 	void raytrace();
-	void update(const float delta_time_ms);
+	void update(const f32 delta_time_ms);
 	void ui();
 
-	int get_target_fps();
+	u32 get_target_fps();
 };

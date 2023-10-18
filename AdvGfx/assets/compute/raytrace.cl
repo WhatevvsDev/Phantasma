@@ -264,8 +264,6 @@ struct TraceArgs
 
 float3 trace(struct TraceArgs* args)
 {
-	float3 sun_dir = normalize((float3)(1.0f, 0.8f, -0.7f));
-
 	// Keeping track of current ray in the stack
 	const int ray_stack_size = 32;
 	struct Ray ray_stack[ray_stack_size];
@@ -290,7 +288,6 @@ float3 trace(struct TraceArgs* args)
 		{
 			continue;
 		}
-
 
 		float oldt = current_ray.t;
 		int hit_header_idx = -1;
@@ -338,12 +335,12 @@ float3 trace(struct TraceArgs* args)
 
 			bool inner_normal = dot(normal, current_ray.D) > 0.0f;
 
-			if(inner_normal)
-				normal = -normal;
-
 			float3 hemisphere_normal = random_unit_vector(args->rand_seed);
 			if(dot(hemisphere_normal, normal) < 0.0f)
 				hemisphere_normal = -hemisphere_normal;
+
+			if(inner_normal)
+				normal = -normal;
 
 			struct Ray new_ray;
 			new_ray.O = hit_pos + hemisphere_normal * EPSILON;
@@ -399,6 +396,7 @@ float3 trace(struct TraceArgs* args)
 				}
 				else
 				{
+
 					new_ray.D = hemisphere_normal;
 					ray_stack[ray_stack_idx++] = new_ray;
 
@@ -448,7 +446,6 @@ void kernel raytrace(global float* accumulation_buffer, global int* mouse, globa
 	trace_args.trisIdx = trisIdx;
 	trace_args.rand_seed = &rand_seed;
 	trace_args.mesh_headers = mesh_headers;
-	trace_args.mesh_idx = sceneData->mesh_idx;
 	trace_args.exr = exr;
 	trace_args.exr_width = sceneData->exr_width;
 	trace_args.exr_height = sceneData->exr_height;

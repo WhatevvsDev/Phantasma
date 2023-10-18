@@ -1,11 +1,13 @@
 #include "BVH.h"
 #include "Mesh.h"
+#include "PrimitiveTypes.h"
 
 #include <utility>
 
 void update_node_bounds( uint nodeIdx, BVH& bvh, const std::vector<Tri>& tris)
 {
 	BVHNode& node = bvh.bvhNodes[nodeIdx];
+
 	node.min = glm::vec3( 1e30f );
 	node.max = glm::vec3( -1e30f );
 	for (uint first = node.left_first, i = 0; i < node.tri_count; i++)
@@ -78,24 +80,6 @@ float evaluate_sah( BVHNode& node, int axis, float pos, BVH& bvh, const std::vec
 
 float find_best_split_plane( BVHNode& node, int& axis, float& splitPos, BVH& bvh, const std::vector<Tri>& tris )
 {
-	/*
-	float bestCost = 1e30f;
-	for (int a = 0; a < 3; a++) for (uint i = 0; i < node.tri_count; i++)
-	{
-		const Tri& triangle = tris[bvh.triIdx[node.left_first + i]];
-		float candidatePos = bvh.centroids[bvh.triIdx[i]][axis];
-		float cost = evaluate_sah( node, a, candidatePos, bvh, tris);
-		if (cost < bestCost) 
-		{
-			splitPos = candidatePos;
-			axis = a;
-			bestCost = cost;
-		}
-	}
-
-	return bestCost;
-	*/
-
 	float bestCost = 1e30f;
 	for (int a = 0; a < 3; a++) 
 	{
@@ -175,7 +159,9 @@ BVH::BVH(const std::vector<Tri>& tris)
 	centroids.resize(tris.size());
 
 	// populate triangle index array
-	for (int i = 0; i < primitive_count; i++) triIdx[i] = i;
+	for (int i = 0; i < primitive_count; i++) 
+		triIdx[i] = i;
+
 	// calculate triangle centroids for partitioning
 	for (int i = 0; i < primitive_count; i++)
 		centroids[i] = (tris[i].vertex0 + tris[i].vertex1 + tris[i].vertex2) * 0.3333f;

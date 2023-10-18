@@ -1,3 +1,4 @@
+#pragma warning(push, 0)
 #ifndef TINYEXR_H_
 #define TINYEXR_H_
 /*
@@ -9305,3 +9306,4 @@ int SaveEXR(const float *data, int width, int height, int components,
 
 #endif  // TINYEXR_IMPLEMENTATION_DEFINED
 #endif  // TINYEXR_IMPLEMENTATION
+#pragma warning(pop)

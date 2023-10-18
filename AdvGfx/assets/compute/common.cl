@@ -128,7 +128,6 @@ struct SceneData
 	float3 cam_up;
 	float object_inverse_transform[16];
 	bool reset_accumulator;
-	uint mesh_idx;
 	uint exr_width;
 	uint exr_height;
 };
