@@ -714,6 +714,8 @@ namespace Raytracer
 				uint idx = 0;
 				for(auto& mesh_header : AssetManager::get_mesh_headers())
 				{
+					(void)mesh_header;
+
 					if (ImGui::Selectable(std::to_string(idx).c_str(), idx == selected_mesh_idx_to_instance))
 					{
 						selected_mesh_idx_to_instance = idx;
