@@ -12,6 +12,7 @@ struct RayIntersection
 	float v;
 	int tri_hit;
 	int header_tri_count;
+	float3 geo_normal;
 };
 
 struct Ray 
@@ -118,6 +119,7 @@ void intersect_tri(struct Ray* ray, struct Tri* tris, uint triIdx, struct MeshHe
 		ray->intersection.u = u;
 		ray->intersection.v = v;
 		ray->intersection.header_tri_count = header[0].tris_count;
+		ray->intersection.geo_normal = -cross(edge1, edge2);
 	}
 }
 
@@ -337,12 +339,13 @@ float3 trace(struct TraceArgs* args)
 
 			float3 hit_pos = current_ray.O + (current_ray.D * current_ray.t);
 			float3 normal = interpolate_tri_normal(&args->normals[mesh->normals_offset], &current_ray);
-			
+			float3 geo_normal = current_ray.intersection.geo_normal;
+
 			// We have to apply transform so normals are world-space
 			normal = transform((float4)(normal, 0.0f), instance->transform).xyz;
 			normal = normalize(normal);
 
-			bool inner_normal = dot(normal, current_ray.D) > 0.0f;
+			bool inner_normal = dot(-geo_normal, current_ray.D) > 0.0f;
 
 			float3 hemisphere_normal = random_unit_vector(args->rand_seed, normal);
 			if(dot(hemisphere_normal, normal) < 0.0f)
