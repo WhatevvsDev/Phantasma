@@ -410,6 +410,11 @@ float3 trace(struct TraceArgs* args)
 	return color;
 }
 
+float3 to_float3(float* array)
+{
+	return (float3)(array[0], array[1], array[2]);
+}
+
 void kernel raytrace(global float* accumulation_buffer, global int* mouse, global float4* normals, global struct Tri* tris, global struct BVHNode* nodes, global uint* trisIdx, global struct MeshHeader* mesh_headers, global struct SceneData* sceneData, global float* exr, global struct WorldManagerDeviceData* world_manager_data)
 {     
 	int width = sceneData->resolution_x;
@@ -427,13 +432,13 @@ void kernel raytrace(global float* accumulation_buffer, global int* mouse, globa
 
 	float aspect_ratio = (float)(sceneData->resolution_x) / (float)(sceneData->resolution_y);
 
-	float3 pixelPos = sceneData->cam_forward + sceneData->cam_right * x_t * aspect_ratio - sceneData->cam_up * y_t;
+	float3 pixel_dir_in_world_space = (to_float3(sceneData->cam_forward)) + to_float3(sceneData->cam_right) * x_t * aspect_ratio - to_float3(sceneData->cam_up) * y_t;
 
 	// Actual raytracing
 
 	struct Ray ray;
-	ray.O = (float3)(sceneData->cam_pos_x, sceneData->cam_pos_y, sceneData->cam_pos_z);
-    ray.D = normalize( pixelPos );
+	ray.O = to_float3(sceneData->cam_pos);
+    ray.D = normalize( pixel_dir_in_world_space );
     ray.t = 1e30f;
 	ray.light = 1.0f;
 	ray.depth = DEPTH;

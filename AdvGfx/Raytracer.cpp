@@ -87,15 +87,12 @@ namespace Raytracer
 		glm::vec3 cam_pos { 0.0f, 10.0f, 0.0f };
 		u32 frame_number { 0 };
 		glm::vec3 cam_forward { 0.0f };
-		f32 pad_1 { 0.0f };
-		glm::vec3 cam_right { 0.0f };
-		f32 pad_2 { 0.0f };
-		glm::vec3 cam_up { 0.0f };
-		f32 pad_3 { 0.0f };
-		glm::mat4 object_inverse_transform { glm::mat4(1) };
-		u32 reset_accumulator { false };
 		u32 exr_width { 0 };
+		glm::vec3 cam_right { 0.0f };
 		u32 exr_height { 0 };
+		glm::vec3 cam_up { 0.0f };
+		u32 reset_accumulator { false };
+		glm::mat4 object_inverse_transform { glm::mat4(1) };
 	} sceneData;
 
 	struct
