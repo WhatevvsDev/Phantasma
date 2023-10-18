@@ -93,6 +93,7 @@ namespace Raytracer
 		glm::vec3 cam_up { 0.0f };
 		u32 reset_accumulator { false };
 		glm::mat4 object_inverse_transform { glm::mat4(1) };
+		f32 exr_angle;
 	} sceneData;
 
 	struct
@@ -697,6 +698,14 @@ namespace Raytracer
 
 			ImGui::EndTabItem();
 
+			internal.render_dirty |= ImGui::DragFloat("EXR Angle", &sceneData.exr_angle);
+
+			if(sceneData.exr_angle > 360.0f)
+				sceneData.exr_angle -= 360.0f;
+
+			if (sceneData.exr_angle < 0.0f)
+				sceneData.exr_angle += 360.0f;
+
 			static u32 selected_mesh_idx_to_instance = 0;
 
 			if(ImGui::BeginCombo("Mesh Instances", std::to_string(selected_mesh_idx_to_instance).c_str()))
@@ -727,7 +736,7 @@ namespace Raytracer
 		ImGui::End();
 
 		ImGui::SetNextWindowPos({});
-		ImGui::Begin("Transform tools", 0, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoMouseInputs);
+		ImGui::Begin("Transform tools", 0, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
 
 		f32 icon_font_size = 50.0f;	
 

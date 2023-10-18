@@ -66,13 +66,21 @@ struct WorldManagerDeviceData
 
 #define PI 3.14159265359f
 
-float3 get_exr_color(float3 direction, float* exr, uint exr_width, uint exr_height)
+float3 get_exr_color(float3 direction, float* exr, uint exr_width, uint exr_height, float exr_angle)
 {
 	float theta = acos(direction.y);
 	float phi = atan2(direction.z, direction.x) + PI;
 
 	float u = phi / (2 * PI);
 	float v = theta / PI;
+	
+	u += exr_angle / 360.0f;
+
+	if(u > 1.0f)
+		u -= 1.0f;
+	
+	if(u < 0.0f)
+		u += 1.0f;
 
 	int i = (int)(u * exr_width);
 	int j = (int)(v * exr_height);
@@ -259,6 +267,7 @@ struct TraceArgs
 	float* exr;
 	uint exr_width;
 	uint exr_height;
+	float exr_angle;
 	struct WorldManagerDeviceData* world_data;
 };
 
@@ -318,7 +327,7 @@ float3 trace(struct TraceArgs* args)
 
 		if(!hit_anything)
 		{
-			color += current_ray.light * get_exr_color(current_ray.D, args->exr, args->exr_width, args->exr_height);
+			color += current_ray.light * get_exr_color(current_ray.D, args->exr, args->exr_width, args->exr_height, args->exr_angle);
 			continue;
 		}
 		else
@@ -454,6 +463,7 @@ void kernel raytrace(global float* accumulation_buffer, global int* mouse, globa
 	trace_args.exr = exr;
 	trace_args.exr_width = sceneData->exr_width;
 	trace_args.exr_height = sceneData->exr_height;
+	trace_args.exr_angle = sceneData->exr_angle;
 	trace_args.world_data = world_manager_data;
 
 	float3 color = trace(&trace_args);

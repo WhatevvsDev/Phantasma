@@ -130,6 +130,7 @@ struct SceneData
 	float cam_up[3];
 	bool reset_accumulator;
 	float object_inverse_transform[16];
+	float exr_angle;
 };
 
 #endif
