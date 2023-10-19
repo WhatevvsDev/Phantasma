@@ -42,6 +42,9 @@
 	// 2. Asset browser/manager
 	//		- A system that automatically detects, sorts and shows the state of various assets (whether its loaded to CPU/GPU or still on disk, etc.)
 
+	// 3. Some extra EXR controls
+	//		- Maybe adjusting brightness
+			- Follow camera rotation? so we can see the model w the same lighting from all angles
 
 */
 
@@ -81,21 +84,23 @@ namespace Raytracer
 		glm::vec3 saved_camera_position			{ 0.0f };
 	} settings;
 
+	struct  
+	{
+		glm::vec3 position;
+		glm::vec3 rotation;
+	} host_camera;
+
 	struct SceneData
 	{
 		u32 resolution[2] { 0, 0 };
-		u32 mouse_pos[2] {};
-		glm::vec3 cam_pos { 0.0f, 10.0f, 0.0f };
+		u32 mouse_pos[2] { 0, 0 };
 		u32 frame_number { 0 };
-		glm::vec3 cam_forward { 0.0f };
 		u32 exr_width { 0 };
-		glm::vec3 cam_right { 0.0f };
 		u32 exr_height { 0 };
-		glm::vec3 cam_up { 0.0f };
 		u32 reset_accumulator { false };
-		glm::mat4 object_inverse_transform { glm::mat4(1) };
+		glm::mat4 camera_transform {glm::identity<glm::mat4>()};
 		f32 exr_angle;
-	} sceneData;
+	} scene_data;
 
 	struct
 	{
@@ -132,9 +137,6 @@ namespace Raytracer
 
 	namespace Input
 	{
-		// TODO: Replace this with an actual camera [1]
-		glm::vec3 cam_rotation;
-
 		void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 		{
 			// Unused parameters
@@ -196,8 +198,8 @@ namespace Raytracer
 
 		internal.render_width_px = desc.width_px;
 		internal.render_height_px = desc.height_px;
-		sceneData.resolution[0] = desc.width_px;
-		sceneData.resolution[1] = desc.height_px;
+		scene_data.resolution[0] = desc.width_px;
+		scene_data.resolution[1] = desc.height_px;
 	}
 
 	// Creates the necessary buffers and sets internal state
@@ -240,7 +242,7 @@ namespace Raytracer
 			TryFromJSONVal(save_data, settings, limit_accumulated_frames);
 			TryFromJSONVal(save_data, settings, accumulated_frame_limit);
 
-			TryFromJSONVal(save_data, sceneData, cam_pos);
+			//TryFromJSONVal(save_data, sceneData, cam_pos);
 		}
 	}
 
@@ -296,8 +298,8 @@ namespace Raytracer
 			LOGERROR(err);
 		}
 		
-		sceneData.exr_width = (u32)width;
-		sceneData.exr_height = (u32)height;
+		scene_data.exr_width = (u32)width;
+		scene_data.exr_height = (u32)height;
 
 		exr_buffer = new ComputeWriteBuffer({internal.loaded_exr_data, (usize)(width * height * 4)});
 		internal.render_dirty = true;
@@ -345,7 +347,7 @@ namespace Raytracer
 		ToJSONVal(save_data, settings, limit_accumulated_frames);
 		ToJSONVal(save_data, settings, accumulated_frame_limit);
 
-		ToJSONVal(save_data, sceneData, cam_pos);
+		//ToJSONVal(save_data, sceneData, cam_pos);
 
 		std::ofstream o("phantasma.data.json");
 		o << save_data << std::endl;
@@ -369,67 +371,52 @@ namespace Raytracer
 			internal.render_dirty |= camera_is_orbiting;
 		}
 
-		glm::mat3 rotation = glm::eulerAngleXY(glm::radians(settings.orbit_camera_angle), glm::radians(orbit_cam_t * 360.0f));
-		glm::vec3 offset = glm::vec3(0.0f, 0.0f, 1.0f) * rotation;
+		glm::vec3 position_offset = glm::vec3(0.0f, 0.0f, -settings.orbit_camera_distance);
 
-		offset *= settings.orbit_camera_distance;
+		host_camera.rotation = glm::vec3(settings.orbit_camera_angle, orbit_cam_t * 360.0f, 0.0f);
+		position_offset = position_offset * glm::mat3(glm::eulerAngleXY(glm::radians(-host_camera.rotation.x), glm::radians(-host_camera.rotation.y)));
 
-		sceneData.cam_forward = glm::normalize(-offset);
-		sceneData.cam_right = glm::normalize(glm::cross(sceneData.cam_forward, glm::vec3(0.0f, 1.0f, 0.0f)));
-		sceneData.cam_up = glm::normalize(glm::cross(sceneData.cam_right, sceneData.cam_forward));
-		sceneData.cam_pos = offset + settings.orbit_camera_position;
+		host_camera.position = settings.orbit_camera_position + position_offset;
 	}
 
 	void update_free_float_camera_behavior(float delta_time_ms)
 	{
-		i32 moveHor =	(ImGui::IsKeyDown(ImGuiKey_D))		- (ImGui::IsKeyDown(ImGuiKey_A));
-		i32 moveVer =	(ImGui::IsKeyDown(ImGuiKey_Space))	- (ImGui::IsKeyDown(ImGuiKey_LeftCtrl));
-		i32 moveWard =	(ImGui::IsKeyDown(ImGuiKey_W))		- (ImGui::IsKeyDown(ImGuiKey_S));
+		i32 move_hor =	(ImGui::IsKeyDown(ImGuiKey_D))		- (ImGui::IsKeyDown(ImGuiKey_A));
+		i32 move_ver =	(ImGui::IsKeyDown(ImGuiKey_Space))	- (ImGui::IsKeyDown(ImGuiKey_LeftCtrl));
+		i32 move_ward =	(ImGui::IsKeyDown(ImGuiKey_W))		- (ImGui::IsKeyDown(ImGuiKey_S));
+				
+		glm::vec3 move_dir = glm::vec3(move_hor, move_ver, move_ward);
 
-		glm::mat3 rotation = glm::eulerAngleXYZ(glm::radians(Input::cam_rotation.x), glm::radians(Input::cam_rotation.y), glm::radians(Input::cam_rotation.z));
+		move_dir = glm::normalize(move_dir * glm::mat3(glm::eulerAngleXY(glm::radians(-host_camera.rotation.x), glm::radians(-host_camera.rotation.y))));
 
-		sceneData.cam_forward = glm::vec3(0, 0, 1.0f) * rotation;
-		sceneData.cam_right = glm::vec3(-1.0f, 0, 0) * rotation;
-		sceneData.cam_up = glm::vec3(0, 1.0f, 0) * rotation;
-
-		glm::vec3 move_dir = 
-			sceneData.cam_forward * moveWard + 
-			sceneData.cam_up * moveVer + 
-			sceneData.cam_right * moveHor;
-
-		glm::normalize(move_dir);
-		glm::vec3 camera_move_delta = glm::vec3(move_dir * delta_time_ms * 0.01f) * camera_speed_t_to_m_per_second();
-
-		bool camera_is_moving = (glm::dot(camera_move_delta, camera_move_delta) != 0.0f);
+		bool camera_is_moving = (glm::dot(move_dir, move_dir) > 0.5f);
 
 		if(camera_is_moving)
 		{
+
+			glm::vec3 camera_move_delta = glm::vec3(move_dir * delta_time_ms * 0.01f) * camera_speed_t_to_m_per_second();
+			
 			internal.render_dirty = true;
 				
-			sceneData.cam_pos += camera_move_delta;
+			host_camera.position += camera_move_delta;
 		}
 
+		ImVec2 mouse_delta = ImGui::GetIO().MouseDelta;
+		glm::vec3 camera_angular_delta = glm::vec3(mouse_delta.y, mouse_delta.x, 0);
+
+		bool camera_is_rotating = (glm::dot(camera_angular_delta, camera_angular_delta) != 0.0f);
 		bool allow_camera_rotation = !internal.show_debug_ui;
 
-		if(allow_camera_rotation)
+		if(allow_camera_rotation && camera_is_rotating)
 		{
-			auto mouse_delta = ImGui::GetIO().MouseDelta;
+			host_camera.rotation += camera_angular_delta * 0.1f;
 
-			glm::vec3 camera_angular_delta = glm::vec3(-mouse_delta.y, mouse_delta.x, 0);
+			bool pitch_exceeds_limit = (fabs(host_camera.rotation.x) > 89.9f);
 
-			bool camera_is_rotating = (glm::dot(camera_angular_delta, camera_angular_delta) != 0.0f);
+			if(pitch_exceeds_limit)
+				host_camera.rotation.x = 89.9f * sgn(host_camera.rotation.x);
 
-			if(camera_is_rotating)
-			{
-				Input::cam_rotation += camera_angular_delta * 0.1f;
-
-				bool pitch_exceeds_limit = (fabs(Input::cam_rotation.x) > 89.9f);
-
-				if(pitch_exceeds_limit)
-					Input::cam_rotation.x = 89.9f * sgn(Input::cam_rotation.x);
-
-				internal.render_dirty = true;
-			}
+			internal.render_dirty = true;
 		}
 	}
 
@@ -442,8 +429,8 @@ namespace Raytracer
 
 		auto cursor_pos = ImGui::GetIO().MousePos;
 
-		sceneData.mouse_pos[0] = glm::clamp((u32)cursor_pos.x, 0u, internal.render_width_px - 1);
-		sceneData.mouse_pos[1] = glm::clamp((u32)cursor_pos.y, 0u, internal.render_height_px - 1);
+		scene_data.mouse_pos[0] = glm::clamp((u32)cursor_pos.x, 0u, internal.render_width_px - 1);
+		scene_data.mouse_pos[1] = glm::clamp((u32)cursor_pos.y, 0u, internal.render_height_px - 1);
 
 		if(clicked_on_non_gizmo)
 		{
@@ -486,7 +473,7 @@ namespace Raytracer
 			.read_write(accumulated_samples)
 			.read_write(screen_buffer)
 			.write({&samples_reciprocal, 1})
-			.write({&sceneData, 1})
+			.write({&scene_data, 1})
 			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
 			.execute();
 	}
@@ -504,19 +491,27 @@ namespace Raytracer
 	void raytrace()
 	{
 		internal.performance.timer.reset();
-		sceneData.frame_number++;
+		scene_data.frame_number++;
 
 		// TODO: we currently don't take into account world changes!
 		if(internal.render_dirty || !settings.accumulate_frames)
 		{
-			sceneData.reset_accumulator = true;
+			scene_data.reset_accumulator = true;
 			internal.render_dirty = false;
 			internal.accumulated_frames = 0;
 		}
 
 		u32 render_area = internal.render_width_px * internal.render_height_px;
 		ComputeReadWriteBuffer screen_buffer({internal.buffer, (usize)(render_area)});
-		
+
+		glm::mat4 new_transform = glm::identity<glm::mat4>();
+
+		new_transform *= glm::translate(host_camera.position);
+		new_transform *= glm::eulerAngleY(glm::radians(host_camera.rotation.y));
+		new_transform *= glm::eulerAngleX(glm::radians(host_camera.rotation.x));
+				
+		scene_data.camera_transform = new_transform;
+
 		bool stop_accumulating_frames = settings.limit_accumulated_frames && (internal.accumulated_frames > (u32)settings.accumulated_frame_limit);
 
 		if(stop_accumulating_frames)
@@ -532,7 +527,7 @@ namespace Raytracer
 			.write(AssetManager::get_bvh_compute_buffer())
 			.write(AssetManager::get_tri_idx_compute_buffer())
 			.write(AssetManager::get_mesh_header_buffer())
-			.write({&sceneData, 1})
+			.write({&scene_data, 1})
 			.write(*exr_buffer)
 			.write({&WorldManager::get_world_device_data(), 1})
 			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
@@ -540,7 +535,7 @@ namespace Raytracer
 
 		raytrace_average_samples(screen_buffer, (*internal.gpu_accumulation_buffer));
 
-		sceneData.reset_accumulator = false;
+		scene_data.reset_accumulator = false;
 
 		skip_rendering_goto:;
 
@@ -579,16 +574,14 @@ namespace Raytracer
 			if (ImGui::BeginCombo("Camera Movement", settings.camera_movement_type == CameraMovementType::Orbit ? "Orbit" : "Free"))
 			{
 				if (ImGui::Selectable("Freecam", settings.camera_movement_type == CameraMovementType::Freecam))
-				{
 					settings.camera_movement_type = CameraMovementType::Freecam;
-					internal.render_dirty = true;
-				}
 
 				if (ImGui::Selectable("Orbit", settings.camera_movement_type == CameraMovementType::Orbit))
 				{
 					settings.camera_movement_type = CameraMovementType::Orbit;
 					internal.render_dirty = true;
 				}
+
 				ImGui::EndCombo();
 			}
 
@@ -699,13 +692,13 @@ namespace Raytracer
 
 			ImGui::EndTabItem();
 
-			internal.render_dirty |= ImGui::DragFloat("EXR Angle", &sceneData.exr_angle);
+			internal.render_dirty |= ImGui::DragFloat("EXR Angle", &scene_data.exr_angle);
 
-			if(sceneData.exr_angle > 360.0f)
-				sceneData.exr_angle -= 360.0f;
+			if(scene_data.exr_angle > 360.0f)
+				scene_data.exr_angle -= 360.0f;
 
-			if (sceneData.exr_angle < 0.0f)
-				sceneData.exr_angle += 360.0f;
+			if (scene_data.exr_angle < 0.0f)
+				scene_data.exr_angle += 360.0f;
 
 			static u32 selected_mesh_idx_to_instance = 0;
 
@@ -762,7 +755,9 @@ namespace Raytracer
 
 		ImGui::End();
 
-		auto view = glm::lookAtRH(glm::vec3(sceneData.cam_pos), glm::vec3(sceneData.cam_pos) + glm::vec3(sceneData.cam_forward), glm::vec3(0.0f, 1.0f, 0.0f));
+		glm::vec3 forward = glm::vec3(0, 0, -1);
+
+		auto view = glm::lookAtRH(host_camera.position, host_camera.position + forward, glm::vec3(0.0f, 1.0f, 0.0f));
 
 		if(internal.selected_instance_idx != -1)
 		{

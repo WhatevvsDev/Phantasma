@@ -121,15 +121,11 @@ struct SceneData
 	uint resolution_y;
 	uint mouse_x;
 	uint mouse_y;
-	float cam_pos[3];
 	int frame_number;
-	float cam_forward[3];
 	uint exr_width;
-	float cam_right[3];
 	uint exr_height;
-	float cam_up[3];
 	bool reset_accumulator;
-	float object_inverse_transform[16];
+	float camera_transform[16];
 	float exr_angle;
 };
 

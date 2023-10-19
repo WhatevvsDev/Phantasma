@@ -83,8 +83,11 @@ float3 get_exr_color(float3 direction, float* exr, uint exr_width, uint exr_heig
 	if(u < 0.0f)
 		u += 1.0f;
 
-	int i = (int)(u * exr_width);
-	int j = (int)(v * exr_height);
+	uint i = (u * exr_width);
+	uint j = (v * exr_height);
+
+	i = clamp(i, 0u, exr_width - 1);
+	j = clamp(j, 0u, exr_height - 1);
 
 	int idx = (i + j * exr_width) * 4;
 	
@@ -444,13 +447,20 @@ void kernel raytrace(global float* accumulation_buffer, global int* mouse, globa
 
 	float aspect_ratio = (float)(sceneData->resolution_x) / (float)(sceneData->resolution_y);
 
-	float3 pixel_dir_in_world_space = (to_float3(sceneData->cam_forward)) + to_float3(sceneData->cam_right) * x_t * aspect_ratio - to_float3(sceneData->cam_up) * y_t;
+	float3 pixel_dir_in_world_space = 
+	(float3)(0.0f, 0.0f, 1.0f) + 
+	(float3)(1.0f, 0.0f, 0.0f) * x_t * aspect_ratio - 
+	(float3)(0.0f, 1.0f, 0.0f) * y_t;
+
+	float3 ray_dir = transform((float4)(pixel_dir_in_world_space, 0.0f), sceneData->camera_transform).xyz;
 
 	// Actual raytracing
 
+	float3 cam_pos_actual = transform((float4)(0.0f, 0.0f, 0.0f, 1.0f), sceneData->camera_transform).xyz;
+
 	struct Ray ray;
-	ray.O = to_float3(sceneData->cam_pos);
-    ray.D = normalize( pixel_dir_in_world_space );
+	ray.O = cam_pos_actual;
+    ray.D = normalize(ray_dir);
     ray.t = 1e30f;
 	ray.light = 1.0f;
 	ray.depth = DEPTH;

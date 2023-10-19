@@ -63,7 +63,6 @@ Mesh::Mesh(const std::string& path)
 	int index_data_size = tinygltf::GetNumComponentsInType(index_accessor.type) * tinygltf::GetComponentSizeInBytes(index_accessor.componentType);
 	size_t index_count = index_buffer_view.byteLength / index_data_size;
 
-	// TODO: Do this properly
 	bool indices_exist = (index_buffer_view.byteLength != 0);
 
 	if(!indices_exist)

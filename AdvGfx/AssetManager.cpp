@@ -53,25 +53,21 @@ void AssetManager::load_mesh(const std::filesystem::path path)
 	// Tris
 	loaded_mesh_header.tris_offset = (u32)internal.consolidated_tris.size();
 	internal.consolidated_tris.reserve(loaded_mesh_header.tris_count);
-	// TODO: This could potentially be slow 
 	internal.consolidated_tris.insert(internal.consolidated_tris.end(), loaded_mesh.tris.begin(), loaded_mesh.tris.end());
 
 	// Normals
 	loaded_mesh_header.normals_offset = (u32)internal.consolidated_normals.size();
 	internal.consolidated_normals.reserve(loaded_mesh_header.normals_count);
-	// TODO: This could potentially be slow 
 	internal.consolidated_normals.insert(internal.consolidated_normals.end(), loaded_mesh.normals.begin(), loaded_mesh.normals.end());
 
 	// Tri Idx	
 	loaded_mesh_header.tri_idx_offset = (u32)internal.consolidated_tri_idxs.size();
 	internal.consolidated_tri_idxs.reserve(loaded_mesh_header.tri_idx_count);
-	// TODO: This could potentially be slow 
 	internal.consolidated_tri_idxs.insert(internal.consolidated_tri_idxs.end(), loaded_mesh.bvh->triIdx.begin(), loaded_mesh.bvh->triIdx.end());
 
 	// BVH nodes
 	loaded_mesh_header.root_bvh_node_idx = (u32)internal.consolidated_nodes.size();
 	internal.consolidated_nodes.reserve(loaded_mesh_header.bvh_node_count);
-	// TODO: This could potentially be slow 
 	internal.consolidated_nodes.insert(internal.consolidated_nodes.end(), loaded_mesh.bvh->bvhNodes.begin(), loaded_mesh.bvh->bvhNodes.end());
 
 	internal.headers.push_back(loaded_mesh_header);
