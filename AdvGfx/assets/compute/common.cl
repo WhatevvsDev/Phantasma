@@ -36,6 +36,24 @@ float4 transform(float4 vector, float* transform)
 	return result;
 }
 
+void transpose4x4(float* matrix)
+{
+	float temp = 0.0f;
+
+	temp = matrix[1], matrix[1] = matrix[4], matrix[4] = temp;
+	temp = matrix[2], matrix[2] = matrix[8], matrix[8] = temp;
+	temp = matrix[6], matrix[6] = matrix[9], matrix[9] = temp;
+	temp = matrix[3], matrix[3] = matrix[12], matrix[12] = temp;
+	temp = matrix[7], matrix[7] = matrix[13], matrix[13] = temp;
+	temp = matrix[11], matrix[11] = matrix[14], matrix[14] = temp;
+}
+
+void copy4x4(float* src, float* dst)
+{
+	for(int i = 0; i < 16; i++)
+		dst[i] = src[i];
+}
+
 // Taken from https://www.scratchapixel.com/lessons/3d-basic-rendering/introduction-to-shading/reflection-refraction-fresnel.html
 float3 refracted(float3 in, float3 n, float ior) 
 {

@@ -371,7 +371,7 @@ namespace Raytracer
 			internal.render_dirty |= camera_is_orbiting;
 		}
 
-		glm::vec3 position_offset = glm::vec3(0.0f, 0.0f, -settings.orbit_camera_distance);
+		glm::vec3 position_offset = glm::vec3(0.0f, 0.0f, settings.orbit_camera_distance);
 
 		host_camera.rotation = glm::vec3(settings.orbit_camera_angle, orbit_cam_t * 360.0f, 0.0f);
 		position_offset = position_offset * glm::mat3(glm::eulerAngleXY(glm::radians(-host_camera.rotation.x), glm::radians(-host_camera.rotation.y)));
@@ -385,7 +385,7 @@ namespace Raytracer
 		i32 move_ver =	(ImGui::IsKeyDown(ImGuiKey_Space))	- (ImGui::IsKeyDown(ImGuiKey_LeftCtrl));
 		i32 move_ward =	(ImGui::IsKeyDown(ImGuiKey_W))		- (ImGui::IsKeyDown(ImGuiKey_S));
 				
-		glm::vec3 move_dir = glm::vec3(move_hor, move_ver, move_ward);
+		glm::vec3 move_dir = glm::vec3(move_hor, move_ver, -move_ward);
 
 		move_dir = glm::normalize(move_dir * glm::mat3(glm::eulerAngleXY(glm::radians(-host_camera.rotation.x), glm::radians(-host_camera.rotation.y))));
 
@@ -402,7 +402,7 @@ namespace Raytracer
 		}
 
 		ImVec2 mouse_delta = ImGui::GetIO().MouseDelta;
-		glm::vec3 camera_angular_delta = glm::vec3(mouse_delta.y, mouse_delta.x, 0);
+		glm::vec3 camera_angular_delta = glm::vec3(-mouse_delta.y, -mouse_delta.x, 0);
 
 		bool camera_is_rotating = (glm::dot(camera_angular_delta, camera_angular_delta) != 0.0f);
 		bool allow_camera_rotation = !internal.show_debug_ui;
@@ -755,7 +755,7 @@ namespace Raytracer
 
 		ImGui::End();
 
-		glm::vec3 forward = glm::vec3(0, 0, -1);
+		glm::vec3 forward = glm::normalize(glm::vec3(0.0f, 0.0f, -1.0f) * glm::mat3(glm::eulerAngleXY(glm::radians(-host_camera.rotation.x), glm::radians(-host_camera.rotation.y))));;
 
 		auto view = glm::lookAtRH(host_camera.position, host_camera.position + forward, glm::vec3(0.0f, 1.0f, 0.0f));
 

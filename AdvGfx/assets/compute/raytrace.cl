@@ -122,7 +122,7 @@ void intersect_tri(struct Ray* ray, struct Tri* tris, uint triIdx, struct MeshHe
 		ray->intersection.u = u;
 		ray->intersection.v = v;
 		ray->intersection.header_tri_count = header[0].tris_count;
-		ray->intersection.geo_normal = -cross(edge1, edge2);
+		ray->intersection.geo_normal = cross(edge1, edge2);
 	}
 }
 
@@ -345,10 +345,17 @@ float3 trace(struct TraceArgs* args)
 			float3 geo_normal = current_ray.intersection.geo_normal;
 
 			// We have to apply transform so normals are world-space
-			normal = transform((float4)(normal, 0.0f), instance->transform).xyz;
-			normal = normalize(normal);
 
-			bool inner_normal = dot(-geo_normal, current_ray.D) > 0.0f;
+			float local_inverse_transform_ver[16];
+			copy4x4(instance->inverse_transform, &local_inverse_transform_ver);
+			transpose4x4(&local_inverse_transform_ver);
+
+			normal = transform((float4)(normal, 0.0f), &local_inverse_transform_ver).xyz;
+			geo_normal = transform((float4)(geo_normal, 0.0f), &local_inverse_transform_ver).xyz;
+			normal = normalize(normal);
+			geo_normal = normalize(geo_normal);
+
+			bool inner_normal = dot(geo_normal, current_ray.D) > 0.0f;
 
 			float3 hemisphere_normal = random_unit_vector(args->rand_seed, normal);
 			if(dot(hemisphere_normal, normal) < 0.0f)
@@ -448,7 +455,7 @@ void kernel raytrace(global float* accumulation_buffer, global int* mouse, globa
 	float aspect_ratio = (float)(sceneData->resolution_x) / (float)(sceneData->resolution_y);
 
 	float3 pixel_dir_in_world_space = 
-	(float3)(0.0f, 0.0f, 1.0f) + 
+	(float3)(0.0f, 0.0f, -1.0f) + 
 	(float3)(1.0f, 0.0f, 0.0f) * x_t * aspect_ratio - 
 	(float3)(0.0f, 1.0f, 0.0f) * y_t;
 
