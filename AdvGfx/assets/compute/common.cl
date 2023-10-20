@@ -145,6 +145,7 @@ struct SceneData
 	bool reset_accumulator;
 	float camera_transform[16];
 	float exr_angle;
+	uint material_idx;
 };
 
 #endif

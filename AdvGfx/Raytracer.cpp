@@ -56,6 +56,26 @@ namespace Raytracer
 		std::string filename;
 	};
 
+	enum class MaterialType : u32
+	{
+		Diffuse,
+		Mirror,
+		Dielectric
+	};
+
+	struct Material
+	{
+		glm::vec4 albedo;
+		float ior;
+		float absorbtion_coefficient;
+		MaterialType type;
+		float pad_0;
+	};
+
+	Material default_material = {glm::vec4(1.0f, 0.5f, 0.7f, 1.0f), 1.5f, 0.1f, MaterialType::Diffuse, 0.0f};
+
+	std::vector<Material> materials = {default_material};
+
 	enum class CameraMovementType
 	{
 		Freecam,
@@ -99,7 +119,8 @@ namespace Raytracer
 		u32 exr_height { 0 };
 		u32 reset_accumulator { false };
 		glm::mat4 camera_transform {glm::identity<glm::mat4>()};
-		f32 exr_angle;
+		f32 exr_angle { 0 };
+		u32 material_idx { 0 };
 	} scene_data;
 
 	struct
@@ -530,6 +551,7 @@ namespace Raytracer
 			.write({&scene_data, 1})
 			.write(*exr_buffer)
 			.write({&WorldManager::get_world_device_data(), 1})
+			.write(materials)
 			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
 			.execute();
 
@@ -724,6 +746,59 @@ namespace Raytracer
 			{
 				internal.selected_instance_idx = WorldManager::add_instance_of_mesh(selected_mesh_idx_to_instance);
 				internal.render_dirty = true;
+			}
+
+			if(ImGui::Button("Add Material"))
+			{
+				materials.push_back({});
+			}
+
+
+			i32 mat_idx_proxy = (i32) scene_data.material_idx;
+			internal.render_dirty |= ImGui::DragInt("Using material", &mat_idx_proxy, 1.0f, 0, materials.size() - 1);
+			mat_idx_proxy = glm::clamp(mat_idx_proxy, 0, (i32)materials.size() - 1);
+			scene_data.material_idx = (u32)mat_idx_proxy;
+
+			u32 number_idx = 0;
+			for(auto& current_material : materials)
+			{
+				std::string types_as_strings[3] =
+				{
+					"Diffuse",
+					"Mirror",
+					"Dielectric"
+				};
+
+				if (ImGui::TreeNode((types_as_strings[(u32)current_material.type] + "## material list index" + std::to_string(number_idx)).c_str()))
+				{
+					internal.render_dirty |= ImGui::DragFloat3("Albedo", glm::value_ptr(current_material.albedo), 1.0f / 255.0f, 0.0f, 1.0f);
+					internal.render_dirty |= ImGui::DragFloat("Absorbtion", &current_material.absorbtion_coefficient, 0.01f, 0.0f, 1.0f);
+					internal.render_dirty |= ImGui::DragFloat("IOR", &current_material.ior, 0.01f, 1.0f, 2.0f);
+					
+					if(ImGui::BeginCombo("Material Type", types_as_strings[(u32)current_material.type].c_str()))
+					{
+						if(ImGui::Selectable("Diffuse", current_material.type == MaterialType::Diffuse))
+						{
+							current_material.type = MaterialType::Diffuse;
+							internal.render_dirty = true;
+						}
+						if(ImGui::Selectable("Mirror", current_material.type == MaterialType::Mirror))
+						{
+							current_material.type = MaterialType::Mirror;
+							internal.render_dirty = true;
+						}
+						if(ImGui::Selectable("Dielectric", current_material.type == MaterialType::Dielectric))
+						{
+							current_material.type = MaterialType::Dielectric;
+							internal.render_dirty = true;
+						}
+
+						ImGui::EndCombo();
+					}
+
+					ImGui::TreePop();
+				}
+				number_idx++;
 			}
 		}
 

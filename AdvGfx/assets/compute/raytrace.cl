@@ -274,10 +274,29 @@ struct TraceArgs
 	uint exr_height;
 	float exr_angle;
 	struct WorldManagerDeviceData* world_data;
+	struct Material* materials;
+	uint material_idx;
+};
+
+enum MaterialType
+{
+	Diffuse 	= 0,
+	Mirror 		= 1,
+	Dielectric 	= 2
+};
+
+struct Material
+{
+	float3 albedo;
+	float ior;
+	float absorbtion_coefficient;
+	enum MaterialType type;
 };
 
 float3 trace(struct TraceArgs* args)
 {
+	struct Material mat = args->materials[args->material_idx];
+
 	// Keeping track of current ray in the stack
 	const int ray_stack_size = 32;
 	struct Ray ray_stack[ray_stack_size];
@@ -377,29 +396,33 @@ float3 trace(struct TraceArgs* args)
 			new_ray.depth = current_ray.depth - 1;
 			new_ray.ray_parent = ray_stack_idx;
 
-			bool is_mirror = false;
-			bool is_dielectric = false;
-
-			float3 albedo = (float3)(0.7f, 0.5f, 1.0f);
-			float ior = 1.66f;
-			float absorbtion_coefficient = 0.1f;
-
-			if(is_mirror)
+			switch(mat.type)
 			{
-				float mirror_absorption = 0.1f;
-
-				new_ray.D = reflected(current_ray.D, normal);
-				ray_stack[ray_stack_idx++] = new_ray;
-
-				ray_stack[current_ray.ray_parent].light = current_ray.light * (1.0f - mirror_absorption);
-			}
-			else
-			{
-				if(is_dielectric)
+				case Diffuse:
 				{
-					float refraction_ratio = (inner_normal ? (1.0f / ior) : ior);// <- Only use with objects that are enclosed
+					new_ray.D = hemisphere_normal;
+					ray_stack[ray_stack_idx++] = new_ray;
 
-					float reflectance = fresnel(current_ray.D, normal, ior);
+					float3 brdf = mat.albedo / (float)M_PI;
+
+					ray_stack[current_ray.ray_parent].light = (float)M_PI * 2.0f * brdf * current_ray.light * dot(normal, hemisphere_normal);
+					continue;
+				}
+				case Mirror:
+				{
+					float mirror_absorption = 0.1f;
+
+					new_ray.D = reflected(current_ray.D, normal);
+					ray_stack[ray_stack_idx++] = new_ray;
+
+					ray_stack[current_ray.ray_parent].light = current_ray.light * mat.albedo * (1.0f - mat.absorbtion_coefficient);
+					continue;
+				}
+				case Dielectric:
+				{
+					float refraction_ratio = (inner_normal ? (1.0f / mat.ior) : mat.ior);// <- Only use with objects that are enclosed
+
+					float reflectance = fresnel(current_ray.D, normal, refraction_ratio);
 					float transmittance = 1.0f - reflectance;
 					float random = RandomFloat(args->rand_seed);
 					
@@ -408,33 +431,19 @@ float3 trace(struct TraceArgs* args)
 						new_ray.D = reflected(current_ray.D, normal);
 						ray_stack[ray_stack_idx++] = new_ray;
 
-						ray_stack[current_ray.ray_parent].light = current_ray.light * albedo;
+						ray_stack[current_ray.ray_parent].light = current_ray.light * mat.albedo;
 					}
 					else
 					{
 						new_ray.D = refracted(current_ray.D, normal, refraction_ratio);
 						ray_stack[ray_stack_idx++] = new_ray;
 
-						ray_stack[current_ray.ray_parent].light = current_ray.light * albedo;
+						float transmission_factor = inner_normal ? beers_law(current_ray.t, mat.absorbtion_coefficient) : 1.0f;
+
+						ray_stack[current_ray.ray_parent].light = current_ray.light * mat.albedo * transmission_factor;
 					
-						if(inner_normal)
-						{
-							ray_stack[current_ray.ray_parent].light *= beers_law(current_ray.t, absorbtion_coefficient);
-						}
 					}
-				}
-				else
-				{
-
-					// color = l * color + (1 - l);
-					// l(t) = e^(-0.0005 * t * individual factors)
-
-					new_ray.D = hemisphere_normal;
-					ray_stack[ray_stack_idx++] = new_ray;
-
-					float3 brdf = albedo / (float)M_PI;
-
-					ray_stack[current_ray.ray_parent].light = (float)M_PI * 2.0f * brdf * current_ray.light * dot(normal, hemisphere_normal);;
+					continue;
 				}
 			}
 		}
@@ -447,7 +456,7 @@ float3 to_float3(float* array)
 	return (float3)(array[0], array[1], array[2]);
 }
 
-void kernel raytrace(global float* accumulation_buffer, global int* mouse, global float4* normals, global struct Tri* tris, global struct BVHNode* nodes, global uint* trisIdx, global struct MeshHeader* mesh_headers, global struct SceneData* sceneData, global float* exr, global struct WorldManagerDeviceData* world_manager_data)
+void kernel raytrace(global float* accumulation_buffer, global int* mouse, global float4* normals, global struct Tri* tris, global struct BVHNode* nodes, global uint* trisIdx, global struct MeshHeader* mesh_headers, global struct SceneData* sceneData, global float* exr, global struct WorldManagerDeviceData* world_manager_data, global struct Material* materials)
 {     
 	int width = sceneData->resolution_x;
 	int height = sceneData->resolution_y;
@@ -495,6 +504,8 @@ void kernel raytrace(global float* accumulation_buffer, global int* mouse, globa
 	trace_args.exr_height = sceneData->exr_height;
 	trace_args.exr_angle = sceneData->exr_angle;
 	trace_args.world_data = world_manager_data;
+	trace_args.material_idx = sceneData->material_idx;
+	trace_args.materials = materials;
 
 	float3 color = trace(&trace_args);
 
