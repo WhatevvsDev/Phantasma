@@ -332,7 +332,14 @@ float3 trace(struct TraceArgs* args)
 
 		if(!hit_anything)
 		{
-			color += current_ray.light * get_exr_color(current_ray.D, args->exr, args->exr_width, args->exr_height, args->exr_angle);
+			float3 exr_color = get_exr_color(current_ray.D, args->exr, args->exr_width, args->exr_height, args->exr_angle);
+
+			// Hacky way to get rid of fireflies
+			//exr_color.x = clamp(exr_color.x, 0.0f , 32.0f);
+			//exr_color.y = clamp(exr_color.y, 0.0f , 32.0f);
+			//exr_color.z = clamp(exr_color.z, 0.0f , 32.0f);
+
+			color += current_ray.light * exr_color;
 			continue;
 		}
 		else
@@ -419,12 +426,15 @@ float3 trace(struct TraceArgs* args)
 				else
 				{
 
+					// color = l * color + (1 - l);
+					// l(t) = e^(-0.0005 * t * individual factors)
+
 					new_ray.D = hemisphere_normal;
 					ray_stack[ray_stack_idx++] = new_ray;
 
 					float3 brdf = albedo / (float)M_PI;
 
-					ray_stack[current_ray.ray_parent].light = (float)M_PI * 2.0f * brdf * current_ray.light * dot(normal, hemisphere_normal);
+					ray_stack[current_ray.ray_parent].light = (float)M_PI * 2.0f * brdf * current_ray.light * dot(normal, hemisphere_normal);;
 				}
 			}
 		}

@@ -12,7 +12,9 @@ void kernel average_accumulated(global float* accumulation_buffer, global uint* 
 
 	color *= *sample_count_reciprocal;
 
-	//color = (float3)(1.0f, 0.0f, 0.0f);
+	color.x = sqrt(color.x);
+	color.y = sqrt(color.y);
+	color.z = sqrt(color.z);
 	
 	int r = clamp((int)(color.x * 255.0f), 0, 255);
 	int g = clamp((int)(color.y * 255.0f), 0, 255);
