@@ -59,6 +59,7 @@ namespace Raytracer
 	enum class MaterialType : u32
 	{
 		Diffuse,
+		Metal,
 		Dielectric
 	};
 
@@ -767,14 +768,16 @@ namespace Raytracer
 					ImGui::Text((types_as_strings[(u32)current_material.type].c_str()));
 
 					bool is_diffuse = current_material.type == MaterialType::Diffuse;
+					bool is_metal = current_material.type == MaterialType::Metal;
+					bool is_dielectric = current_material.type == MaterialType::Dielectric;
 
 					internal.render_dirty |= ImGui::DragFloat3("Albedo", glm::value_ptr(current_material.albedo), 1.0f / 255.0f, 0.0f, 1.0f);
 					internal.render_dirty |= ImGui::DragFloat("Absorbtion", &current_material.absorbtion_coefficient, 0.01f, 0.0f, 1.0f);
 
-					if(!is_diffuse)
+					if(is_dielectric)
 					internal.render_dirty |= ImGui::DragFloat("IOR", &current_material.ior, 0.01f, 1.0f, 2.0f);
 					
-					if(is_diffuse)
+					if(is_diffuse || is_metal)
 					internal.render_dirty |= ImGui::DragFloat("Specularity", &current_material.specularity, 0.01f, 0.0f, 1.0f);
 					
 					if(ImGui::BeginCombo("Material Type", types_as_strings[(u32)current_material.type].c_str()))
@@ -784,7 +787,12 @@ namespace Raytracer
 							current_material.type = MaterialType::Diffuse;
 							internal.render_dirty = true;
 						}
-						if(ImGui::Selectable("Dielectric", !is_diffuse))
+						if(ImGui::Selectable("Metal", is_metal))
+						{
+							current_material.type = MaterialType::Metal;
+							internal.render_dirty = true;
+						}
+						if(ImGui::Selectable("Dielectric", is_dielectric))
 						{
 							current_material.type = MaterialType::Dielectric;
 							internal.render_dirty = true;
@@ -803,7 +811,7 @@ namespace Raytracer
 				number_idx++;
 			}
 
-			number_idx = 0;
+			number_idx = 0; 
 
 			for(int i = 0; i < WorldManager::get_world_device_data().mesh_count; i++)
 			{

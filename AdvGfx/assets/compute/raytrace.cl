@@ -282,7 +282,8 @@ struct TraceArgs
 enum MaterialType
 {
 	Diffuse 	= 0,
-	Dielectric 	= 1
+	Metal,
+	Dielectric
 };
 
 struct Material
@@ -353,9 +354,7 @@ float3 trace(struct TraceArgs* args)
 			float3 exr_color = get_exr_color(current_ray.D, args->exr, args->exr_width, args->exr_height, args->exr_angle);
 
 			// Hacky way to get rid of fireflies
-			//exr_color.x = clamp(exr_color.x, 0.0f , 32.0f);
-			//exr_color.y = clamp(exr_color.y, 0.0f , 32.0f);
-			//exr_color.z = clamp(exr_color.z, 0.0f , 32.0f);
+			exr_color = clamp(exr_color, 0.0f , 32.0f);
 
 			color += current_ray.light * exr_color;
 			continue;
@@ -396,20 +395,20 @@ float3 trace(struct TraceArgs* args)
 			new_ray.depth = current_ray.depth - 1;
 			new_ray.ray_parent = ray_stack_idx;
 
+			float3 reflected_dir = reflected(current_ray.D, normal);
+			float random = RandomFloat(args->rand_seed);
+
 			switch(mat.type)
 			{
 				case Diffuse:
 				{
-					float3 reflected_dir = reflected(current_ray.D, normal);
-					new_ray.D = lerp(hemisphere_normal, reflected_dir, mat.specularity);
-					
-					if(dot(new_ray.D, new_ray.D) == 0)
+					if(random > mat.specularity)
 					{
-						new_ray.D = reflected_dir;
+						new_ray.D = hemisphere_normal;
 					}
 					else
 					{
-						new_ray.D = normalize(new_ray.D);
+						new_ray.D = reflected_dir;
 					}
 
 					ray_stack[ray_stack_idx++] = new_ray;
@@ -421,13 +420,23 @@ float3 trace(struct TraceArgs* args)
 					ray_stack[current_ray.ray_parent].light = lerp(diffuse, specular, mat.specularity) * (1.0f - mat.absorbtion_coefficient);
 					continue;
 				}
+				case Metal:
+				{
+					float3 reflected_dir = reflected(current_ray.D, normal) * (1.0f + EPSILON);
+					
+					new_ray.D = normalize(reflected_dir + random_unit_vector(args->rand_seed, normal) * (1.0f - mat.specularity));
+
+					ray_stack[ray_stack_idx++] = new_ray;
+
+					ray_stack[current_ray.ray_parent].light = current_ray.light * mat.albedo * (1.0f - mat.absorbtion_coefficient);
+					continue;
+				}
 				case Dielectric:
 				{
 					float refraction_ratio = (inner_normal ? (1.0f / mat.ior) : mat.ior);// <- Only use with objects that are enclosed
 
 					float reflectance = fresnel(current_ray.D, normal, refraction_ratio);
 					float transmittance = 1.0f - reflectance;
-					float random = RandomFloat(args->rand_seed);
 					
 					if(reflectance > random)
 					{
@@ -471,8 +480,8 @@ void kernel raytrace(global float* accumulation_buffer, global int* mouse, globa
 
 	uint rand_seed = WangHash(pixel_dest + sceneData->frame_number * width * height);
 
-	float x_t = ((x / (float)width) - 0.5f) * 2.0f;
-	float y_t = ((y / (float)height)- 0.5f) * 2.0f;
+	float x_t = ((((float)x + RandomFloat(&rand_seed)) / (float)width) - 0.5f) * 2.0f;
+	float y_t = ((((float)y + RandomFloat(&rand_seed)) / (float)height)- 0.5f) * 2.0f;
 
 	float aspect_ratio = (float)(sceneData->resolution_x) / (float)(sceneData->resolution_y);
 
