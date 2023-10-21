@@ -208,7 +208,7 @@ void intersect_bvh( struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct
 	ray->O = org_pos;
 }
 
-#define DEPTH 8
+#define DEPTH 16
 
 float3 tri_normal(struct Tri* tri)
 {
@@ -400,11 +400,12 @@ float3 trace(struct TraceArgs* args)
 			{
 				case Diffuse:
 				{
-					new_ray.D = lerp(hemisphere_normal, reflected(current_ray.D, normal), mat.specularity);
+					float3 reflected_dir = reflected(current_ray.D, normal);
+					new_ray.D = lerp(hemisphere_normal, reflected_dir, mat.specularity);
 					
 					if(dot(new_ray.D, new_ray.D) == 0)
 					{
-						new_ray.D = normal;
+						new_ray.D = reflected_dir;
 					}
 					else
 					{

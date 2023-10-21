@@ -754,7 +754,7 @@ namespace Raytracer
 
 
 			i32 mat_idx_proxy = (i32) scene_data.material_idx;
-			internal.render_dirty |= ImGui::DragInt("Using material", &mat_idx_proxy, 1.0f, 0, materials.size() - 1);
+			internal.render_dirty |= ImGui::DragInt("Using material", &mat_idx_proxy, 1.0f, 0, (i32)materials.size() - 1);
 			mat_idx_proxy = glm::clamp(mat_idx_proxy, 0, (i32)materials.size() - 1);
 			scene_data.material_idx = (u32)mat_idx_proxy;
 
