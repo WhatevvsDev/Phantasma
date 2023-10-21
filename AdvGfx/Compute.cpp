@@ -91,6 +91,7 @@ struct
     cl::Platform platform; // Driver
     cl::CommandQueue queue;
     std::string common_source { "" };
+    FILETIME common_source_last_write_time;
 
     std::unordered_map<std::string, ComputeKernel> kernels;
 
@@ -105,6 +106,33 @@ struct
 #else
 #define CHECKCL(func) func;
 #endif
+
+void load_common_shader_source()
+{
+    std::string expected_common_path = get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\compute\\common.cl";
+
+    WIN32_FILE_ATTRIBUTE_DATA fileData;
+
+    GetFileAttributesExA(expected_common_path.c_str(), GetFileExInfoStandard, &fileData);
+
+    FILETIME current_write_time = fileData.ftLastWriteTime;
+
+    bool common_source_updated = CompareFileTime(&current_write_time, &compute.common_source_last_write_time) != 0;
+
+    if(!common_source_updated)
+        return;
+
+    compute.common_source = read_file_to_string(expected_common_path);
+
+    if(compute.common_source.length() == 0)
+    {
+        LOGDEFAULT("Could not find shader common source, or source was empty!");
+    }
+    else
+    {
+        LOGDEBUG("Loaded shader common source.");
+    }
+}
 
 ComputeKernel::ComputeKernel(const std::string& path, const std::string& entry_point)
     : path(path)
@@ -125,10 +153,13 @@ void ComputeKernel::compile()
     cl::Program::Sources sources;
 
     // First try to add common source, then add shader-specific source
+    load_common_shader_source();
     bool common_shader_source_exists = compute.common_source.length() != 0;
 
     if(common_shader_source_exists)
+    {
         sources.push_back(compute.common_source);
+    }
 
     sources.push_back(read_file_to_string(path));
 
@@ -227,7 +258,6 @@ ComputeOperation::ComputeOperation(const std::string& kernel_name)
 
 }
 
-
 ComputeOperation& ComputeOperation::write(const ComputeGPUOnlyBuffer& buffer)
 {
     kernel->cl_kernel.setArg(arg_count, buffer.internal_buffer);
@@ -285,7 +315,6 @@ ComputeOperation& ComputeOperation::read(const ComputeGPUOnlyBuffer& buffer)
     arg_count++;
     return *this;
 }
-
 
 ComputeOperation& ComputeOperation::read_write(const ComputeReadWriteBuffer& buffer)
 {
@@ -382,22 +411,6 @@ void get_context_and_command_queue()
 {
     compute.context = (compute.device);
     compute.queue = cl::CommandQueue(compute.context, compute.device);
-}
-
-void load_common_shader_source()
-{
-    std::string expected_common_path = get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\compute\\common.cl";
-
-    compute.common_source = read_file_to_string(expected_common_path);
-
-    if(compute.common_source.length() == 0)
-    {
-        LOGDEFAULT("Could not find shader common source, or source was empty!");
-    }
-    else
-    {
-        LOGDEBUG("Loaded shader common source.");
-    }
 }
 
 void Compute::init()

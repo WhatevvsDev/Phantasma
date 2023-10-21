@@ -281,8 +281,7 @@ struct TraceArgs
 enum MaterialType
 {
 	Diffuse 	= 0,
-	Mirror 		= 1,
-	Dielectric 	= 2
+	Dielectric 	= 1
 };
 
 struct Material
@@ -291,6 +290,7 @@ struct Material
 	float ior;
 	float absorbtion_coefficient;
 	enum MaterialType type;
+	float specularity;
 };
 
 float3 trace(struct TraceArgs* args)
@@ -400,22 +400,24 @@ float3 trace(struct TraceArgs* args)
 			{
 				case Diffuse:
 				{
-					new_ray.D = hemisphere_normal;
+					new_ray.D = lerp(hemisphere_normal, reflected(current_ray.D, normal), mat.specularity);
+					
+					if(dot(new_ray.D, new_ray.D) == 0)
+					{
+						new_ray.D = normal;
+					}
+					else
+					{
+						new_ray.D = normalize(new_ray.D);
+					}
+
 					ray_stack[ray_stack_idx++] = new_ray;
 
 					float3 brdf = mat.albedo / (float)M_PI;
+					float3 diffuse = (float)M_PI * 2.0f * brdf * current_ray.light * dot(normal, new_ray.D);
+					float3 specular = current_ray.light * mat.albedo;
 
-					ray_stack[current_ray.ray_parent].light = (float)M_PI * 2.0f * brdf * current_ray.light * dot(normal, hemisphere_normal);
-					continue;
-				}
-				case Mirror:
-				{
-					float mirror_absorption = 0.1f;
-
-					new_ray.D = reflected(current_ray.D, normal);
-					ray_stack[ray_stack_idx++] = new_ray;
-
-					ray_stack[current_ray.ray_parent].light = current_ray.light * mat.albedo * (1.0f - mat.absorbtion_coefficient);
+					ray_stack[current_ray.ray_parent].light = lerp(diffuse, specular, mat.specularity) * (1.0f - mat.absorbtion_coefficient);
 					continue;
 				}
 				case Dielectric:
@@ -440,7 +442,7 @@ float3 trace(struct TraceArgs* args)
 
 						float transmission_factor = inner_normal ? beers_law(current_ray.t, mat.absorbtion_coefficient) : 1.0f;
 
-						ray_stack[current_ray.ray_parent].light = current_ray.light * mat.albedo * transmission_factor;
+						ray_stack[current_ray.ray_parent].light = current_ray.light * (mat.albedo) * transmission_factor;
 					
 					}
 					continue;

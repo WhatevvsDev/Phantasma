@@ -59,7 +59,6 @@ namespace Raytracer
 	enum class MaterialType : u32
 	{
 		Diffuse,
-		Mirror,
 		Dielectric
 	};
 
@@ -69,7 +68,7 @@ namespace Raytracer
 		float ior;
 		float absorbtion_coefficient;
 		MaterialType type;
-		float pad_0;
+		float specularity;
 	};
 
 	Material default_material = {glm::vec4(1.0f, 0.5f, 0.7f, 1.0f), 1.5f, 0.1f, MaterialType::Diffuse, 0.0f};
@@ -765,29 +764,33 @@ namespace Raytracer
 				std::string types_as_strings[3] =
 				{
 					"Diffuse",
-					"Mirror",
 					"Dielectric"
 				};
 
-				if (ImGui::TreeNode((types_as_strings[(u32)current_material.type] + "## material list index" + std::to_string(number_idx)).c_str()))
+				if (ImGui::TreeNode(("## material list index" + std::to_string(number_idx)).c_str()))
 				{
+					ImGui::SameLine();
+					ImGui::Text((types_as_strings[(u32)current_material.type].c_str()));
+
+					bool is_diffuse = current_material.type == MaterialType::Diffuse;
+
 					internal.render_dirty |= ImGui::DragFloat3("Albedo", glm::value_ptr(current_material.albedo), 1.0f / 255.0f, 0.0f, 1.0f);
 					internal.render_dirty |= ImGui::DragFloat("Absorbtion", &current_material.absorbtion_coefficient, 0.01f, 0.0f, 1.0f);
+
+					if(!is_diffuse)
 					internal.render_dirty |= ImGui::DragFloat("IOR", &current_material.ior, 0.01f, 1.0f, 2.0f);
+					
+					if(is_diffuse)
+					internal.render_dirty |= ImGui::DragFloat("Specularity", &current_material.specularity, 0.01f, 0.0f, 1.0f);
 					
 					if(ImGui::BeginCombo("Material Type", types_as_strings[(u32)current_material.type].c_str()))
 					{
-						if(ImGui::Selectable("Diffuse", current_material.type == MaterialType::Diffuse))
+						if(ImGui::Selectable("Diffuse", is_diffuse))
 						{
 							current_material.type = MaterialType::Diffuse;
 							internal.render_dirty = true;
 						}
-						if(ImGui::Selectable("Mirror", current_material.type == MaterialType::Mirror))
-						{
-							current_material.type = MaterialType::Mirror;
-							internal.render_dirty = true;
-						}
-						if(ImGui::Selectable("Dielectric", current_material.type == MaterialType::Dielectric))
+						if(ImGui::Selectable("Dielectric", !is_diffuse))
 						{
 							current_material.type = MaterialType::Dielectric;
 							internal.render_dirty = true;
@@ -797,6 +800,11 @@ namespace Raytracer
 					}
 
 					ImGui::TreePop();
+				}
+				else
+				{
+					ImGui::SameLine();
+					ImGui::Text((types_as_strings[(u32)current_material.type].c_str()));
 				}
 				number_idx++;
 			}
