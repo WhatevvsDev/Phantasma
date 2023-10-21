@@ -66,7 +66,7 @@ namespace Raytracer
 
 	struct Material
 	{
-		glm::vec4 albedo { 0.0f, 0.0f, 0.0f, 0.0f };
+		glm::vec4 albedo { 1.0f, 1.0f, 1.0f, 0.0f };
 		float ior { 1.33f };
 		float absorbtion_coefficient { 0.0f };
 		MaterialType type { MaterialType::Diffuse };
@@ -91,8 +91,8 @@ namespace Raytracer
 		bool show_onscreen_log							{ true };
 		bool orbit_automatically						{ true };
 		bool accumulate_frames							{ true };
-		bool limit_accumulated_frames					{ true };
-		bool fps_limit_enabled							{ true };
+		bool limit_accumulated_frames					{ false };
+		bool fps_limit_enabled							{ false };
 		bool recompile_changed_shaders_automatically	{ true };
 		 
 		// TODO: Replace this with an actual camera [1]
@@ -249,9 +249,14 @@ namespace Raytracer
 		{
 			json save_data = json::parse(f);
 
-			TryFromJSONVal(save_data, settings, camera_speed_t);
-			TryFromJSONVal(save_data, settings, fps_limit_enabled);
+			TryFromJSONVal(save_data, settings, accumulated_frame_limit);
 			TryFromJSONVal(save_data, settings, fps_limit);
+
+			TryFromJSONVal(save_data, settings, show_onscreen_log);
+			TryFromJSONVal(save_data, settings, orbit_automatically);
+			TryFromJSONVal(save_data, settings, accumulate_frames);
+			TryFromJSONVal(save_data, settings, limit_accumulated_frames);
+			TryFromJSONVal(save_data, settings, fps_limit_enabled);
 			TryFromJSONVal(save_data, settings, recompile_changed_shaders_automatically);
 
 			TryFromJSONVal(save_data, settings, camera_movement_type);
@@ -259,12 +264,11 @@ namespace Raytracer
 			TryFromJSONVal(save_data, settings, orbit_camera_distance);
 			TryFromJSONVal(save_data, settings, orbit_camera_angle);
 			TryFromJSONVal(save_data, settings, orbit_camera_rotations_per_second);
+			TryFromJSONVal(save_data, settings, camera_speed_t);
+			TryFromJSONVal(save_data, settings, saved_camera_position);
 
-			TryFromJSONVal(save_data, settings, accumulate_frames);
-			TryFromJSONVal(save_data, settings, limit_accumulated_frames);
-			TryFromJSONVal(save_data, settings, accumulated_frame_limit);
-
-			//TryFromJSONVal(save_data, sceneData, cam_pos);
+			TryFromJSONVal(save_data, host_camera, position);
+			TryFromJSONVal(save_data, host_camera, rotation);
 		}
 	}
 
@@ -354,9 +358,14 @@ namespace Raytracer
 	{
 		json save_data;
 
-		ToJSONVal(save_data, settings, camera_speed_t);
-		ToJSONVal(save_data, settings, fps_limit_enabled);
+		ToJSONVal(save_data, settings, accumulated_frame_limit);
 		ToJSONVal(save_data, settings, fps_limit);
+
+		ToJSONVal(save_data, settings, show_onscreen_log);
+		ToJSONVal(save_data, settings, orbit_automatically);
+		ToJSONVal(save_data, settings, accumulate_frames);
+		ToJSONVal(save_data, settings, limit_accumulated_frames);
+		ToJSONVal(save_data, settings, fps_limit_enabled);
 		ToJSONVal(save_data, settings, recompile_changed_shaders_automatically);
 
 		ToJSONVal(save_data, settings, camera_movement_type);
@@ -364,12 +373,11 @@ namespace Raytracer
 		ToJSONVal(save_data, settings, orbit_camera_distance);
 		ToJSONVal(save_data, settings, orbit_camera_angle);
 		ToJSONVal(save_data, settings, orbit_camera_rotations_per_second);
+		ToJSONVal(save_data, settings, camera_speed_t);
+		ToJSONVal(save_data, settings, saved_camera_position);
 
-		ToJSONVal(save_data, settings, accumulate_frames);
-		ToJSONVal(save_data, settings, limit_accumulated_frames);
-		ToJSONVal(save_data, settings, accumulated_frame_limit);
-
-		//ToJSONVal(save_data, sceneData, cam_pos);
+		ToJSONVal(save_data, host_camera, position);
+		ToJSONVal(save_data, host_camera, rotation);
 
 		std::ofstream o("phantasma.data.json");
 		o << save_data << std::endl;
