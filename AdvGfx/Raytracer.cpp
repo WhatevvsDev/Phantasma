@@ -748,85 +748,102 @@ namespace Raytracer
 				internal.render_dirty = true;
 			}
 
-			if(ImGui::Button("Add Material"))
+			if(ImGui::TreeNode("Materials"))
 			{
-				materials.push_back({});
-			}
-
-			u32 number_idx = 0;
-			for(auto& current_material : materials)
-			{
-				std::string types_as_strings[3] =
+				if(ImGui::Button("Add Material"))
 				{
-					"Diffuse",
-					"Dielectric"
-				};
+					materials.push_back({});
+				}
 
-				if (ImGui::TreeNode(("## material list index" + std::to_string(number_idx)).c_str()))
+				u32 number_idx = 0;
+				for(auto& current_material : materials)
 				{
-					ImGui::SameLine();
-					ImGui::Text((types_as_strings[(u32)current_material.type].c_str()));
-
-					bool is_diffuse = current_material.type == MaterialType::Diffuse;
-					bool is_metal = current_material.type == MaterialType::Metal;
-					bool is_dielectric = current_material.type == MaterialType::Dielectric;
-
-					internal.render_dirty |= ImGui::DragFloat3("Albedo", glm::value_ptr(current_material.albedo), 1.0f / 255.0f, 0.0f, 1.0f);
-					internal.render_dirty |= ImGui::DragFloat("Absorbtion", &current_material.absorbtion_coefficient, 0.01f, 0.0f, 1.0f);
-
-					if(is_dielectric)
-					internal.render_dirty |= ImGui::DragFloat("IOR", &current_material.ior, 0.01f, 1.0f, 2.0f);
-					
-					if(is_diffuse || is_metal)
-					internal.render_dirty |= ImGui::DragFloat("Specularity", &current_material.specularity, 0.01f, 0.0f, 1.0f);
-					
-					if(ImGui::BeginCombo("Material Type", types_as_strings[(u32)current_material.type].c_str()))
+					std::string types_as_strings[3] =
 					{
-						if(ImGui::Selectable("Diffuse", is_diffuse))
+						"Diffuse",
+						"Metal",
+						"Dielectric"
+					};
+
+					if (ImGui::TreeNode(("## material list index" + std::to_string(number_idx)).c_str()))
+					{
+						ImGui::SameLine();
+						ImGui::Text((types_as_strings[(u32)current_material.type].c_str()));
+
+						bool is_diffuse = current_material.type == MaterialType::Diffuse;
+						bool is_metal = current_material.type == MaterialType::Metal;
+						bool is_dielectric = current_material.type == MaterialType::Dielectric;
+
+						internal.render_dirty |= ImGui::DragFloat3("Albedo", glm::value_ptr(current_material.albedo), 1.0f / 255.0f, 0.0f, 1.0f);
+						internal.render_dirty |= ImGui::DragFloat("Absorbtion", &current_material.absorbtion_coefficient, 0.01f, 0.0f, 1.0f);
+
+						if(is_dielectric)
+						internal.render_dirty |= ImGui::DragFloat("IOR", &current_material.ior, 0.01f, 1.0f, 2.0f);
+					
+						if(is_diffuse || is_metal)
+						internal.render_dirty |= ImGui::DragFloat("Specularity", &current_material.specularity, 0.01f, 0.0f, 1.0f);
+					
+						if(ImGui::BeginCombo("Material Type", types_as_strings[(u32)current_material.type].c_str()))
 						{
-							current_material.type = MaterialType::Diffuse;
-							internal.render_dirty = true;
-						}
-						if(ImGui::Selectable("Metal", is_metal))
-						{
-							current_material.type = MaterialType::Metal;
-							internal.render_dirty = true;
-						}
-						if(ImGui::Selectable("Dielectric", is_dielectric))
-						{
-							current_material.type = MaterialType::Dielectric;
-							internal.render_dirty = true;
+							if(ImGui::Selectable("Diffuse", is_diffuse))
+							{
+								current_material.type = MaterialType::Diffuse;
+								internal.render_dirty = true;
+							}
+							if(ImGui::Selectable("Metal", is_metal))
+							{
+								current_material.type = MaterialType::Metal;
+								internal.render_dirty = true;
+							}
+							if(ImGui::Selectable("Dielectric", is_dielectric))
+							{
+								current_material.type = MaterialType::Dielectric;
+								internal.render_dirty = true;
+							}
+
+							ImGui::EndCombo();
 						}
 
-						ImGui::EndCombo();
+						ImGui::TreePop();
 					}
+					else
+					{
+						ImGui::SameLine();
+						ImGui::Text((types_as_strings[(u32)current_material.type].c_str()));
+					}
+					number_idx++;
+				}
 
-					ImGui::TreePop();
-				}
-				else
-				{
-					ImGui::SameLine();
-					ImGui::Text((types_as_strings[(u32)current_material.type].c_str()));
-				}
-				number_idx++;
+				ImGui::TreePop();
 			}
 
-			number_idx = 0; 
-
-			for(int i = 0; i < WorldManager::get_world_device_data().mesh_count; i++)
+			if(internal.selected_instance_idx != -1)
 			{
-				auto& instance = WorldManager::get_world_device_data().instances[i];
+				auto& instance = WorldManager::get_world_device_data().instances[internal.selected_instance_idx];
+				bool transformed = false;
 
-				if (ImGui::TreeNode((std::to_string(number_idx)).c_str()))
+				glm::vec3 translation;
+				glm::vec3 rotation;
+				glm::vec3 scale;
+
+				ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(instance.transform), glm::value_ptr(translation), glm::value_ptr(rotation), glm::value_ptr(scale));
+				
+				transformed |= ImGui::InputFloat3("Translation", glm::value_ptr(translation));
+				transformed |= ImGui::InputFloat3("Rotation", glm::value_ptr(rotation));
+				transformed |= ImGui::InputFloat3("Scale", glm::value_ptr(scale));
+				
+				ImGuizmo::RecomposeMatrixFromComponents(glm::value_ptr(translation), glm::value_ptr(rotation), glm::value_ptr(scale), glm::value_ptr(instance.transform));
+
+				if(transformed)
 				{
-					i32 mat_idx_proxy = (i32) instance.material_idx;
-					internal.render_dirty |= ImGui::DragInt("Using material", &mat_idx_proxy, 1.0f, 0, (i32)materials.size() - 1);
-					mat_idx_proxy = glm::clamp(mat_idx_proxy, 0, (i32)materials.size() - 1);
-					instance.material_idx = (u32)mat_idx_proxy;
-
-					ImGui::TreePop();
+					instance.inverse_transform = glm::inverse(instance.transform);
+					internal.render_dirty = true;
 				}
-				number_idx++;
+
+				i32 mat_idx_proxy = (i32) instance.material_idx;
+				internal.render_dirty |= ImGui::InputInt("Material", &mat_idx_proxy, 1);
+				mat_idx_proxy = glm::clamp(mat_idx_proxy, 0, (i32)materials.size() - 1);
+				instance.material_idx = (u32)mat_idx_proxy;
 			}
 		}
 

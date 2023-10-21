@@ -282,8 +282,8 @@ struct TraceArgs
 enum MaterialType
 {
 	Diffuse 	= 0,
-	Metal,
-	Dielectric
+	Metal		= 1,
+	Dielectric	= 2
 };
 
 struct Material
@@ -354,7 +354,7 @@ float3 trace(struct TraceArgs* args)
 			float3 exr_color = get_exr_color(current_ray.D, args->exr, args->exr_width, args->exr_height, args->exr_angle);
 
 			// Hacky way to get rid of fireflies
-			exr_color = clamp(exr_color, 0.0f , 32.0f);
+			//exr_color = clamp(exr_color, 0.0f , 64.0f);
 
 			color += current_ray.light * exr_color;
 			continue;
