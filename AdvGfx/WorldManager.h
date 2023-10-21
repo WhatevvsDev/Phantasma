@@ -10,6 +10,7 @@ struct MeshInstanceHeader
 	glm::mat4 inverse_transform;
 		
 	u32 mesh_idx;
+	u32 material_idx { 0 };
 };
 
 struct WorldManagerDeviceData

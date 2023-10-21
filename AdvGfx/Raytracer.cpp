@@ -752,12 +752,6 @@ namespace Raytracer
 				materials.push_back({});
 			}
 
-
-			i32 mat_idx_proxy = (i32) scene_data.material_idx;
-			internal.render_dirty |= ImGui::DragInt("Using material", &mat_idx_proxy, 1.0f, 0, (i32)materials.size() - 1);
-			mat_idx_proxy = glm::clamp(mat_idx_proxy, 0, (i32)materials.size() - 1);
-			scene_data.material_idx = (u32)mat_idx_proxy;
-
 			u32 number_idx = 0;
 			for(auto& current_material : materials)
 			{
@@ -805,6 +799,24 @@ namespace Raytracer
 				{
 					ImGui::SameLine();
 					ImGui::Text((types_as_strings[(u32)current_material.type].c_str()));
+				}
+				number_idx++;
+			}
+
+			number_idx = 0;
+
+			for(int i = 0; i < WorldManager::get_world_device_data().mesh_count; i++)
+			{
+				auto& instance = WorldManager::get_world_device_data().instances[i];
+
+				if (ImGui::TreeNode((std::to_string(number_idx)).c_str()))
+				{
+					i32 mat_idx_proxy = (i32) instance.material_idx;
+					internal.render_dirty |= ImGui::DragInt("Using material", &mat_idx_proxy, 1.0f, 0, (i32)materials.size() - 1);
+					mat_idx_proxy = glm::clamp(mat_idx_proxy, 0, (i32)materials.size() - 1);
+					instance.material_idx = (u32)mat_idx_proxy;
+
+					ImGui::TreePop();
 				}
 				number_idx++;
 			}

@@ -57,6 +57,7 @@ struct MeshInstanceHeader
 	float inverse_transform[16];
 		
 	uint mesh_idx;
+	uint material_idx;
 };
 
 struct WorldManagerDeviceData
@@ -295,8 +296,6 @@ struct Material
 
 float3 trace(struct TraceArgs* args)
 {
-	struct Material mat = args->materials[args->material_idx];
-
 	// Keeping track of current ray in the stack
 	const int ray_stack_size = 32;
 	struct Ray ray_stack[ray_stack_size];
@@ -365,6 +364,7 @@ float3 trace(struct TraceArgs* args)
 		{
 			struct MeshInstanceHeader* instance = &(*args->world_data).instances[hit_header_idx];
 			struct MeshHeader* mesh = &args->mesh_headers[instance->mesh_idx];	
+			struct Material mat = args->materials[instance->material_idx];
 
 			float3 hit_pos = current_ray.O + (current_ray.D * current_ray.t);
 			float3 normal = interpolate_tri_normal(&args->normals[mesh->normals_offset], &current_ray);
