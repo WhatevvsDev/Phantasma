@@ -34,6 +34,14 @@ int sgn(T val) {
 #define SGN_TEMPLATED_FUNC
 #endif
 
+#ifndef WRAP_NUMBER_TEMPLATED_FUNC
+template <typename T> 
+T wrap_number(T val, T min, T max) {
+    return val + (max - min) * ((int)(val < min) - (int)(val > max));
+}
+#define WRAP_NUMBER_TEMPLATED_FUNC
+#endif
+
 #include "JSONUtility.h"
 
 namespace glm

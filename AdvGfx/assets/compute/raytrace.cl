@@ -68,6 +68,16 @@ struct WorldManagerDeviceData
 
 #define PI 3.14159265359f
 
+float4 sample_exr(float* exr, uint idx)
+{
+	return (float4)(exr[idx + 0], exr[idx + 1], exr[idx + 2], exr[idx + 3]);
+};
+
+float wrap_float(float val, float min, float max) 
+{
+    return val + (max - min) * sign((float)(val < min) - (float)(val > max));
+}
+
 float3 get_exr_color(float3 direction, float* exr, uint exr_width, uint exr_height, float exr_angle)
 {
 	float theta = acos(direction.y);
@@ -76,26 +86,14 @@ float3 get_exr_color(float3 direction, float* exr, uint exr_width, uint exr_heig
 	float u = phi / (2 * PI);
 	float v = theta / PI;
 	
-	u += exr_angle / 360.0f;
+	u = wrap_float(u + exr_angle / 360.0f, 0.0f, 1.0f);
 
-	if(u > 1.0f)
-		u -= 1.0f;
-	
-	if(u < 0.0f)
-		u += 1.0f;
+	uint i = floor(u * exr_width);
+	uint j = floor(v * exr_height);
 
-	uint i = (u * exr_width);
-	uint j = (v * exr_height);
+	float4 color = sample_exr(exr, (i + j * exr_width) * 4u);
 
-	i = clamp(i, 0u, exr_width - 1);
-	j = clamp(j, 0u, exr_height - 1);
-
-	int idx = (i + j * exr_width) * 4;
-	
-	float3 color = (float3)(exr[idx + 0],exr[idx + 1],exr[idx + 2]);
-	float intensity = exr[idx + 3];
-	
-	return color * intensity;
+	return color.xyz * color.w;
 }
 
 #define EPSILON 0.00001f

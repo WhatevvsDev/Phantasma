@@ -591,7 +591,8 @@ namespace Raytracer
 		bool is_metal = material.type == MaterialType::Metal;
 		bool is_dielectric = material.type == MaterialType::Dielectric;
 
-		internal.render_dirty |= ImGui::DragFloat3("Albedo", glm::value_ptr(material.albedo), 1.0f / 255.0f, 0.0f, 1.0f);
+		
+		internal.render_dirty |= ImGui::ColorPicker3("Albedo", glm::value_ptr(material.albedo), ImGuiColorEditFlags_NoInputs);
 		internal.render_dirty |= ImGui::DragFloat("Absorbtion", &material.absorbtion_coefficient, 0.01f, 0.0f, 1.0f);
 
 		if(is_dielectric)
@@ -772,12 +773,8 @@ namespace Raytracer
 			ImGui::EndTabItem();
 
 			internal.render_dirty |= ImGui::DragFloat("EXR Angle", &scene_data.exr_angle, 0.1f);
-
-			if(scene_data.exr_angle > 360.0f)
-				scene_data.exr_angle -= 360.0f;
-
-			if (scene_data.exr_angle < 0.0f)
-				scene_data.exr_angle += 360.0f;
+			
+			scene_data.exr_angle = wrap_number(scene_data.exr_angle, 0.0f, 360.0f);
 
 			static u32 selected_mesh_idx_to_instance = 0;
 
