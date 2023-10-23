@@ -23,6 +23,7 @@ struct Mesh
 	std::vector<Tri> tris;
 	std::vector<glm::vec4> normals;
 	BVH* bvh;
+	std::string name;
 
 	void reconstruct_bvh();
 };

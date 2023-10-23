@@ -64,6 +64,22 @@ namespace Raytracer
 		Dielectric
 	};
 
+	enum class LockAxis
+	{
+		X,
+		Y,
+		Z
+	};
+
+	const ImGuizmo::OPERATION axis_bits[3] = {
+			(ImGuizmo::OPERATION)(ImGuizmo::TRANSLATE_X | ImGuizmo::ROTATE_X | ImGuizmo::SCALE_X),
+			(ImGuizmo::OPERATION)(ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Y | ImGuizmo::SCALE_Y),
+			(ImGuizmo::OPERATION)(ImGuizmo::TRANSLATE_Z | ImGuizmo::ROTATE_Z | ImGuizmo::SCALE_Z)
+		};
+
+	ImGuizmo::OPERATION all_axis_bits = (ImGuizmo::OPERATION)(axis_bits[0] | axis_bits[1] | axis_bits[2]);;
+
+
 	struct Material
 	{
 		glm::vec4 albedo { 1.0f, 1.0f, 1.0f, 0.0f };
@@ -141,6 +157,8 @@ namespace Raytracer
 		const u32 render_channel_count { 4 };
 		
 		ImGuizmo::OPERATION current_gizmo_operation { ImGuizmo::TRANSLATE };
+		ImGuizmo::OPERATION axis_gizmo_bitmask { all_axis_bits };
+
 		ComputeGPUOnlyBuffer* gpu_accumulation_buffer { nullptr };
 
 		std::vector<DiskAsset> exr_assets_on_disk;
@@ -351,6 +369,7 @@ namespace Raytracer
 		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\flat_vs_smoothed.gltf");
 		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\mid_poly_sphere.gltf");
 		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\sah_test.gltf");
+		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\utahteapot.gltf");
 	}
 
 	// Saves data such as settings, or world state to phantasma.data.json
@@ -468,6 +487,57 @@ namespace Raytracer
 		}
 	}
 
+	void axis_lock_change(LockAxis axis)
+	{
+		if(internal.axis_gizmo_bitmask == all_axis_bits)
+		{
+			internal.axis_gizmo_bitmask = axis_bits[(int)axis];
+			return;
+		}
+
+		if(internal.axis_gizmo_bitmask & axis_bits[(int)axis])
+		{
+			internal.axis_gizmo_bitmask = (ImGuizmo::OPERATION)(internal.axis_gizmo_bitmask ^ axis_bits[(int)axis]);
+		}
+		else
+		{
+			internal.axis_gizmo_bitmask = (ImGuizmo::OPERATION)(internal.axis_gizmo_bitmask | axis_bits[(int)axis]);
+		}
+
+		if((int)internal.axis_gizmo_bitmask == 0)
+		{
+			internal.axis_gizmo_bitmask = all_axis_bits;
+		}
+
+	}
+
+	void update_instance_transform_hotkeys()
+	{
+		bool x_axis = ImGui::IsKeyPressed(ImGuiKey_X);
+		bool y_axis = ImGui::IsKeyPressed(ImGuiKey_Y);
+		bool z_axis = ImGui::IsKeyPressed(ImGuiKey_Z);
+		
+		bool translate = ImGui::IsKeyPressed(ImGuiKey_G);
+		bool rotate = ImGui::IsKeyPressed(ImGuiKey_R);
+		bool scale = ImGui::IsKeyPressed(ImGuiKey_E);
+
+		if(translate)
+			internal.current_gizmo_operation = ImGuizmo::TRANSLATE;
+
+		if(rotate)
+			internal.current_gizmo_operation = ImGuizmo::ROTATE;
+
+		if(scale)
+			internal.current_gizmo_operation = ImGuizmo::SCALE;
+
+		if(translate || rotate || scale)
+			internal.axis_gizmo_bitmask = all_axis_bits;
+
+		if(x_axis) axis_lock_change(LockAxis::X);
+		if(y_axis) axis_lock_change(LockAxis::Y);
+		if(z_axis) axis_lock_change(LockAxis::Z);
+	}
+
 	void update(const f32 delta_time_ms)
 	{
 		internal.performance.timer.reset();
@@ -477,6 +547,7 @@ namespace Raytracer
 			: update_free_float_camera_behavior(delta_time_ms);
 
 		update_instance_selection_behavior();
+		update_instance_transform_hotkeys();
 
 		if(settings.recompile_changed_shaders_automatically)
 		{
@@ -919,7 +990,7 @@ namespace Raytracer
 
 			glm::mat4 projection = glm::perspectiveRH(glm::radians(90.0f), (f32)internal.render_width_px / (f32)internal.render_height_px, 0.1f, 1000.0f);
 
-			if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection), internal.current_gizmo_operation, ImGuizmo::LOCAL, glm::value_ptr(transform)))
+			if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection), (ImGuizmo::OPERATION)(internal.current_gizmo_operation & internal.axis_gizmo_bitmask), ImGuizmo::LOCAL, glm::value_ptr(transform)))
 			{
 				instance.inverse_transform = glm::inverse(transform);
 				internal.render_dirty = true;

@@ -1,11 +1,11 @@
- struct Tri 
+typedef struct Tri 
 { 
     float3 vertex0;
 	float3 vertex1;
 	float3 vertex2;
-};
+} Tri;
 
-struct RayIntersection
+typedef struct RayIntersection
 {
 	// Barycentrics, we can reconstruct w
 	float u;
@@ -13,9 +13,9 @@ struct RayIntersection
 	int tri_hit;
 	int header_tri_count;
 	float3 geo_normal;
-};
+} RayIntersection;
 
-struct Ray 
+typedef struct Ray
 { 
     float3 O;
     float3 D; 
@@ -25,18 +25,18 @@ struct Ray
 	float3 D_reciprocal;
 	uint bvh_hits;
 	uint ray_parent;
-	struct RayIntersection intersection;
-};
+	RayIntersection intersection;
+} Ray;
 
-struct BVHNode
+typedef struct BVHNode
 {
     float minx, miny, minz;
     int left_first;
     float maxx, maxy, maxz;
 	int tri_count;
-};
+} BVHNode;
 
-struct MeshHeader
+typedef struct MeshHeader
 {
 	uint tris_offset;
 	uint tris_count;
@@ -49,22 +49,22 @@ struct MeshHeader
 
 	uint tri_idx_offset;
 	uint tri_idx_count;
-};
+} MeshHeader;
 
-struct MeshInstanceHeader
+typedef struct MeshInstanceHeader
 {
 	float transform[16];
 	float inverse_transform[16];
 		
 	uint mesh_idx;
 	uint material_idx;
-};
+} MeshInstanceHeader;
 
-struct WorldManagerDeviceData
+typedef struct WorldManagerDeviceData
 {
 	uint mesh_count;
-	struct MeshInstanceHeader instances[256];
-};
+	MeshInstanceHeader instances[256];
+} WorldManagerDeviceData;
 
 #define PI 3.14159265359f
 
@@ -91,6 +91,9 @@ float3 get_exr_color(float3 direction, float* exr, uint exr_width, uint exr_heig
 	uint i = floor(u * exr_width);
 	uint j = floor(v * exr_height);
 
+	i = clamp(i, 0u, exr_width - 1u);
+	j = clamp(j, 0u, exr_height - 1u);
+
 	float4 color = sample_exr(exr, (i + j * exr_width) * 4u);
 
 	return color.xyz * color.w;
@@ -98,7 +101,7 @@ float3 get_exr_color(float3 direction, float* exr, uint exr_width, uint exr_heig
 
 #define EPSILON 0.00001f
 
-void intersect_tri(struct Ray* ray, struct Tri* tris, uint triIdx, struct MeshHeader* header)
+void intersect_tri(Ray* ray, Tri* tris, uint triIdx, MeshHeader* header)
 {
 	const float3 edge1 = tris[triIdx].vertex1 - tris[triIdx].vertex0;
 	const float3 edge2 = tris[triIdx].vertex2 - tris[triIdx].vertex0;
@@ -125,7 +128,7 @@ void intersect_tri(struct Ray* ray, struct Tri* tris, uint triIdx, struct MeshHe
 	}
 }
 
-float intersect_aabb( struct Ray* ray, struct BVHNode* node )
+float intersect_aabb(Ray* ray, BVHNode* node )
 {
 	float tx1 = (node->minx - ray->O.x) * ray->D_reciprocal.x, tx2 = (node->maxx - ray->O.x)  * ray->D_reciprocal.x;
 	float tmin = min( tx1, tx2 ), tmax = max( tx1, tx2 );
@@ -133,15 +136,18 @@ float intersect_aabb( struct Ray* ray, struct BVHNode* node )
 	tmin = max( tmin, min( ty1, ty2 ) ), tmax = min( tmax, max( ty1, ty2 ) );
 	float tz1 = (node->minz - ray->O.z)  * ray->D_reciprocal.z, tz2 = (node->maxz - ray->O.z)  * ray->D_reciprocal.z;
 	tmin = max( tmin, min( tz1, tz2 ) ), tmax = min( tmax, max( tz1, tz2 ) );
-	if (tmax >= tmin && tmin < ray->t && tmax > 0) return tmin; else return 1e30f;
+	if (tmax >= tmin && tmin < ray->t && tmax > 0) 
+		return tmin; 
+	else 
+		return 1e30f;
 }
 
-void intersect_bvh( struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct Tri* tris, uint* trisIdx, struct MeshHeader* mesh_header, float* inverse_transform)
+void intersect_bvh(Ray* ray, uint nodeIdx, BVHNode* nodes, Tri* tris, uint* trisIdx, MeshHeader* mesh_header, float* inverse_transform)
 {
 	// Keeping track of current node in the stack
 	uint node_offset = mesh_header->root_bvh_node_idx;
-	struct BVHNode* node = &nodes[nodeIdx];
-	struct BVHNode* traversal_stack[32];
+	BVHNode* node = &nodes[nodeIdx];
+	BVHNode* traversal_stack[32];
 	uint stack_ptr = 0; 
 
 	float3 org_dir = ray->D;
@@ -173,8 +179,8 @@ void intersect_bvh( struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct
 		}
 		else
 		{
-			struct BVHNode* left_child = &nodes[node->left_first + node_offset];
-			struct BVHNode* right_child = &nodes[node->left_first + node_offset + 1];
+			BVHNode* left_child = &nodes[node->left_first + node_offset];
+			BVHNode* right_child = &nodes[node->left_first + node_offset + 1];
 			float left_dist = intersect_aabb(ray, left_child);
 			float right_dist = intersect_aabb(ray, right_child);
 
@@ -183,7 +189,7 @@ void intersect_bvh( struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct
 				// Swap around dist and node
 				float d = left_dist; left_dist = right_dist; right_dist = d;
 				
-				struct BVHNode* n = left_child; left_child = right_child; right_child = n;
+				BVHNode* n = left_child; left_child = right_child; right_child = n;
 			}
 
 			if(left_dist == 1e30f)
@@ -209,7 +215,7 @@ void intersect_bvh( struct Ray* ray, uint nodeIdx, struct BVHNode* nodes, struct
 
 #define DEPTH 16
 
-float3 tri_normal(struct Tri* tri)
+float3 tri_normal(Tri* tri)
 {
 	float3 a = (*tri).vertex0;
 	float3 b = (*tri).vertex1;
@@ -218,7 +224,7 @@ float3 tri_normal(struct Tri* tri)
 	return normalize(cross(a - b, a - c));
 }
 
-float3 random_unit_vector( uint* rand_seed, float3 normal)
+float3 random_unit_vector(uint* rand_seed, float3 normal)
 {
 	float3 result = (float3)(RandomFloat(rand_seed), RandomFloat(rand_seed), RandomFloat(rand_seed));
 
@@ -258,46 +264,46 @@ float3 interpolate_tri_normal(float4* normals, struct Ray* ray)
 	return normalize(v0normal * w + v1normal * u + v2normal * v);
 }
 
-struct TraceArgs
+typedef enum MaterialType
 {
-	struct Ray* primary_ray;
-	struct BVHNode* nodes;
+	Diffuse 	= 0,
+	Metal		= 1,
+	Dielectric	= 2
+} MaterialType;
+
+typedef struct Material
+{
+	float3 albedo;
+	float ior;
+	float absorbtion_coefficient;
+	MaterialType type;
+	float specularity;
+} Material;
+
+typedef struct TraceArgs
+{
+	Ray* primary_ray;
+	BVHNode* nodes;
 	float4* normals;
-	struct Tri* tris;
+	Tri* tris;
 	uint* trisIdx;
 	uint* rand_seed;
-	struct MeshHeader* mesh_headers;
+	MeshHeader* mesh_headers;
 	uint mesh_idx;
 	float* exr;
 	uint exr_width;
 	uint exr_height;
 	float exr_angle;
-	struct WorldManagerDeviceData* world_data;
-	struct Material* materials;
+	WorldManagerDeviceData* world_data;
+	Material* materials;
 	uint material_idx;
-};
+} TraceArgs;
 
-enum MaterialType
-{
-	Diffuse 	= 0,
-	Metal		= 1,
-	Dielectric	= 2
-};
-
-struct Material
-{
-	float3 albedo;
-	float ior;
-	float absorbtion_coefficient;
-	enum MaterialType type;
-	float specularity;
-};
-
-float3 trace(struct TraceArgs* args)
+float3 trace(TraceArgs* args)
 {
 	// Keeping track of current ray in the stack
 	const int ray_stack_size = 32;
-	struct Ray ray_stack[ray_stack_size];
+	Ray ray_stack[ray_stack_size];
 	int ray_stack_idx = 1;
 
 	ray_stack[0] = *args->primary_ray;
@@ -311,7 +317,7 @@ float3 trace(struct TraceArgs* args)
 		if(ray_stack_idx < 0)
 			return color;
 
-		struct Ray current_ray = ray_stack[ray_stack_idx];
+		Ray current_ray = ray_stack[ray_stack_idx];
 
 		bool out_of_scope = (dot(current_ray.light, current_ray.light) < EPSILON || ( current_ray.depth <= 0 ));
 
@@ -326,8 +332,8 @@ float3 trace(struct TraceArgs* args)
 		// Do raytracing bits
 		for(uint i = 0; i < (*args->world_data).mesh_count; i++)
 		{
-			struct MeshInstanceHeader* instance = &(*args->world_data).instances[i];
-			struct MeshHeader* mesh = &args->mesh_headers[instance->mesh_idx];
+			MeshInstanceHeader* instance = &(*args->world_data).instances[i];
+			MeshHeader* mesh = &args->mesh_headers[instance->mesh_idx];
 
 			intersect_bvh(&current_ray, mesh->root_bvh_node_idx, args->nodes, args->tris, args->trisIdx, &args->mesh_headers[instance->mesh_idx], instance->inverse_transform);
 
@@ -359,9 +365,9 @@ float3 trace(struct TraceArgs* args)
 		}
 		else
 		{
-			struct MeshInstanceHeader* instance = &(*args->world_data).instances[hit_header_idx];
-			struct MeshHeader* mesh = &args->mesh_headers[instance->mesh_idx];	
-			struct Material mat = args->materials[instance->material_idx];
+			MeshInstanceHeader* instance = &(*args->world_data).instances[hit_header_idx];
+			MeshHeader* mesh = &args->mesh_headers[instance->mesh_idx];	
+			Material mat = args->materials[instance->material_idx];
 
 			float3 hit_pos = current_ray.O + (current_ray.D * current_ray.t);
 			float3 normal = interpolate_tri_normal(&args->normals[mesh->normals_offset], &current_ray);
@@ -387,7 +393,7 @@ float3 trace(struct TraceArgs* args)
 			if(inner_normal)
 				normal = -normal;
 
-			struct Ray new_ray;
+			Ray new_ray;
 			new_ray.O = hit_pos + hemisphere_normal * EPSILON;
 			new_ray.t = 1e30f;
 			new_ray.depth = current_ray.depth - 1;

@@ -133,7 +133,7 @@ float RandomFloat( uint* s )
 
 #define SCENE_DATA
 
-struct SceneData
+typedef struct SceneData
 {
 	uint resolution_x;
 	uint resolution_y;
@@ -146,6 +146,6 @@ struct SceneData
 	float camera_transform[16];
 	float exr_angle;
 	uint material_idx;
-};
+} SceneData;
 
 #endif
