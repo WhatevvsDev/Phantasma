@@ -165,6 +165,8 @@ namespace Raytracer
 		f32* loaded_exr_data { nullptr };
 		std::string current_exr { "None" };
 
+		f32 orbit_camera_t { 0.0f };
+
 		struct
 		{
 			Timer timer;
@@ -287,6 +289,8 @@ namespace Raytracer
 
 			TryFromJSONVal(save_data, host_camera, position);
 			TryFromJSONVal(save_data, host_camera, rotation);
+
+			TryFromJSONVal(save_data, internal, orbit_camera_t);
 		}
 	}
 
@@ -398,6 +402,8 @@ namespace Raytracer
 		ToJSONVal(save_data, host_camera, position);
 		ToJSONVal(save_data, host_camera, rotation);
 
+		ToJSONVal(save_data, internal, orbit_camera_t);
+
 		std::ofstream o("phantasma.data.json");
 		o << save_data << std::endl;
 	}
@@ -409,11 +415,10 @@ namespace Raytracer
 
 	void update_orbit_camera_behavior(f32 delta_time_ms)
 	{
-		static f32 orbit_cam_t = 0.0f;
-
 		if(settings.orbit_automatically)
 		{
-			orbit_cam_t += (delta_time_ms / 1000.0f) * -settings.orbit_camera_rotations_per_second;
+			internal.orbit_camera_t += (delta_time_ms / 1000.0f) * settings.orbit_camera_rotations_per_second;
+			internal.orbit_camera_t = wrap_number(internal.orbit_camera_t, 0.0f, 1.0f); 
 
 			bool camera_is_orbiting = (settings.orbit_camera_rotations_per_second != 0.0f);
 
@@ -422,7 +427,7 @@ namespace Raytracer
 
 		glm::vec3 position_offset = glm::vec3(0.0f, 0.0f, settings.orbit_camera_distance);
 
-		host_camera.rotation = glm::vec3(settings.orbit_camera_angle, orbit_cam_t * 360.0f, 0.0f);
+		host_camera.rotation = glm::vec3(settings.orbit_camera_angle, internal.orbit_camera_t * 360.0f, 0.0f);
 		position_offset = position_offset * glm::mat3(glm::eulerAngleXY(glm::radians(-host_camera.rotation.x), glm::radians(-host_camera.rotation.y)));
 
 		host_camera.position = settings.orbit_camera_position + position_offset;
@@ -746,6 +751,15 @@ namespace Raytracer
 				ImGui::DragFloat("Rotations/s", &settings.orbit_camera_rotations_per_second, 0.001f, -1.0f, 1.0f);
 				
 				if(!settings.orbit_automatically)
+					ImGui::EndDisabled();
+
+				if(settings.orbit_automatically)
+					ImGui::BeginDisabled();
+
+				internal.render_dirty |= ImGui::DragFloat("Rotation t", &internal.orbit_camera_t, 0.001f);
+				internal.orbit_camera_t = wrap_number(internal.orbit_camera_t, 0.0f, 1.0f); 
+
+				if(settings.orbit_automatically)
 					ImGui::EndDisabled();
 			}
 
