@@ -373,7 +373,7 @@ namespace Raytracer
 		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\flat_vs_smoothed.gltf");
 		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\mid_poly_sphere.gltf");
 		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\sah_test.gltf");
-		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\utahteapot.gltf");
+		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\plane.gltf");
 	}
 
 	// Saves data such as settings, or world state to phantasma.data.json
