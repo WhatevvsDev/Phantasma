@@ -301,14 +301,18 @@ typedef struct TraceArgs
 
 float4 malleys_method(uint* rand_seed)
 {
-	float angle = RandomFloat(rand_seed) * PI;
+	float azimuth = RandomFloat(rand_seed) * PI * 2;
+	float len = sqrt(RandomFloat(rand_seed));
 
-	float x = cos(angle);
-	float y = sin(angle);
+	float x = cos(azimuth) * len;
+	float z = sin(azimuth) * len;
 
-	float z = sqrt(max(1.0f - x*x - y*y, 0.0f));
+	float powx = x * x;
+	float powz = z * z;
 
-	return (float4)(x, y, z, fabs(cos(angle) / PI));
+	float y = sqrt(max(1.0f - powx - powz, 0.0f));
+
+	return (float4)(normalize((float3)(x, y, z)), y);
 }
 
 float3 uniform_hemisphere(uint* rand_seed, float3 normal)
@@ -320,38 +324,38 @@ float3 uniform_hemisphere(uint* rand_seed, float3 normal)
 	return hemisphere_normal;
 }
 
-float3 uniform_hemisphere_tangent(uint* rand_seed, float3 normal)
+float3 uniform_hemisphere_tangent(uint* rand_seed)
 {
-	float3 hemisphere_normal = random_unit_vector(rand_seed, normal);
-		if(hemisphere_normal.y < 0.0f)
-			hemisphere_normal.y = -hemisphere_normal.y;
+	float3 hemisphere_normal = random_unit_vector(rand_seed, (float3)(0.0f, 1.0f, 0.0f));
+
+	if(dot(hemisphere_normal, (float3)(float3)(0.0f, 1.0f, 0.0f)) < 0.0f)
+			hemisphere_normal = -hemisphere_normal;
 
 	return hemisphere_normal;
 }
 
+void get_tangents(float3 n, float3* b1, float3* b2) {
+    // SOURCE: https://graphics.pixar.com/library/OrthonormalB/paper.pdf
+    float mysign = 1.0f * sign(n.z);
+    float a = -1.0f / (mysign + n.z);
+    float b = n.x*n.y*a;
+    *b1 = (float3)(1.0f + mysign*n.x*n.x*a, mysign*b, -mysign*n.x);
+    *b2 = (float3)(b, mysign + n.y*n.y*a, -n.y);
+}
+
 float3 transform_tangent_dir_to_world(float3 tangent_dir, float3 normal)
 {
-	if(fabs(normal.y) == 1.0f) 
-		return tangent_dir;
+	if(fabs(normal.y) == 1.0f)
+		return tangent_dir * sign(normal.y);
 
-	if(dot(normal,tangent_dir) < 0.0f)
-	{
-		normal.y = -normal.y;
-	}
+	float3 bitangent;
+	float3 tangent;
 
-	float3 bitangent = cross(normal , (float3)(0.0f, 1.0f, 0.0f));
-	float3 something = cross(normal , bitangent);
+	get_tangents(normal, &tangent, &bitangent);
 
-	float3 a = bitangent;
-	float3 b = normal;
-	float3 c = something;
+	float3 new_tang = tangent_dir.x * tangent + tangent_dir.y * normal + tangent_dir.z * bitangent;
 
-	float3 org_tang = tangent_dir;
-
-	tangent_dir = org_tang.x * c + org_tang.y * b, org_tang.z * a;
-
-
-	return tangent_dir;
+	return normalize(new_tang);
 }
 
 float3 trace(TraceArgs* args)
@@ -413,7 +417,7 @@ float3 trace(TraceArgs* args)
 			float3 exr_color = get_exr_color(current_ray.D, args->exr, args->exr_width, args->exr_height, args->exr_angle);
 
 			// Hacky way to get rid of fireflies
-			//exr_color = clamp(exr_color, 0.0f , 64.0f);
+			exr_color = clamp(exr_color, 0.0f , 64.0f);
 
 			color += current_ray.light * exr_color;
 			continue;
@@ -441,20 +445,22 @@ float3 trace(TraceArgs* args)
 
 			bool inner_normal = dot(geo_normal, current_ray.D) > 0.0f;
 
-			//float4 new_hemisphere_normal = malleys_method(args->rand_seed);
-			//float3 hemisphere_normal = transform_tangent_dir_to_world(new_hemisphere_normal.xyz, normal);
-			//hemisphere_normal = normalize(hemisphere_normal);
-			
-			//hemisphere_normal = uniform_hemisphere(args->rand_seed, normal);
-			//float3 hemisphere_normal = uniform_hemisphere(args->rand_seed, normal);
-			float3 hemisphere_normal = uniform_hemisphere_tangent(args->rand_seed, normal);
+
+
+#ifdef JOE
+			float4 new_hemisphere_normal = malleys_method(args->rand_seed);
+			float3 hemisphere_normal = transform_tangent_dir_to_world(new_hemisphere_normal.xyz, normal);
+#else
+			float3 hemisphere_normal = uniform_hemisphere_tangent(args->rand_seed);
 			hemisphere_normal = transform_tangent_dir_to_world(hemisphere_normal, normal);
-
+#endif
 			//hemisphere_normal = uniform_hemisphere(args->rand_seed, normal);
-
-			//return normal;
-
+			//float3 correct_hemisphere_normal = uniform_hemisphere(args->rand_seed, normal);
+			
+			//return correct_hemisphere_normal;
 			//return hemisphere_normal;
+
+			//return pow(dot(correct_hemisphere_normal, hemisphere_normal), 1.0f);
 
 			if(inner_normal)
 				normal = -normal;
@@ -483,9 +489,14 @@ float3 trace(TraceArgs* args)
 
 					ray_stack[ray_stack_idx++] = new_ray;
 
-					float3 brdf = mat.albedo / (float)M_PI;
+					float3 brdf = mat.albedo / PI;
+					
 					float3 diffuse = (float)M_PI * 2.0f * brdf * current_ray.light * dot(normal, new_ray.D);
 					//float3 specular = current_ray.light * mat.albedo;
+
+					#ifdef JOE
+						diffuse *= cos(new_hemisphere_normal.w);
+					#endif
 
 					ray_stack[current_ray.ray_parent].light = diffuse;//lerp(diffuse, specular, mat.specularity) * (1.0f - mat.absorbtion_coefficient);
 					continue;
