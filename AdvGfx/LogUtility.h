@@ -1,11 +1,7 @@
 #pragma once
 
-#include <string>
-#include "strippedwindows.h"
-
 namespace Log
 {
-
 	enum class MessageType
 	{
 		Default,

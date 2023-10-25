@@ -1,7 +1,5 @@
 #pragma once
 
-#include <chrono>
-
 class Timer
 {
 	using Clock = std::chrono::high_resolution_clock;

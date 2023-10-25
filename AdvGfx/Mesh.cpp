@@ -1,28 +1,6 @@
 #include "Mesh.h"
-#include "LogUtility.h"
 
 #include "BVH.h"
-
-#include <stb_image.h>
-#include <stb_image_write.h>
-
-#define TINYGLTF_NOEXCEPTION
-//#define TINYGLTF_NO_STB_IMAGE
-//#define TINYGLTF_NO_STB_IMAGE_WRITE
-//#define TINYGLTF_NO_EXTERNAL_IMAGE
-#define TINYGLTF_NO_INCLUDE_JSON
-#define TINYGLTF_NO_INCLUDE_RAPIDJSON
-#define TINYGLTF_NO_INCLUDE_STB_IMAGE
-#define TINYGLTF_NO_INCLUDE_STB_IMAGE_WRITE
-#define TINYGLTF_USE_CPP14
-#define TINYGLTF_IMPLEMENTATION
-#include "json.hpp"
-#include "tiny_gltf.h"
-
-#include "Timer.h"
-#include "LogUtility.h"
-#include "PrimitiveTypes.h"
-#include "IOUtility.h"
 
 Timer build_timer;
 

@@ -1,9 +1,6 @@
 #include "AssetManager.h"
 
-#include "Mesh.h"
 #include "BVH.h"
-
-#include <unordered_map>
 
 struct
 {

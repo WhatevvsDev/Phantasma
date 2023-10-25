@@ -1,9 +1,6 @@
 #pragma once
 
-#include "Math.h"
 #include "Mesh.h"
-
-#include <vector>
 
 struct BVHNode
 {

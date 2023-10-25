@@ -1,6 +1,3 @@
-#include "Math.h"
-#include <cstdint>
-
 // RNG - Marsaglia's xor32
 static uint seed = 0x12345678;
 uint WangHash( uint s )

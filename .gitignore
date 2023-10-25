@@ -363,3 +363,7 @@ MigrationBackup/
 FodyWeavers.xsd
 /AdvGfx/imgui.ini
 /AdvGfx/phantasma.settings.json
+/compileData.scor
+/compileData.scor.gbl
+/compileData.scor.incl
+/compileData.scor.t0000

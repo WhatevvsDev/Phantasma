@@ -1,5 +1,3 @@
-#include "Timer.h"
-#include "LogUtility.h"
 
 // Starts timing
 void Timer::start()

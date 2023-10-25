@@ -1,13 +1,4 @@
 #pragma once
-#include <unordered_map>
-#include <string>
-#include <array>
-
-#define CL_HPP_TARGET_OPENCL_VERSION 300
-#include <CL/opencl.hpp>
-#include <glm/glm.hpp>
-
-#include "strippedwindows.h"
 
 enum class ComputeKernelState
 {

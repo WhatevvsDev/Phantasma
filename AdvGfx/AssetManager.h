@@ -1,8 +1,5 @@
 #pragma once
-#include <filesystem>
 #include "Compute.h"
-#include "Math.h"
-#include "PrimitiveTypes.h"
 
 struct MeshHeader
 {

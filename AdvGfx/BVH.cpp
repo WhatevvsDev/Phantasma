@@ -1,8 +1,4 @@
 #include "BVH.h"
-#include "Mesh.h"
-#include "PrimitiveTypes.h"
-
-#include <utility>
 
 void update_node_bounds( uint nodeIdx, BVH& bvh, const std::vector<Tri>& tris)
 {
@@ -92,7 +88,7 @@ float find_best_split_plane( BVHNode& node, int& axis, float& splitPos, BVH& bvh
 		int split_planes = 8;
 
 		float scale = (boundsMax - boundsMin) / split_planes;
-		for (uint i = 1; i < split_planes; i++)
+		for (uint i = 1; i < (uint)split_planes; i++)
 		{
 			float candidatePos = boundsMin + i * scale;
 			float cost = evaluate_sah( node, a, candidatePos, bvh, tris);

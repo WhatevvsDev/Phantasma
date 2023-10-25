@@ -1,34 +1,28 @@
 #include "Raytracer.h"
 
-#include "Math.h"
-#include "Common.h"
+#include <GLFW/glfw3.h>
+
 #include "Compute.h"
-#include "BVH.h"
-#include "Mesh.h"
-#include "LogUtility.h"
-#include "IOUtility.h"
-#include "Utilities.h"
-#include "Timer.h"
 #include "AssetManager.h"
 #include "WorldManager.h"
+#include "Math.h"
+#include "BVH.h"
 
+#define TINYGLTF_IMPLEMENTATION
+#include "tiny_gltf.h"
 
-#include <fstream>
-#include <ostream>
-#include <format>
-#include <filesystem>
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include <stb_image.h>
 #include <stb_image_write.h>
-#include <GLFW/glfw3.h>
-#include <ImGuizmo.h>
-#include <ImPlot.h>
+
 #include <IconsFontAwesome6.h>
+#include <ImPlot.h>
 
 #define TINYEXR_IMPLEMENTATION
 #define TINYEXR_USE_THREAD 1
 #include "tinyexr.h"
+
 
 // Implicit casting as error
 #pragma warning(error:4244)
@@ -247,8 +241,6 @@ namespace Raytracer
 	// Creates the necessary buffers and sets internal state
 	void init_internal(const RaytracerInitDesc& desc)
 	{
-		desc.validate();
-
 		RaytracerResizeDesc resize_desc;
 		resize_desc.width_px = desc.width_px;
 		resize_desc.height_px = desc.height_px;
@@ -355,6 +347,8 @@ namespace Raytracer
 
 	void init(const RaytracerInitDesc& desc)
 	{
+		Compute::init();
+
 		init_internal(desc);
 		init_load_saved_data();
 		init_find_assets();

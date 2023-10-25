@@ -1,8 +1,5 @@
 #pragma once
-#include <vector>
 
-#include "LogUtility.h"
-#include "Math.h"
 #include "tiny_gltf.h"
 
 struct BVH;

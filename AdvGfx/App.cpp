@@ -1,20 +1,8 @@
 #include "App.h"
 #include "Raytracer.h"
-#include "Compute.h"
-
-#include "Timer.h"
-#include "LogUtility.h"
 
 #include <GLFW/glfw3.h>
-
-#include <ImGuizmo.h>
 #include <ImPlot.h>
-#include "Math.h"
-
-#include <cmath>
-#include <format>
-#include <IconsFontAwesome6.h>
-#include <ImGuiNotify.hpp>
 
 namespace App
 {
@@ -82,8 +70,6 @@ namespace App
 		ImGui_ImplOpenGL3_Init("#version 130");
 
 		fps_timer.start();
-
-		Compute::init();
 		
 		RaytracerInitDesc raytracer_desc;
 		raytracer_desc.width_px = desc.width;

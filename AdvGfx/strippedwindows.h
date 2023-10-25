@@ -7,8 +7,8 @@
 #endif
 #define NOGDICAPMASKS
 // #define NOVIRTUALKEYCODES <- Required for GLFW (?) I think
-#define NOWINMESSAGES
-#define NOWINSTYLES
+//#define NOWINMESSAGES <- Required for ImGUI
+//#define NOWINSTYLES <- Required for ImGUI
 #define NOSYSMETRICS
 #define NOMENUS
 #define NOICONS
@@ -18,7 +18,7 @@
 #define NOSHOWWINDOW
 #define OEMRESOURCE
 #define NOATOM
-#define NOCLIPBOARD
+//#define NOCLIPBOARD <- Required for ImGUI
 #define NOCOLOR
 #define NOCTLMGR
 #define NODRAWTEXT
@@ -32,7 +32,7 @@
 #define NOSCROLL
 #define NOTEXTMETRIC
 #define NOWH
-#define NOWINOFFSETS
+//#define NOWINOFFSETS <- Required for ImGUi 
 #define NOHELP
 #define NOPROFILER
 #define NODEFERWINDOWPOS

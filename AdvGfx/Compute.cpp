@@ -1,11 +1,4 @@
 #include "Compute.h"
-#include "LogUtility.h"
-#include "IOUtility.h"
-
-#include <GLM/glm.hpp>
-
-#include <vector>
-#include <format>
 
 const char *get_cl_error_string(cl_int error)
 {
