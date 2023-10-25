@@ -14,6 +14,7 @@
 #include <cmath>
 #include <format>
 #include <IconsFontAwesome6.h>
+#include <ImGuiNotify.hpp>
 
 namespace App
 {
@@ -62,7 +63,7 @@ namespace App
 
 		// Merge icons into  font
 		float text_font_size = 15.0f;
-		float icon_font_size = 35.0f;
+		float icon_font_size = 25.0f;
 		io.Fonts->AddFontFromFileTTF("Roboto.ttf", text_font_size);
 
 		// Add in Icon font
@@ -70,7 +71,7 @@ namespace App
 		config.MergeMode = true;
 		config.GlyphMinAdvanceX = icon_font_size;
 		config.GlyphOffset.y += (icon_font_size - text_font_size) * 0.5f- 2.0f;
-		static const ImWchar icon_ranges[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
+		static const ImWchar icon_ranges[] = { ICON_MIN_FA, ICON_MAX_16_FA, 0 };
 		io.Fonts->AddFontFromFileTTF("FontAwesome.otf", icon_font_size, &config, icon_ranges);
 
 		// Setup Dear ImGui style
@@ -89,6 +90,8 @@ namespace App
 		raytracer_desc.height_px = desc.height;
 		raytracer_desc.screen_buffer_ptr = render_buffer;
 		
+		ImGuiNotify::InsertNotification({ImGuiToastType::Success, 3000, "That is a success! %s", "(Format here)"});
+
 		Raytracer::init(raytracer_desc);
 
 		while (!glfwWindowShouldClose(window))
@@ -144,6 +147,8 @@ namespace App
 		glRasterPos2f(-1,1);
 		glPixelZoom( 1, -1 );
 		glDrawPixels(app_desc.width, app_desc.height, GL_RGBA, GL_UNSIGNED_BYTE, render_buffer);
+
+		ImGuiNotify::RenderNotifications();
 
 		ImGui::Render();
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

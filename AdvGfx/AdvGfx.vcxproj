@@ -71,20 +71,20 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <ExternalIncludePath>$(SolutionDir)Dependencies\ImGUI;$(SolutionDir)Dependencies\glm;$(SolutionDir)Dependencies\GLFW3\include;$(SolutionDir)Dependencies\OpenCL\include;$(SolutionDir)Dependencies\STB;$(SolutionDir)Dependencies\NlohmannJSON;$(SolutionDir)Dependencies\TinyGLTF;$(SolutionDir)Dependencies\ImGuizmo;$(SolutionDir)Dependencies\FontAwesome;$(SolutionDir)Dependencies\ImPlot;$(SolutionDir)Dependencies\TinyEXR;$(ExternalIncludePath)</ExternalIncludePath>
+    <ExternalIncludePath>$(SolutionDir)Dependencies\ImGUI;$(SolutionDir)Dependencies\glm;$(SolutionDir)Dependencies\GLFW3\include;$(SolutionDir)Dependencies\OpenCL\include;$(SolutionDir)Dependencies\STB;$(SolutionDir)Dependencies\NlohmannJSON;$(SolutionDir)Dependencies\TinyGLTF;$(SolutionDir)Dependencies\ImGuizmo;$(SolutionDir)Dependencies\FontAwesome;$(SolutionDir)Dependencies\ImPlot;$(SolutionDir)Dependencies\TinyEXR;$(SolutionDir)Dependencies\ImGuiNotify;$(ExternalIncludePath)</ExternalIncludePath>
     <SourcePath>$(SolutionDir)Dependencies\ImGuizmo;$(SolutionDir)Dependencies\ImGUI;$(SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <ExternalIncludePath>$(SolutionDir)Dependencies\ImGUI;$(SolutionDir)Dependencies\glm;$(SolutionDir)Dependencies\GLFW3\include;$(SolutionDir)Dependencies\OpenCL\include;$(SolutionDir)Dependencies\STB;$(SolutionDir)Dependencies\NlohmannJSON;$(SolutionDir)Dependencies\TinyGLTF;$(SolutionDir)Dependencies\ImGuizmo;$(SolutionDir)Dependencies\FontAwesome;$(SolutionDir)Dependencies\ImPlot;$(SolutionDir)Dependencies\TinyEXR;$(ExternalIncludePath)</ExternalIncludePath>
+    <ExternalIncludePath>$(SolutionDir)Dependencies\ImGUI;$(SolutionDir)Dependencies\glm;$(SolutionDir)Dependencies\GLFW3\include;$(SolutionDir)Dependencies\OpenCL\include;$(SolutionDir)Dependencies\STB;$(SolutionDir)Dependencies\NlohmannJSON;$(SolutionDir)Dependencies\TinyGLTF;$(SolutionDir)Dependencies\ImGuizmo;$(SolutionDir)Dependencies\FontAwesome;$(SolutionDir)Dependencies\ImPlot;$(SolutionDir)Dependencies\TinyEXR;$(SolutionDir)Dependencies\ImGuiNotify;$(ExternalIncludePath)</ExternalIncludePath>
     <SourcePath>$(SolutionDir)Dependencies\ImGuizmo;$(SolutionDir)Dependencies\ImGUI;$(SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <SourcePath>$(SolutionDir)Dependencies\ImGuizmo;$(SolutionDir)Dependencies\ImGUI;$(VC_SourcePath);</SourcePath>
-    <ExternalIncludePath>$(SolutionDir)Dependencies\ImGUI;$(SolutionDir)Dependencies\glm;$(SolutionDir)Dependencies\GLFW3\include;$(SolutionDir)Dependencies\OpenCL\include;$(SolutionDir)Dependencies\STB;$(SolutionDir)Dependencies\NlohmannJSON;$(SolutionDir)Dependencies\TinyGLTF;$(SolutionDir)Dependencies\ImGuizmo;$(SolutionDir)Dependencies\FontAwesome;$(SolutionDir)Dependencies\ImPlot;$(SolutionDir)Dependencies\TinyEXR;$(ExternalIncludePath)</ExternalIncludePath>
+    <ExternalIncludePath>$(SolutionDir)Dependencies\ImGUI;$(SolutionDir)Dependencies\glm;$(SolutionDir)Dependencies\GLFW3\include;$(SolutionDir)Dependencies\OpenCL\include;$(SolutionDir)Dependencies\STB;$(SolutionDir)Dependencies\NlohmannJSON;$(SolutionDir)Dependencies\TinyGLTF;$(SolutionDir)Dependencies\ImGuizmo;$(SolutionDir)Dependencies\FontAwesome;$(SolutionDir)Dependencies\ImPlot;$(SolutionDir)Dependencies\TinyEXR;$(SolutionDir)Dependencies\ImGuiNotify;$(ExternalIncludePath)</ExternalIncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <SourcePath>$(SolutionDir)Dependencies\ImGuizmo;$(SolutionDir)Dependencies\ImGUI;$(VC_SourcePath);</SourcePath>
-    <ExternalIncludePath>$(SolutionDir)Dependencies\ImGUI;$(SolutionDir)Dependencies\glm;$(SolutionDir)Dependencies\GLFW3\include;$(SolutionDir)Dependencies\OpenCL\include;$(SolutionDir)Dependencies\STB;$(SolutionDir)Dependencies\NlohmannJSON;$(SolutionDir)Dependencies\TinyGLTF;$(SolutionDir)Dependencies\ImGuizmo;$(SolutionDir)Dependencies\FontAwesome;$(SolutionDir)Dependencies\ImPlot;$(SolutionDir)Dependencies\TinyEXR;$(ExternalIncludePath)</ExternalIncludePath>
+    <ExternalIncludePath>$(SolutionDir)Dependencies\ImGUI;$(SolutionDir)Dependencies\glm;$(SolutionDir)Dependencies\GLFW3\include;$(SolutionDir)Dependencies\OpenCL\include;$(SolutionDir)Dependencies\STB;$(SolutionDir)Dependencies\NlohmannJSON;$(SolutionDir)Dependencies\TinyGLTF;$(SolutionDir)Dependencies\ImGuizmo;$(SolutionDir)Dependencies\FontAwesome;$(SolutionDir)Dependencies\ImPlot;$(SolutionDir)Dependencies\TinyEXR;$(SolutionDir)Dependencies\ImGuiNotify;$(ExternalIncludePath)</ExternalIncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -96,6 +96,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <TreatAngleIncludeAsExternal>true</TreatAngleIncludeAsExternal>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -116,6 +117,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <TreatAngleIncludeAsExternal>true</TreatAngleIncludeAsExternal>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -136,6 +138,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <TreatAngleIncludeAsExternal>true</TreatAngleIncludeAsExternal>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -156,6 +159,7 @@
       <LanguageStandard>stdcpp20</LanguageStandard>
       <ExternalWarningLevel>TurnOffAllWarnings</ExternalWarningLevel>
       <TreatAngleIncludeAsExternal>true</TreatAngleIncludeAsExternal>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
