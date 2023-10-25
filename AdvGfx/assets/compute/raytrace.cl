@@ -307,6 +307,7 @@ float4 malleys_method(uint* rand_seed)
 	float x = cos(azimuth) * len;
 	float z = sin(azimuth) * len;
 
+
 	float powx = x * x;
 	float powz = z * z;
 
@@ -335,7 +336,7 @@ float3 uniform_hemisphere_tangent(uint* rand_seed)
 }
 
 void get_tangents(float3 n, float3* b1, float3* b2) {
-    // SOURCE: https://graphics.pixar.com/library/OrthonormalB/paper.pdf
+    // Taken from: https://graphics.pixar.com/library/OrthonormalB/paper.pdf
     float mysign = 1.0f * sign(n.z);
     float a = -1.0f / (mysign + n.z);
     float b = n.x*n.y*a;
@@ -343,7 +344,7 @@ void get_tangents(float3 n, float3* b1, float3* b2) {
     *b2 = (float3)(b, mysign + n.y*n.y*a, -n.y);
 }
 
-float3 transform_tangent_dir_to_world(float3 tangent_dir, float3 normal)
+float3 tangent_to_base_vector(float3 tangent_dir, float3 normal)
 {
 	if(fabs(normal.y) == 1.0f)
 		return tangent_dir * sign(normal.y);
@@ -417,7 +418,7 @@ float3 trace(TraceArgs* args)
 			float3 exr_color = get_exr_color(current_ray.D, args->exr, args->exr_width, args->exr_height, args->exr_angle);
 
 			// Hacky way to get rid of fireflies
-			exr_color = clamp(exr_color, 0.0f , 64.0f);
+			exr_color = clamp(exr_color, 0.0f , 32.0f);
 
 			color += current_ray.light * exr_color;
 			continue;
@@ -445,22 +446,8 @@ float3 trace(TraceArgs* args)
 
 			bool inner_normal = dot(geo_normal, current_ray.D) > 0.0f;
 
-
-
-#ifdef JOE
 			float4 new_hemisphere_normal = malleys_method(args->rand_seed);
-			float3 hemisphere_normal = transform_tangent_dir_to_world(new_hemisphere_normal.xyz, normal);
-#else
-			float3 hemisphere_normal = uniform_hemisphere_tangent(args->rand_seed);
-			hemisphere_normal = transform_tangent_dir_to_world(hemisphere_normal, normal);
-#endif
-			//hemisphere_normal = uniform_hemisphere(args->rand_seed, normal);
-			//float3 correct_hemisphere_normal = uniform_hemisphere(args->rand_seed, normal);
-			
-			//return correct_hemisphere_normal;
-			//return hemisphere_normal;
-
-			//return pow(dot(correct_hemisphere_normal, hemisphere_normal), 1.0f);
+			float3 hemisphere_normal = tangent_to_base_vector(new_hemisphere_normal.xyz, normal);
 
 			if(inner_normal)
 				normal = -normal;
@@ -478,27 +465,16 @@ float3 trace(TraceArgs* args)
 			{
 				case Diffuse:
 				{
-					if(random > mat.specularity)
-					{
-						new_ray.D = hemisphere_normal;
-					}
-					else
-					{
-						new_ray.D = reflected_dir;
-					}
+					float3 brdf = mat.albedo;
+					float3 diffuse = current_ray.light * brdf;
+					float3 specular = current_ray.light * mat.albedo;
+
+					new_ray.D = (mat.specularity < random)
+						 ? hemisphere_normal
+						 : reflected_dir;
 
 					ray_stack[ray_stack_idx++] = new_ray;
-
-					float3 brdf = mat.albedo / PI;
-					
-					float3 diffuse = (float)M_PI * 2.0f * brdf * current_ray.light * dot(normal, new_ray.D);
-					//float3 specular = current_ray.light * mat.albedo;
-
-					#ifdef JOE
-						diffuse *= cos(new_hemisphere_normal.w);
-					#endif
-
-					ray_stack[current_ray.ray_parent].light = diffuse;//lerp(diffuse, specular, mat.specularity) * (1.0f - mat.absorbtion_coefficient);
+					ray_stack[current_ray.ray_parent].light = lerp(diffuse, specular, mat.specularity) * (1.0f - mat.absorbtion_coefficient);
 					continue;
 				}
 				case Metal:
