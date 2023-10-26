@@ -4,6 +4,22 @@
 #include <GLFW/glfw3.h>
 #include <ImPlot.h>
 
+void SetupStyleFromHue()
+{
+
+	ImGuiStyle& style = ImGui::GetStyle();
+	style.WindowPadding                     = ImVec2(8.00f, 8.00f);
+	style.FramePadding                      = ImVec2(8.00f, 4.00f);
+	style.CellPadding                       = ImVec2(6.00f, 6.00f);
+	style.ItemSpacing                       = ImVec2(6.00f, 6.00f);
+	style.ItemInnerSpacing                  = ImVec2(6.00f, 6.00f);
+	style.TouchExtraPadding                 = ImVec2(0.00f, 0.00f);
+	style.IndentSpacing                     = 25;
+	style.ScrollbarSize                     = 15;
+	style.GrabMinSize                       = 10;
+	style.LogSliderDeadzone                 = 4;
+}
+
 namespace App
 {
 	GLFWwindow* window { nullptr };
@@ -50,8 +66,8 @@ namespace App
 		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
 		// Merge icons into  font
-		float text_font_size = 15.0f;
-		float icon_font_size = 25.0f;
+		float text_font_size = 16.0f;
+		float icon_font_size = 40.0f;
 		io.Fonts->AddFontFromFileTTF("Roboto.ttf", text_font_size);
 
 		// Add in Icon font
@@ -64,6 +80,7 @@ namespace App
 
 		// Setup Dear ImGui style
 		ImGui::StyleColorsDark();
+		SetupStyleFromHue();
 
 		// Setup Platform/Renderer backends
 		ImGui_ImplGlfw_InitForOpenGL(window, true);

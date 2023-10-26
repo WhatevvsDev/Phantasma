@@ -547,7 +547,7 @@ namespace ImGuiNotify
 				if (!NOTIFY_NULL_OR_EMPTY(icon))
 				{
 					//Text(icon); // Render icon text
-					ImGui::SetWindowFontScale(0.75f);
+					ImGui::SetWindowFontScale(0.47f);
 					SetCursorPosY(GetCursorPosY() + 5.f);
 					TextColored(textColor, "%s", icon);
 					ImGui::SetWindowFontScale(1.0f);

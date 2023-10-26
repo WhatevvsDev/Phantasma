@@ -73,7 +73,6 @@ namespace Raytracer
 
 	ImGuizmo::OPERATION all_axis_bits = (ImGuizmo::OPERATION)(axis_bits[0] | axis_bits[1] | axis_bits[2]);;
 
-
 	struct Material
 	{
 		glm::vec4 albedo { 1.0f, 1.0f, 1.0f, 0.0f };
@@ -541,6 +540,16 @@ namespace Raytracer
 	{
 		internal.performance.timer.reset();
 		
+		bool pressed_move_key =	
+			(ImGui::IsKeyDown(ImGuiKey_W) || 
+			ImGui::IsKeyDown(ImGuiKey_A) || 
+			ImGui::IsKeyDown(ImGuiKey_S) || 
+			ImGui::IsKeyDown(ImGuiKey_D)) &&
+			!ImGui::IsAnyItemFocused();
+
+		if(pressed_move_key)
+			settings.camera_movement_type = CameraMovementType::Freecam;
+
 		settings.camera_movement_type == CameraMovementType::Orbit
 			? update_orbit_camera_behavior(delta_time_ms)
 			: update_free_float_camera_behavior(delta_time_ms);
@@ -717,7 +726,7 @@ namespace Raytracer
 			ImGui::SeparatorText("Camera");
 			ImGui::Indent();
 
-			if (ImGui::BeginCombo("Camera Movement", settings.camera_movement_type == CameraMovementType::Orbit ? "Orbit" : "Free"))
+			if (ImGui::BeginCombo("Type", settings.camera_movement_type == CameraMovementType::Orbit ? "Orbit" : "Free"))
 			{
 				if (ImGui::Selectable("Freecam", settings.camera_movement_type == CameraMovementType::Freecam))
 					settings.camera_movement_type = CameraMovementType::Freecam;
@@ -739,18 +748,11 @@ namespace Raytracer
 				settings.orbit_camera_angle = glm::clamp(settings.orbit_camera_angle, -89.9f, 89.9f);
 				
 				ImGui::Checkbox("Orbit automatically?", &settings.orbit_automatically);
-				if(!settings.orbit_automatically)
-					ImGui::BeginDisabled();
-
-				ImGui::DragFloat("Rotations/s", &settings.orbit_camera_rotations_per_second, 0.001f, -1.0f, 1.0f);
-				
-				if(!settings.orbit_automatically)
-					ImGui::EndDisabled();
-
 				if(settings.orbit_automatically)
-					ImGui::BeginDisabled();
-
-				internal.render_dirty |= ImGui::DragFloat("Rotation t", &internal.orbit_camera_t, 0.001f);
+					ImGui::DragFloat("Rotations/s", &settings.orbit_camera_rotations_per_second, 0.001f, -1.0f, 1.0f);
+				else
+					internal.render_dirty |= ImGui::DragFloat("Rotated T", &internal.orbit_camera_t, 0.001f);
+				
 				internal.orbit_camera_t = wrap_number(internal.orbit_camera_t, 0.0f, 1.0f); 
 
 				if(settings.orbit_automatically)
