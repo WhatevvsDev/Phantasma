@@ -19,7 +19,7 @@ Latest Render
 - Live shader recompilation
 - Pathtracing
 - SAH BVH
-- EXR HDRI Support
+- EXR/HDRI Support
 
 ### Using (And thanks to)
 - [GLFW](https://www.glfw.org/)
