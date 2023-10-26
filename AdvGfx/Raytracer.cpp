@@ -41,6 +41,10 @@
 	//		- Maybe adjusting brightness
 			- Follow camera rotation? so we can see the model w the same lighting from all angles
 
+	// 4. For blur:
+			- Set focus distance to a point, so something can always be in focus?
+			- Replace "Blur amount" with an actual real-world value or sm
+
 */
 
 namespace Raytracer
@@ -131,7 +135,7 @@ namespace Raytracer
 		glm::mat4 camera_transform {glm::identity<glm::mat4>()};
 		f32 exr_angle { 0.0f };
 		u32 material_idx { 0 };
-		f32 focal_distance { 0.0f };
+		f32 focal_distance { 1.0f };
 		f32 blur_radius { 0.0f };
 	} scene_data;
 
@@ -145,6 +149,9 @@ namespace Raytracer
 		bool show_debug_ui { false };
 		bool save_render_to_file { false };
 		bool render_dirty { true };
+		bool focus_on_clicked { false };
+
+		f32 distance_to_hovered { 0.0f };
 
 		u32 accumulated_frames { 0 };
 		u32 render_width_px { 0 };
@@ -474,16 +481,30 @@ namespace Raytracer
 		if(!internal.show_debug_ui)
 			return;
 		
-		bool clicked_on_non_gizmo = (ImGui::GetIO().MouseReleased[0] && !ImGuizmo::IsOver() && !ImGui::IsWindowHovered() && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem | ImGuiHoveredFlags_AnyWindow));
+		bool clicked_on_non_gizmo = (ImGui::GetIO().MouseClicked[0] && (!ImGuizmo::IsOver() || internal.selected_instance_idx == -1) && !ImGui::IsWindowHovered() && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem | ImGuiHoveredFlags_AnyWindow));
 
 		auto cursor_pos = ImGui::GetIO().MousePos;
 
 		scene_data.mouse_pos[0] = glm::clamp((u32)cursor_pos.x, 0u, internal.render_width_px - 1);
 		scene_data.mouse_pos[1] = glm::clamp((u32)cursor_pos.y, 0u, internal.render_height_px - 1);
-
+		
 		if(clicked_on_non_gizmo)
 		{
-			internal.selected_instance_idx = internal.hovered_instance_idx;
+			bool valid_focus_hover = internal.distance_to_hovered > 0.0f; 
+
+			if(internal.focus_on_clicked)
+			{
+				if(valid_focus_hover)
+				{
+					scene_data.focal_distance = internal.distance_to_hovered;
+					internal.focus_on_clicked = false;
+					internal.render_dirty = true;
+				}
+			}
+			else
+			{
+				internal.selected_instance_idx = internal.hovered_instance_idx;
+			}
 		}
 	}
 
@@ -633,6 +654,7 @@ namespace Raytracer
 		ComputeOperation("raytrace.cl")
 			.read_write(*internal.gpu_accumulation_buffer)
 			.read(ComputeReadBuffer({&internal.hovered_instance_idx, 1}))
+			.read(ComputeReadBuffer({&internal.distance_to_hovered, 1}))
 			.write(AssetManager::get_normals_compute_buffer())
 			.write(AssetManager::get_tris_compute_buffer())
 			.write(AssetManager::get_bvh_compute_buffer())
@@ -761,8 +783,23 @@ namespace Raytracer
 					ImGui::EndDisabled();
 			}
 
-			internal.render_dirty |= ImGui::DragFloat("Blur radius", &scene_data.blur_radius, 0.01f);
-			internal.render_dirty |= ImGui::DragFloat("Focal distance", &scene_data.focal_distance, 0.1f);
+			static float blur_radius_proxy;
+			internal.render_dirty |= ImGui::DragFloat("Blur amount", &blur_radius_proxy, 0.01f, 0.0f, 1.0f);
+			scene_data.blur_radius = log(blur_radius_proxy * 0.2f + 1.0f);
+
+			internal.render_dirty |= ImGui::DragFloat("Focal distance", &scene_data.focal_distance, 0.001f, 0.001f, 1e34f);
+
+			if(!internal.focus_on_clicked)
+			{
+				if(ImGui::Button("Focus on cursor"))
+				{
+					internal.focus_on_clicked = true;
+				}
+			}
+			else
+			{
+				ImGui::Button("Click to confirm");
+			}
 
 			ImGui::Unindent();
 			ImGui::Dummy({20, 20});

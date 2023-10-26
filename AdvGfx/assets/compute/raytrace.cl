@@ -546,7 +546,7 @@ float3 to_float3(float* array)
 	return (float3)(array[0], array[1], array[2]);
 }
 
-void kernel raytrace(global float* accumulation_buffer, global int* mouse, global float4* normals, global struct Tri* tris, global struct BVHNode* nodes, global uint* trisIdx, global struct MeshHeader* mesh_headers, global struct SceneData* sceneData, global float* exr, global struct WorldManagerDeviceData* world_manager_data, global struct Material* materials)
+void kernel raytrace(global float* accumulation_buffer, global int* mouse, global float* distance, global float4* normals, global struct Tri* tris, global struct BVHNode* nodes, global uint* trisIdx, global struct MeshHeader* mesh_headers, global struct SceneData* sceneData, global float* exr, global struct WorldManagerDeviceData* world_manager_data, global struct Material* materials)
 {     
 	int width = sceneData->resolution_x;
 	int height = sceneData->resolution_y;
@@ -611,9 +611,13 @@ void kernel raytrace(global float* accumulation_buffer, global int* mouse, globa
 	if(is_mouse_ray)
 	{
 		*mouse = trace_args.primary_ray->intersection.header_tri_count;
+		*distance = trace_args.primary_ray->t;
 
 		if(!ray_hit_anything)
+		{
 			*mouse = -1;
+			*distance = -1.0f;
+		}
 	}
 
 	//color = ray.bvh_hits / 10.0f;
