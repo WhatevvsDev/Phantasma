@@ -359,6 +359,8 @@ float3 tangent_to_base_vector(float3 tangent_dir, float3 normal)
 	return normalize(new_tang);
 }
 
+#define COSINE_WEIGHTED_BIAS 1
+
 float3 trace(TraceArgs* args)
 {
 	// Keeping track of current ray in the stack
@@ -449,6 +451,10 @@ float3 trace(TraceArgs* args)
 			float4 new_hemisphere_normal = malleys_method(args->rand_seed);
 			float3 hemisphere_normal = tangent_to_base_vector(new_hemisphere_normal.xyz, normal);
 
+#if(COSINE_WEIGHTED_BIAS == 0)
+			hemisphere_normal = uniform_hemisphere(args->rand_seed, normal);
+#endif
+
 			if(inner_normal)
 				normal = -normal;
 
@@ -465,13 +471,17 @@ float3 trace(TraceArgs* args)
 			{
 				case Diffuse:
 				{
-					float3 brdf = mat.albedo;
-					float3 diffuse = current_ray.light * brdf;
-					float3 specular = current_ray.light * mat.albedo;
-
 					new_ray.D = (mat.specularity < random)
 						 ? hemisphere_normal
 						 : reflected_dir;
+					
+					float3 brdf = mat.albedo;
+					#if(COSINE_WEIGHTED_BIAS == 0)
+					float3 diffuse = current_ray.light * brdf * dot(normal, new_ray.D) * 2.0f;
+					#else
+					float3 diffuse = current_ray.light * brdf;
+					#endif
+					float3 specular = current_ray.light * mat.albedo;
 
 					ray_stack[ray_stack_idx++] = new_ray;
 					ray_stack[current_ray.ray_parent].light = lerp(diffuse, specular, mat.specularity) * (1.0f - mat.absorbtion_coefficient);
