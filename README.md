@@ -32,3 +32,4 @@ Latest Render
 - [STB](https://github.com/nothings/stb)
 - [ImGuizmo](https://github.com/CedricGuillemet/ImGuizmo)
 - [ImPlot](https://github.com/epezent/implot)
+- [ImGuiNotify](https://github.com/TyomaVader/ImGuiNotify)
