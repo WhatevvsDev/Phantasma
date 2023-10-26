@@ -4,7 +4,7 @@
 #include <GLFW/glfw3.h>
 #include <ImPlot.h>
 
-void SetupStyleFromHue()
+void CustomImGuiStyle()
 {
 
 	ImGuiStyle& style = ImGui::GetStyle();
@@ -80,7 +80,7 @@ namespace App
 
 		// Setup Dear ImGui style
 		ImGui::StyleColorsDark();
-		SetupStyleFromHue();
+		CustomImGuiStyle();
 
 		// Setup Platform/Renderer backends
 		ImGui_ImplGlfw_InitForOpenGL(window, true);
