@@ -146,6 +146,8 @@ typedef struct SceneData
 	float camera_transform[16];
 	float exr_angle;
 	uint material_idx;
+	float focal_distance;
+	float blur_radius;
 } SceneData;
 
 #endif

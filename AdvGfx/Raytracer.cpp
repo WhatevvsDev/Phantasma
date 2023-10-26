@@ -129,8 +129,10 @@ namespace Raytracer
 		u32 exr_height { 0 };
 		u32 reset_accumulator { false };
 		glm::mat4 camera_transform {glm::identity<glm::mat4>()};
-		f32 exr_angle { 0 };
+		f32 exr_angle { 0.0f };
 		u32 material_idx { 0 };
+		f32 focal_distance { 0.0f };
+		f32 blur_radius { 0.0f };
 	} scene_data;
 
 	struct
@@ -758,6 +760,9 @@ namespace Raytracer
 				if(settings.orbit_automatically)
 					ImGui::EndDisabled();
 			}
+
+			internal.render_dirty |= ImGui::DragFloat("Blur radius", &scene_data.blur_radius, 0.01f);
+			internal.render_dirty |= ImGui::DragFloat("Focal distance", &scene_data.focal_distance, 0.1f);
 
 			ImGui::Unindent();
 			ImGui::Dummy({20, 20});

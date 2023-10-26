@@ -297,9 +297,11 @@ typedef struct TraceArgs
 	WorldManagerDeviceData* world_data;
 	Material* materials;
 	uint material_idx;
+	float focal_distance;
+	float blur_radius;
 } TraceArgs;
 
-float4 malleys_method(uint* rand_seed)
+float2 sample_uniform_disk(uint* rand_seed)
 {
 	float azimuth = RandomFloat(rand_seed) * PI * 2;
 	float len = sqrt(RandomFloat(rand_seed));
@@ -307,6 +309,15 @@ float4 malleys_method(uint* rand_seed)
 	float x = cos(azimuth) * len;
 	float z = sin(azimuth) * len;
 
+	return (float2)(x, z);
+}
+
+float4 malleys_method(uint* rand_seed)
+{
+	float2 disk_pos = sample_uniform_disk(rand_seed);
+
+	float x = disk_pos.x;
+	float z = disk_pos.y;
 
 	float powx = x * x;
 	float powz = z * z;
@@ -552,19 +563,25 @@ void kernel raytrace(global float* accumulation_buffer, global int* mouse, globa
 
 	float aspect_ratio = (float)(sceneData->resolution_x) / (float)(sceneData->resolution_y);
 
-	float3 pixel_dir_in_world_space = 
+	float3 pixel_dir_tangent = 
 	(float3)(0.0f, 0.0f, -1.0f) + 
-	(float3)(1.0f, 0.0f, 0.0f) * x_t * aspect_ratio - 
+	(float3)(1.0f, 0.0f, 0.0f) * x_t * aspect_ratio -
 	(float3)(0.0f, 1.0f, 0.0f) * y_t;
 
-	float3 ray_dir = transform((float4)(pixel_dir_in_world_space, 0.0f), sceneData->camera_transform).xyz;
+	float3 disk_pos_tangent = (float3)(sample_uniform_disk(&rand_seed) * sceneData->blur_radius, 0.0f);
+
+	pixel_dir_tangent -= disk_pos_tangent / sceneData->focal_distance;
+	float3 pixel_dir_world = transform((float4)(pixel_dir_tangent, 0.0f), sceneData->camera_transform).xyz;;
+	float3 disk_pos_world = transform((float4)(disk_pos_tangent, 0.0f), sceneData->camera_transform).xyz;
+	
+	// TODO: this is kinda dumb innit?
+	float3 cam_pos = transform((float4)(0.0f, 0.0f, 0.0f, 1.0f), sceneData->camera_transform).xyz;
+
+	float3 ray_dir = (pixel_dir_world);
 
 	// Actual raytracing
-
-	float3 cam_pos_actual = transform((float4)(0.0f, 0.0f, 0.0f, 1.0f), sceneData->camera_transform).xyz;
-
 	struct Ray ray;
-	ray.O = cam_pos_actual;
+	ray.O = cam_pos + disk_pos_world;
     ray.D = normalize(ray_dir);
     ray.t = 1e30f;
 	ray.light = 1.0f;
