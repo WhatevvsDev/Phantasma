@@ -371,6 +371,7 @@ float3 tangent_to_base_vector(float3 tangent_dir, float3 normal)
 }
 
 #define COSINE_WEIGHTED_BIAS 1
+#define STRATIFIED_4x4 1
 
 float3 trace(TraceArgs* args)
 {
@@ -558,8 +559,23 @@ void kernel raytrace(global float* accumulation_buffer, global int* mouse, globa
 
 	uint rand_seed = WangHash(pixel_dest + sceneData->frame_number * width * height);
 
-	float x_t = ((((float)x + RandomFloat(&rand_seed)) / (float)width) - 0.5f) * 2.0f;
-	float y_t = ((((float)y + RandomFloat(&rand_seed)) / (float)height)- 0.5f) * 2.0f;
+	uint strata_idx = sceneData->frame_number % (16);
+	uint strata_x_idx = strata_idx % 4;
+	uint strata_y_idx = strata_idx / 4;
+
+	float strata_u = (RandomFloat(&rand_seed) * 0.25f) + (0.25f * (float)strata_x_idx);
+	float strata_v = (RandomFloat(&rand_seed) * 0.25f) + (0.25f * (float)strata_y_idx);
+
+	float x_t;
+	float y_t;
+
+#if(STRATIFIED_4x4 == 0)
+	x_t = ((((float)x + RandomFloat(&rand_seed)) / (float)width) - 0.5f) * 2.0f;
+	y_t = ((((float)y + RandomFloat(&rand_seed)) / (float)height)- 0.5f) * 2.0f;
+#else
+	x_t = ((((float)x + strata_u) / (float)width) - 0.5f) * 2.0f;
+	y_t = ((((float)y + strata_v) / (float)height) - 0.5f) * 2.0f;
+#endif
 
 	float aspect_ratio = (float)(sceneData->resolution_x) / (float)(sceneData->resolution_y);
 
