@@ -79,6 +79,9 @@ Mesh::Mesh(const std::string& path)
 		normals[i + 2] = glm::vec4(normal_buf[tri_indices[2]], 0);
 	}
 
+	std::string file_name_with_extension = path.substr(path.find_last_of("/\\") + 1);
+	name = file_name_with_extension;
+
 	build_timer.start();
 	bvh = new BVH(tris);
 	LOGDEBUG(std::format("Built BVH for {} in {} ms", get_file_name_from_path_string(path), (u32)build_timer.to_now()));

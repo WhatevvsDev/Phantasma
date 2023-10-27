@@ -899,18 +899,18 @@ namespace Raytracer
 			
 			scene_data.exr_angle = wrap_number(scene_data.exr_angle, 0.0f, 360.0f);
 
-			static u32 selected_mesh_idx_to_instance = 0;
+			static std::string selected_mesh_name = AssetManager::get_meshes().begin()->second.name;
+			static uint selected_mesh_idx = 0;
 
-			if(ImGui::BeginCombo("Mesh Instances", std::to_string(selected_mesh_idx_to_instance).c_str()))
+			if(ImGui::BeginCombo("Mesh Instances", selected_mesh_name.c_str()))
 			{
 				uint idx = 0;
-				for(auto& mesh_header : AssetManager::get_mesh_headers())
+				for(auto& [key, mesh] : AssetManager::get_meshes())
 				{
-					(void)mesh_header;
-
-					if (ImGui::Selectable(std::to_string(idx).c_str(), idx == selected_mesh_idx_to_instance))
+					if (ImGui::Selectable(mesh.name.c_str(), mesh.name == selected_mesh_name))
 					{
-						selected_mesh_idx_to_instance = idx;
+						selected_mesh_name = mesh.name;
+						selected_mesh_idx = idx;
 					}
 
 					idx++;
@@ -921,7 +921,7 @@ namespace Raytracer
 
 			if(ImGui::Button("Add Instance"))
 			{
-				internal.selected_instance_idx = WorldManager::add_instance_of_mesh(selected_mesh_idx_to_instance);
+				internal.selected_instance_idx = WorldManager::add_instance_of_mesh(selected_mesh_idx);
 				internal.render_dirty = true;
 			}
 

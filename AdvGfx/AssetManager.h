@@ -1,5 +1,6 @@
 #pragma once
 #include "Compute.h"
+#include "Mesh.h"
 
 struct MeshHeader
 {
@@ -31,4 +32,5 @@ namespace AssetManager
 	ComputeWriteBuffer& get_mesh_header_buffer();
 
 	std::vector<MeshHeader>& get_mesh_headers();
+	std::unordered_map<std::string, Mesh>& get_meshes();
 }

@@ -110,3 +110,8 @@ std::vector<MeshHeader>& AssetManager::get_mesh_headers()
 {
 	return internal.headers;
 }
+
+std::unordered_map<std::string, Mesh>& AssetManager::get_meshes()
+{
+	return internal.meshes;
+}
