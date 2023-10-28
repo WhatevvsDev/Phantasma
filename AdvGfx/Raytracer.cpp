@@ -137,6 +137,7 @@ namespace Raytracer
 		u32 material_idx { 0 };
 		f32 focal_distance { 1.0f };
 		f32 blur_radius { 0.0f };
+		u32 max_luma_idx { 0 };
 	} scene_data;
 
 	struct
@@ -348,6 +349,18 @@ namespace Raytracer
 		
 		scene_data.exr_width = (u32)width;
 		scene_data.exr_height = (u32)height;
+
+		// Finding the brightest spot on the exr, assumed to be the sun for NEE
+		f32 max_luma = -1e34;
+		for(u32 idx = 0; idx < width * height; idx++)
+		{
+			glm::vec4 value = *(((glm::vec4*)internal.loaded_exr_data) + idx);
+			f32 luma = (value.x * 0.2126f + value.y * 0.7152f + value.z * 0.0722f) * value.w;
+			max_luma = glm::max(luma, max_luma);
+
+			if(luma == max_luma)
+				scene_data.max_luma_idx = idx;
+		}
 
 		exr_buffer = new ComputeWriteBuffer({internal.loaded_exr_data, (usize)(width * height * 4)});
 		internal.render_dirty = true;
@@ -695,7 +708,7 @@ namespace Raytracer
 		bool is_dielectric = material.type == MaterialType::Dielectric;
 
 		
-		internal.render_dirty |= ImGui::ColorPicker3("Albedo", glm::value_ptr(material.albedo), ImGuiColorEditFlags_NoInputs);
+		internal.render_dirty |= ImGui::ColorPicker4("Albedo", glm::value_ptr(material.albedo), ImGuiColorEditFlags_NoInputs);
 		internal.render_dirty |= ImGui::DragFloat("Absorbtion", &material.absorbtion_coefficient, 0.01f, 0.0f, 1.0f);
 
 		if(is_dielectric)

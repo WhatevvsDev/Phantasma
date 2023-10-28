@@ -1,3 +1,7 @@
+#define COSINE_WEIGHTED_BIAS 1
+#define STRATIFIED_4x4 1
+#define NEE_SUN 0
+
 typedef struct Tri 
 { 
     float3 vertex0;
@@ -78,13 +82,39 @@ float wrap_float(float val, float min, float max)
     return val + (max - min) * sign((float)(val < min) - (float)(val > max));
 }
 
-float3 get_exr_color(float3 direction, float* exr, uint exr_width, uint exr_height, float exr_angle)
+#define EPSILON 0.00001f
+
+float3 get_sun_direction(uint exr_width, uint exr_height, uint max_luma_idx)
 {
+	float sun_u = (float)(max_luma_idx % exr_width) / (float)exr_width;
+	float sun_v = (float)(max_luma_idx / exr_width) / (float)exr_height;
+	
+	float sun_yaw = radians(sun_u * 360.0f);
+	float sun_pitch = radians(sun_v * 360.0f - 180.0f) * 0.5f; 
+	
+	float3 sun_dir = (float3)(cos(sun_pitch) * cos(sun_yaw), sin(sun_pitch), cos(sun_pitch) * sin(sun_yaw));
+
+	return sun_dir;
+}
+
+float3 get_sun_sample(uint* rand_seed)
+{
+	float sun_angle = 3.0f * RandomFloat(rand_seed);
+	float a = radians(-90.0f + sun_angle);
+	float b = radians(100.0f);
+
+	float3 sample_dir = (float3)(cos(a) * cos(b), sin(a), cos(a) * sin(b));
+
+	return sample_dir;
+}
+
+float3 get_exr_color(float3 direction, float* exr, uint exr_width, uint exr_height, float exr_angle, uint max_luma_idx, bool include_sun)
+{	
 	float theta = acos(direction.y);
 	float phi = atan2(direction.z, direction.x) + PI;
 
-	float u = phi / (2 * PI);
 	float v = theta / PI;
+	float u = phi / (2 * PI);
 	
 	u = wrap_float(u + exr_angle / 360.0f, 0.0f, 1.0f);
 
@@ -94,12 +124,28 @@ float3 get_exr_color(float3 direction, float* exr, uint exr_width, uint exr_heig
 	i = clamp(i, 0u, exr_width - 1u);
 	j = clamp(j, 0u, exr_height - 1u);
 
-	float4 color = sample_exr(exr, (i + j * exr_width) * 4u);
+	uint idx = (i + j * exr_width);
+	float sun_angle = 3.0f;
+
+#if (NEE_SUN == 1)
+	if(!include_sun)
+	{
+		float3 sun_direction = get_sun_direction(exr_width, exr_height, max_luma_idx);
+
+		// - Epsilon otherwise we get weird dot artefact in the middle of sun disk?
+		bool is_pointing_at_sun = (degrees(acos(dot(direction, -sun_direction) - EPSILON))) < sun_angle;
+		
+		if(is_pointing_at_sun)
+		{
+			return (float3)(0, 0, 0);
+		}
+	}
+#endif
+
+	float4 color = sample_exr(exr, idx * 4u);
 
 	return color.xyz * color.w;
 }
-
-#define EPSILON 0.00001f
 
 void intersect_tri(Ray* ray, Tri* tris, uint triIdx, MeshHeader* header)
 {
@@ -299,6 +345,7 @@ typedef struct TraceArgs
 	uint material_idx;
 	float focal_distance;
 	float blur_radius;
+	uint max_luma_idx;
 } TraceArgs;
 
 float2 sample_uniform_disk(uint* rand_seed)
@@ -370,9 +417,6 @@ float3 tangent_to_base_vector(float3 tangent_dir, float3 normal)
 	return normalize(new_tang);
 }
 
-#define COSINE_WEIGHTED_BIAS 1
-#define STRATIFIED_4x4 1
-
 float3 trace(TraceArgs* args)
 {
 	// Keeping track of current ray in the stack
@@ -418,7 +462,9 @@ float3 trace(TraceArgs* args)
 			}
 		}
 
-		if(current_ray.depth == DEPTH)
+		bool is_primary_ray = (current_ray.depth == DEPTH);
+
+		if(is_primary_ray)
 		{
 			args->primary_ray->bvh_hits = current_ray.bvh_hits;			
 			args->primary_ray->t = current_ray.t;
@@ -429,10 +475,10 @@ float3 trace(TraceArgs* args)
 
 		if(!hit_anything)
 		{
-			float3 exr_color = get_exr_color(current_ray.D, args->exr, args->exr_width, args->exr_height, args->exr_angle);
+			float3 exr_color = get_exr_color(current_ray.D, args->exr, args->exr_width, args->exr_height, args->exr_angle, args->max_luma_idx, is_primary_ray);
 
 			// Hacky way to get rid of fireflies
-			exr_color = clamp(exr_color, 0.0f , 32.0f);
+			//exr_color = clamp(exr_color, 0.0f , 32.0f);
 
 			color += current_ray.light * exr_color;
 			continue;
@@ -478,6 +524,34 @@ float3 trace(TraceArgs* args)
 
 			float3 reflected_dir = reflected(current_ray.D, normal);
 			float random = RandomFloat(args->rand_seed);
+
+#if(NEE_SUN == 1)
+			float light_ray_t = 1e30f;
+
+			float3 to_sun_dir = -get_sun_direction(args->exr_width, args->exr_height, args->max_luma_idx);;
+			float3 sun_sample_dir = tangent_to_base_vector( get_sun_sample(args->rand_seed), to_sun_dir);
+
+			// Shadow ray for NEE
+			for(uint i = 0; i < (*args->world_data).mesh_count; i++)
+			{
+				Ray light_ray;
+				light_ray.O = hit_pos + hemisphere_normal * EPSILON;
+				light_ray.D = sun_sample_dir;
+				light_ray.t = 1e30f;
+
+				MeshInstanceHeader* instance = &(*args->world_data).instances[i];
+				MeshHeader* mesh = &args->mesh_headers[instance->mesh_idx];
+
+				intersect_bvh(&light_ray, mesh->root_bvh_node_idx, args->nodes, args->tris, args->trisIdx, &args->mesh_headers[instance->mesh_idx], instance->inverse_transform);
+			
+				light_ray_t = min(light_ray.t, light_ray_t);
+			}
+
+			if(light_ray_t == 1e30f)
+			{
+				current_ray.light += get_exr_color(sun_sample_dir, args->exr, args->exr_width, args->exr_height, args->exr_angle, args->max_luma_idx, true);
+			}
+#endif
 
 			switch(mat.type)
 			{
@@ -618,6 +692,7 @@ void kernel raytrace(global float* accumulation_buffer, global int* mouse, globa
 	trace_args.world_data = world_manager_data;
 	trace_args.material_idx = sceneData->material_idx;
 	trace_args.materials = materials;
+	trace_args.max_luma_idx = sceneData->max_luma_idx;
 
 	float3 color = trace(&trace_args);
 

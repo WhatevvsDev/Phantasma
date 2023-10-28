@@ -148,6 +148,7 @@ typedef struct SceneData
 	uint material_idx;
 	float focal_distance;
 	float blur_radius;
+	uint max_luma_idx;
 } SceneData;
 
 #endif
