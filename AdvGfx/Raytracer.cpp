@@ -709,6 +709,7 @@ namespace Raytracer
 
 		
 		internal.render_dirty |= ImGui::ColorPicker4("Albedo", glm::value_ptr(material.albedo), ImGuiColorEditFlags_NoInputs);
+		internal.render_dirty |= ImGui::DragFloat("Emissiveness", &material.albedo.a, 0.01f, 0.0f, 100.0f);
 		internal.render_dirty |= ImGui::DragFloat("Absorbtion", &material.absorbtion_coefficient, 0.01f, 0.0f, 1.0f);
 
 		if(is_dielectric)

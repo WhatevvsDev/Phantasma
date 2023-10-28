@@ -319,7 +319,7 @@ typedef enum MaterialType
 
 typedef struct Material
 {
-	float3 albedo;
+	float4 albedo;
 	float ior;
 	float absorbtion_coefficient;
 	MaterialType type;
@@ -553,6 +553,8 @@ float3 trace(TraceArgs* args)
 			}
 #endif
 
+			float3 material_color = mat.albedo.xyz * (mat.albedo.a + 1.0f);
+
 			switch(mat.type)
 			{
 				case Diffuse:
@@ -561,13 +563,14 @@ float3 trace(TraceArgs* args)
 						 ? hemisphere_normal
 						 : reflected_dir;
 					
-					float3 brdf = mat.albedo;
+					float3 brdf = material_color;
+
 					#if(COSINE_WEIGHTED_BIAS == 0)
 					float3 diffuse = current_ray.light * brdf * dot(normal, new_ray.D) * 2.0f;
 					#else
 					float3 diffuse = current_ray.light * brdf;
 					#endif
-					float3 specular = current_ray.light * mat.albedo;
+					float3 specular = current_ray.light * material_color;
 
 					ray_stack[ray_stack_idx++] = new_ray;
 					ray_stack[current_ray.ray_parent].light = lerp(diffuse, specular, mat.specularity) * (1.0f - mat.absorbtion_coefficient);
@@ -581,7 +584,7 @@ float3 trace(TraceArgs* args)
 
 					ray_stack[ray_stack_idx++] = new_ray;
 
-					ray_stack[current_ray.ray_parent].light = current_ray.light * mat.albedo * (1.0f - mat.absorbtion_coefficient);
+					ray_stack[current_ray.ray_parent].light = current_ray.light * material_color * (1.0f - mat.absorbtion_coefficient);
 					continue;
 				}
 				case Dielectric:
@@ -596,7 +599,7 @@ float3 trace(TraceArgs* args)
 						new_ray.D = reflected(current_ray.D, normal);
 						ray_stack[ray_stack_idx++] = new_ray;
 
-						ray_stack[current_ray.ray_parent].light = current_ray.light * mat.albedo;
+						ray_stack[current_ray.ray_parent].light = current_ray.light * material_color;
 					}
 					else
 					{
@@ -605,7 +608,7 @@ float3 trace(TraceArgs* args)
 
 						float transmission_factor = inner_normal ? beers_law(current_ray.t, mat.absorbtion_coefficient) : 1.0f;
 
-						ray_stack[current_ray.ray_parent].light = current_ray.light * (mat.albedo) * transmission_factor;
+						ray_stack[current_ray.ray_parent].light = current_ray.light * (material_color) * transmission_factor;
 					
 					}
 					continue;
