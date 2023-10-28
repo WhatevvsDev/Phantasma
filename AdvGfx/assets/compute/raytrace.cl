@@ -1,6 +1,6 @@
 #define COSINE_WEIGHTED_BIAS 1
 #define STRATIFIED_4x4 1
-#define NEE_SUN 0
+#define NEE_SUN 1
 
 typedef struct Tri 
 { 
@@ -475,7 +475,7 @@ float3 trace(TraceArgs* args)
 
 		if(!hit_anything)
 		{
-			float3 exr_color = get_exr_color(current_ray.D, args->exr, args->exr_width, args->exr_height, args->exr_angle, args->max_luma_idx, is_primary_ray);
+			float3 exr_color = get_exr_color(current_ray.D, args->exr, args->exr_width, args->exr_height, args->exr_angle, args->max_luma_idx, false);
 
 			// Hacky way to get rid of fireflies
 			//exr_color = clamp(exr_color, 0.0f , 32.0f);
