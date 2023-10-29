@@ -83,6 +83,7 @@ Mesh::Mesh(const std::string& path)
 	name = file_name_with_extension;
 
 	build_timer.start();
+	build_timer.reset();
 	bvh = new BVH(tris);
 	LOGDEBUG(std::format("Built BVH for {} in {} ms", get_file_name_from_path_string(path), (u32)build_timer.to_now()));
 

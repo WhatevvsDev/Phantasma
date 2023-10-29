@@ -274,38 +274,6 @@ namespace Raytracer
 		}
 	}
 
-	// Search for, and automatically compile compute shaders
-	/*void init_find_assets()
-	{
-		std::string compute_directory = get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\";
-		for (const auto & asset_path : std::filesystem::recursive_directory_iterator(compute_directory))
-		{
-			std::string file_path = asset_path.path().string();
-			std::string file_name_with_extension = file_path.substr(file_path.find_last_of("/\\") + 1);
-			std::string file_extension = file_name_with_extension.substr(file_name_with_extension.find_last_of(".") + 1);
-			std::string file_name = file_name_with_extension.substr(0, file_name_with_extension.length() - file_extension.length() - 1);
-
-			bool wrong_file_extension = (file_extension != "cl") && (file_extension != "exr");
-			bool kernel_already_exists = (file_extension == "cl") && Compute::kernel_exists(file_name);
-			bool file_is_common_source = (file_name == "common");
-
-			if(wrong_file_extension || kernel_already_exists || file_is_common_source)
-				continue;
-
-			if(file_extension == "cl")
-			{
-				Compute::create_kernel(file_path, file_name);
-				continue;
-			}
-
-			if(file_extension == "exr")
-			{
-				internal.exr_assets_on_disk.push_back({asset_path, file_name});
-				continue;
-			}
-		}
-	}*/
-
 	// TODO: This should probably not be in Raytracer.cpp
 	void load_exr(u32 index = 0)
 	{
@@ -351,7 +319,6 @@ namespace Raytracer
 
 		init_internal(desc);
 		init_load_saved_data();
-		//init_find_assets();
 
 		u32 render_area_px = internal.render_width_px * internal.render_height_px;
 
@@ -694,7 +661,7 @@ namespace Raytracer
 		bool is_dielectric = material.type == MaterialType::Dielectric;
 
 		
-		internal.render_dirty |= ImGui::ColorPicker4("Albedo", glm::value_ptr(material.albedo), ImGuiColorEditFlags_NoInputs);
+		internal.render_dirty |= ImGui::ColorPicker3("Albedo", glm::value_ptr(material.albedo), ImGuiColorEditFlags_NoInputs);
 		internal.render_dirty |= ImGui::DragFloat("Emissiveness", &material.albedo.a, 0.01f, 0.0f, 100.0f);
 		internal.render_dirty |= ImGui::DragFloat("Absorbtion", &material.absorbtion_coefficient, 0.01f, 0.0f, 1.0f);
 
@@ -703,27 +670,69 @@ namespace Raytracer
 					
 		if(is_diffuse || is_metal)
 		internal.render_dirty |= ImGui::DragFloat("Specularity", &material.specularity, 0.01f, 0.0f, 1.0f);
-					
-		if(ImGui::BeginCombo("Material Type", material_types_as_strings[(u32)material.type].c_str()))
+		
+		MaterialType old_type = material.type;
+		std::string material_name = material_types_as_strings[(u32)material.type];
+
+		if(ImGui::BeginCombo("Material Type", material_name.c_str()))
 		{
 			if(ImGui::Selectable("Diffuse", is_diffuse))
-			{
 				material.type = MaterialType::Diffuse;
-				internal.render_dirty = true;
-			}
+
 			if(ImGui::Selectable("Metal", is_metal))
-			{
 				material.type = MaterialType::Metal;
-				internal.render_dirty = true;
-			}
+
 			if(ImGui::Selectable("Dielectric", is_dielectric))
-			{
 				material.type = MaterialType::Dielectric;
-				internal.render_dirty = true;
-			}
 
 			ImGui::EndCombo();
 		}
+
+		internal.render_dirty |= (material.type != old_type);
+	}
+
+	void ui_selected_instance()
+	{
+		if(internal.selected_instance_idx == -1)
+		{
+			ImGui::Dummy({0, 100 + 170});
+			return;
+		}
+
+		ImGui::SeparatorText("Transform");
+
+		auto& instance = WorldManager::get_world_device_data().instances[internal.selected_instance_idx];
+		bool transformed = false;
+
+		glm::vec3 translation;
+		glm::vec3 rotation;
+		glm::vec3 scale;
+
+		ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(instance.transform), glm::value_ptr(translation), glm::value_ptr(rotation), glm::value_ptr(scale));
+				
+		transformed |= ImGui::InputFloat3("Translation", glm::value_ptr(translation));
+		transformed |= ImGui::InputFloat3("Rotation", glm::value_ptr(rotation));
+		transformed |= ImGui::InputFloat3("Scale", glm::value_ptr(scale));
+				
+		ImGuizmo::RecomposeMatrixFromComponents(glm::value_ptr(translation), glm::value_ptr(rotation), glm::value_ptr(scale), glm::value_ptr(instance.transform));
+
+		if(transformed)
+		{
+			instance.inverse_transform = glm::inverse(instance.transform);
+			internal.render_dirty = true;
+		}
+
+		ImGui::Dummy({0, 20});
+		ImGui::SeparatorText("Material");
+
+		i32 mat_idx_proxy = (i32) instance.material_idx;
+		internal.render_dirty |= ImGui::InputInt("Material", &mat_idx_proxy, 1);
+		if(mat_idx_proxy > (i32)materials.size() - 1)
+			materials.push_back(default_material);
+		mat_idx_proxy = glm::max(mat_idx_proxy, 0);
+		instance.material_idx = (u32)mat_idx_proxy;
+
+		ui_material_editor(materials[instance.material_idx]);
 	}
 
 	void ui()
@@ -931,45 +940,7 @@ namespace Raytracer
 			ImGui::SeparatorText("Selected Instance");
 			ImGui::Indent();
 
-			if(internal.selected_instance_idx != -1)
-			{
-				ImGui::SeparatorText("Transform");
-
-				auto& instance = WorldManager::get_world_device_data().instances[internal.selected_instance_idx];
-				bool transformed = false;
-
-				glm::vec3 translation;
-				glm::vec3 rotation;
-				glm::vec3 scale;
-
-				ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(instance.transform), glm::value_ptr(translation), glm::value_ptr(rotation), glm::value_ptr(scale));
-				
-				transformed |= ImGui::InputFloat3("Translation", glm::value_ptr(translation));
-				transformed |= ImGui::InputFloat3("Rotation", glm::value_ptr(rotation));
-				transformed |= ImGui::InputFloat3("Scale", glm::value_ptr(scale));
-				
-				ImGuizmo::RecomposeMatrixFromComponents(glm::value_ptr(translation), glm::value_ptr(rotation), glm::value_ptr(scale), glm::value_ptr(instance.transform));
-
-				if(transformed)
-				{
-					instance.inverse_transform = glm::inverse(instance.transform);
-					internal.render_dirty = true;
-				}
-
-				ImGui::Dummy({0, 20});
-				ImGui::SeparatorText("Material");
-
-				i32 mat_idx_proxy = (i32) instance.material_idx;
-				internal.render_dirty |= ImGui::InputInt("Material", &mat_idx_proxy, 1);
-				mat_idx_proxy = glm::clamp(mat_idx_proxy, 0, (i32)materials.size() - 1);
-				instance.material_idx = (u32)mat_idx_proxy;
-
-				ui_material_editor(materials[instance.material_idx]);
-			}
-			else
-			{
-				ImGui::Dummy({0, 100 + 170});
-			}
+			ui_selected_instance();
 
 			ImGui::Dummy({0, 20});
 			ImGui::Unindent();
@@ -1004,30 +975,6 @@ namespace Raytracer
 
 		ImGui::EndTabBar();
 		
-		ImGui::End();
-
-		ImGui::SetNextWindowPos({});
-		ImGui::Begin("Transform tools", 0, ImGuiWindowFlags_NoBackground | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove);
-
-		f32 icon_font_size = 50.0f;	
-
-		ImGui::SetWindowFontScale(0.9f);
-		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, {0, 0});
-		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 1));
-
-		if (ImGui::Button(ICON_FA_ARROWS_UP_DOWN_LEFT_RIGHT, {icon_font_size, icon_font_size}))
-			internal.current_gizmo_operation = ImGuizmo::TRANSLATE;
-		ImGui::SameLine();
-		if (ImGui::Button(ICON_FA_ARROWS_ROTATE, {icon_font_size, icon_font_size}))
-			internal.current_gizmo_operation = ImGuizmo::ROTATE;
-		ImGui::SameLine();
-		if (ImGui::Button(ICON_FA_EXPAND, {icon_font_size, icon_font_size}))
-			internal.current_gizmo_operation = ImGuizmo::SCALE;
-		
-		ImGui::PopStyleColor();
-		ImGui::PopStyleVar();
-		ImGui::SetWindowFontScale(1.0f);
-
 		ImGui::End();
 
 		glm::vec3 forward = glm::normalize(glm::vec3(0.0f, 0.0f, -1.0f) * glm::mat3(glm::eulerAngleXY(glm::radians(-host_camera.rotation.x), glm::radians(-host_camera.rotation.y))));;

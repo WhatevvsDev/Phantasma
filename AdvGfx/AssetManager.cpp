@@ -27,9 +27,6 @@ struct
 // Search for, and automatically compile compute shaders
 void find_disk_assets()
 {
-	internal.disk_assets.insert({"exr", std::vector<DiskAsset>()});
-	internal.disk_assets.insert({"cl", std::vector<DiskAsset>()});
-
 	std::string assets_directory = get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\";
 	for (const auto & asset_path : std::filesystem::recursive_directory_iterator(assets_directory))
 	{
@@ -38,37 +35,42 @@ void find_disk_assets()
 		std::string file_extension = file_name_with_extension.substr(file_name_with_extension.find_last_of(".") + 1);
 		std::string file_name = file_name_with_extension.substr(0, file_name_with_extension.length() - file_extension.length() - 1);
 
-		bool wrong_file_extension = (file_extension != "cl") && (file_extension != "exr") && (file_extension != "gltf");
-		bool kernel_already_exists = (file_extension == "cl") && Compute::kernel_exists(file_name);
-		bool file_is_common_source = (file_name == "common");
+		bool file_is_common_shader_source = (file_name == "common");
 
 		DiskAsset disk_asset;
 		disk_asset.file_name = file_name_with_extension;
 		disk_asset.path = file_path;
 
-		if(wrong_file_extension || kernel_already_exists || file_is_common_source)
+		if(file_is_common_shader_source)
 			continue;
 
-		if(file_extension == "cl")
+		switch(hashstr(file_extension.c_str()))
 		{
-			Compute::create_kernel(file_path, file_name);
-			internal.disk_assets["cl"].push_back(disk_asset);
-			continue;
+			default:
+			{
+				// Ignore the file
+				continue;
+			}
+			case hashstr("cl"):
+			{
+				if(!Compute::kernel_exists(file_name))
+					Compute::create_kernel(file_path, file_name);
+
+				break;
+			}
+			case hashstr("exr"):
+			{
+				// Do nothing, it will get entered after the switch
+				break;
+			}
+			case hashstr("gltf"):
+			{
+				AssetManager::load_mesh(file_path);
+				break;
+			}
 		}
 
-		if(file_extension == "exr")
-		{
-			//internal.exr_assets_on_disk.push_back({asset_path, file_name});
-			internal.disk_assets["exr"].push_back(disk_asset);
-			continue;
-		}
-
-		if(file_extension == "gltf")
-		{
-			AssetManager::load_mesh(file_path);
-			internal.disk_assets["gltf"].push_back(disk_asset);
-			continue;
-		}
+		internal.disk_assets[file_extension].push_back(disk_asset);
 	}
 }
 

@@ -524,7 +524,7 @@ float3 trace(TraceArgs* args)
 			bool light_ray_hit_anything = false;
 
 			float3 to_sun_dir = -get_sun_direction(args->exr_width, args->exr_height, args->max_luma_idx, args->exr_angle);
-			float3 sun_sample_dir = tangent_to_base_vector( get_sun_sample(args->rand_seed), to_sun_dir);
+			float3 sun_sample_dir = tangent_to_base_vector(get_sun_sample(args->rand_seed), to_sun_dir);
 
 			// Shadow ray for NEE
 			for(uint i = 0; i < (*args->world_data).mesh_count; i++)
@@ -539,16 +539,16 @@ float3 trace(TraceArgs* args)
 
 				intersect_bvh(&light_ray, mesh->root_bvh_node_idx, args->nodes, args->tris, args->trisIdx, &args->mesh_headers[instance->mesh_idx], instance->inverse_transform);
 			
-				if(light_ray.t <= 1e30f)
+				if(light_ray.t != 1e30f)
 				{
 					light_ray_hit_anything = true;
 					break;
 				}
 			}
 
-			if(light_ray_hit_anything)
+			if(!light_ray_hit_anything)
 			{
-				current_ray.light += current_ray.light * get_exr_color(sun_sample_dir, args->exr, args->exr_width, args->exr_height, args->exr_angle, args->max_luma_idx, true);
+				current_ray.light += get_exr_color(sun_sample_dir, args->exr, args->exr_width, args->exr_height, args->exr_angle, args->max_luma_idx, true);
 			}
 #endif
 
