@@ -17,6 +17,12 @@ struct MeshHeader
 	u32 tri_idx_count {};
 };
 
+struct DiskAsset
+{
+	std::filesystem::path path;
+	std::string file_name;
+};
+
 namespace AssetManager
 {
 	void init();
@@ -33,4 +39,6 @@ namespace AssetManager
 
 	std::vector<MeshHeader>& get_mesh_headers();
 	std::unordered_map<std::string, Mesh>& get_meshes();
+
+	std::vector<DiskAsset>& get_disk_files_by_extension(const std::string& extension);
 }

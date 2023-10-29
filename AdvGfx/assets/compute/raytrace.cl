@@ -99,9 +99,11 @@ float3 get_sun_direction(uint exr_width, uint exr_height, uint max_luma_idx, flo
 	return sun_dir;
 }
 
+#define SUN_ANGLE 3.0f
+
 float3 get_sun_sample(uint* rand_seed)
 {
-	float sun_angle = 3.0f * RandomFloat(rand_seed);
+	float sun_angle = SUN_ANGLE * RandomFloat(rand_seed);
 	float a = radians(-90.0f + sun_angle);
 	float b = radians(100.0f);
 
@@ -127,7 +129,7 @@ float3 get_exr_color(float3 direction, float* exr, uint exr_width, uint exr_heig
 	j = clamp(j, 0u, exr_height - 1u);
 
 	uint idx = (i + j * exr_width);
-	float sun_angle = 3.0f;
+	float sun_angle = SUN_ANGLE;
 
 #if (NEE_SUN == 1)
 	if(!include_sun)
@@ -395,24 +397,13 @@ float3 uniform_hemisphere_tangent(uint* rand_seed)
 	return hemisphere_normal;
 }
 
-void get_tangents(float3 n, float3* b1, float3* b2) {
-    // Taken from: https://graphics.pixar.com/library/OrthonormalB/paper.pdf
-    float mysign = 1.0f * sign(n.z);
-    float a = -1.0f / (mysign + n.z);
-    float b = n.x*n.y*a;
-    *b1 = (float3)(1.0f + mysign*n.x*n.x*a, mysign*b, -mysign*n.x);
-    *b2 = (float3)(b, mysign + n.y*n.y*a, -n.y);
-}
-
 float3 tangent_to_base_vector(float3 tangent_dir, float3 normal)
 {
 	if(fabs(normal.y) == 1.0f)
 		return tangent_dir * sign(normal.y);
 
-	float3 bitangent;
-	float3 tangent;
-
-	get_tangents(normal, &tangent, &bitangent);
+	float3 bitangent = normalize(cross(normal, (float3)(0.0f, 1.0f, 0.0f)));
+	float3 tangent = normalize(cross(normal, bitangent));
 
 	float3 new_tang = tangent_dir.x * tangent + tangent_dir.y * normal + tangent_dir.z * bitangent;
 
@@ -537,7 +528,7 @@ float3 trace(TraceArgs* args)
 			for(uint i = 0; i < (*args->world_data).mesh_count; i++)
 			{
 				Ray light_ray;
-				light_ray.O = hit_pos + hemisphere_normal * EPSILON;
+				light_ray.O = hit_pos + normal * EPSILON;
 				light_ray.D = sun_sample_dir;
 				light_ray.t = 1e30f;
 
@@ -716,7 +707,7 @@ void kernel raytrace(global float* accumulation_buffer, global int* mouse, globa
 		}
 	}
 
-	//color = ray.bvh_hits / 10.0f;
+	//color = ray.bvh_hits / 50.0f;
 	
 	if(sceneData->reset_accumulator)
 	{

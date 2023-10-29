@@ -217,6 +217,7 @@
     <ClInclude Include="IOUtility.h" />
     <ClInclude Include="JSONUtility.h" />
     <ClInclude Include="LogUtility.h" />
+    <ClInclude Include="Material.h" />
     <ClInclude Include="Math.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="PrimitiveTypes.h" />

@@ -20,17 +20,75 @@ struct
 
 	ComputeWriteBuffer* header_compute_buffer	{ nullptr };
 
+	std::unordered_map<std::string, std::vector<DiskAsset>> disk_assets {};
+
 } internal;
+
+// Search for, and automatically compile compute shaders
+void find_disk_assets()
+{
+	internal.disk_assets.insert({"exr", std::vector<DiskAsset>()});
+	internal.disk_assets.insert({"cl", std::vector<DiskAsset>()});
+
+	std::string compute_directory = get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\";
+	for (const auto & asset_path : std::filesystem::recursive_directory_iterator(compute_directory))
+	{
+		std::string file_path = asset_path.path().string();
+		std::string file_name_with_extension = file_path.substr(file_path.find_last_of("/\\") + 1);
+		std::string file_extension = file_name_with_extension.substr(file_name_with_extension.find_last_of(".") + 1);
+		std::string file_name = file_name_with_extension.substr(0, file_name_with_extension.length() - file_extension.length() - 1);
+
+		bool wrong_file_extension = (file_extension != "cl") && (file_extension != "exr");
+		bool kernel_already_exists = (file_extension == "cl") && Compute::kernel_exists(file_name);
+		bool file_is_common_source = (file_name == "common");
+
+		DiskAsset disk_asset;
+		disk_asset.file_name = file_name_with_extension;
+		disk_asset.path = file_path;
+
+		if(wrong_file_extension || kernel_already_exists || file_is_common_source)
+			continue;
+
+		if(file_extension == "cl")
+		{
+			Compute::create_kernel(file_path, file_name);
+			internal.disk_assets["cl"].push_back(disk_asset);
+			continue;
+		}
+
+		if(file_extension == "exr")
+		{
+			//internal.exr_assets_on_disk.push_back({asset_path, file_name});
+			internal.disk_assets["exr"].push_back(disk_asset);
+			continue;
+		}
+	}
+}
 
 void AssetManager::init()
 {
+	find_disk_assets();
+}
+
+std::vector<DiskAsset>& AssetManager::get_disk_files_by_extension(const std::string& extension)
+{
+	// TODO: Don't know if theres a better way to do this?
+	static std::vector<DiskAsset> empty_vector;
+
+	auto assets_vector = internal.disk_assets.find(extension);
+
+	if(assets_vector == internal.disk_assets.end())
+		return empty_vector;
 	
+	return assets_vector->second;
 }
 
 void AssetManager::load_mesh(const std::filesystem::path path)
 {
+	std::string file_name = path.filename().string();
+
 	internal.meshes.insert({
-		path.string(), Mesh(path.string())
+		file_name, Mesh(path.string())
 	});
 
 	delete internal.tris_compute_buffer;
@@ -38,7 +96,7 @@ void AssetManager::load_mesh(const std::filesystem::path path)
 	delete internal.bvh_compute_buffer;
 	delete internal.tri_idx_compute_buffer;
 
-	Mesh& loaded_mesh = internal.meshes.find(path.string())->second;
+	Mesh& loaded_mesh = internal.meshes.find(file_name)->second;
 
 	// Create Mesh header for compute
 	MeshHeader loaded_mesh_header;

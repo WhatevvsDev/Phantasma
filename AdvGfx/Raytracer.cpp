@@ -7,6 +7,7 @@
 #include "WorldManager.h"
 #include "Math.h"
 #include "BVH.h"
+#include "Material.h"
 
 #define TINYGLTF_IMPLEMENTATION
 #include "tiny_gltf.h"
@@ -32,35 +33,23 @@
 	// Main TODO
 
 	// 1. Camera system
-	//		- A proper system for managing camera, with various settings and options (DoF, FoV, etc.)
+	//		- A proper system for managing camera, with various settings and options (FoV, etc.)
 
 	// 2. Asset browser/manager
 	//		- A system that automatically detects, sorts and shows the state of various assets (whether its loaded to CPU/GPU or still on disk, etc.)
 
 	// 3. Some extra EXR controls
 	//		- Maybe adjusting brightness
-			- Follow camera rotation? so we can see the model w the same lighting from all angles
 
 	// 4. For blur:
 			- Replace "Blur amount" with an actual real-world value or sm
+
+	// 5. TLAS
 
 */
 
 namespace Raytracer
 {	
-	struct DiskAsset
-	{
-		std::filesystem::path path;
-		std::string filename;
-	};
-
-	enum class MaterialType : u32
-	{
-		Diffuse,
-		Metal,
-		Dielectric
-	};
-
 	enum class LockAxis
 	{
 		X,
@@ -75,15 +64,6 @@ namespace Raytracer
 		};
 
 	ImGuizmo::OPERATION all_axis_bits = (ImGuizmo::OPERATION)(axis_bits[0] | axis_bits[1] | axis_bits[2]);;
-
-	struct Material
-	{
-		glm::vec4 albedo { 1.0f, 1.0f, 1.0f, 0.0f };
-		float ior { 1.33f };
-		float absorbtion_coefficient { 0.0f };
-		MaterialType type { MaterialType::Diffuse };
-		float specularity { 0.0f };
-	};
 
 	Material default_material = {glm::vec4(1.0f, 0.5f, 0.7f, 1.0f), 1.5f, 0.1f, MaterialType::Diffuse, 0.0f};
 
@@ -163,7 +143,7 @@ namespace Raytracer
 
 		ComputeGPUOnlyBuffer* gpu_accumulation_buffer { nullptr };
 
-		std::vector<DiskAsset> exr_assets_on_disk;
+		//std::vector<DiskAsset> exr_assets_on_disk;
 		f32* loaded_exr_data { nullptr };
 		std::string current_exr { "None" };
 
@@ -295,7 +275,7 @@ namespace Raytracer
 	}
 
 	// Search for, and automatically compile compute shaders
-	void init_find_assets()
+	/*void init_find_assets()
 	{
 		std::string compute_directory = get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\";
 		for (const auto & asset_path : std::filesystem::recursive_directory_iterator(compute_directory))
@@ -324,12 +304,12 @@ namespace Raytracer
 				continue;
 			}
 		}
-	}
+	}*/
 
 	// TODO: This should probably not be in Raytracer.cpp
 	void load_exr(u32 index = 0)
 	{
-		std::string exr_path = internal.exr_assets_on_disk[index].path.string();
+		std::string exr_path = AssetManager::get_disk_files_by_extension("exr")[index].path.string();
 		std::string file_name_with_extension = exr_path.substr(exr_path.find_last_of("/\\") + 1);
 
 		internal.current_exr = file_name_with_extension;
@@ -371,8 +351,7 @@ namespace Raytracer
 
 		init_internal(desc);
 		init_load_saved_data();
-		init_find_assets();
-		load_exr();
+		//init_find_assets();
 
 		u32 render_area_px = internal.render_width_px * internal.render_height_px;
 
@@ -388,6 +367,8 @@ namespace Raytracer
 		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\mid_poly_sphere.gltf");
 		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\sah_test.gltf");
 		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\plane.gltf");
+		
+		load_exr();
 	}
 
 	// Saves data such as settings, or world state to phantasma.data.json
@@ -903,11 +884,11 @@ namespace Raytracer
 			if(ImGui::BeginCombo("EXRs", internal.current_exr.c_str()))
 			{
 				u32 idx = 0;
-				for(auto& exr : internal.exr_assets_on_disk)
+				for(auto exr : AssetManager::get_disk_files_by_extension("exr"))
 				{
-					if (ImGui::Selectable((exr.filename + ".exr").c_str(), exr.filename == internal.current_exr))
+					if (ImGui::Selectable((exr.file_name + ".exr").c_str(), exr.file_name == internal.current_exr))
 					{
-						internal.current_exr = exr.filename;
+						internal.current_exr = exr.file_name;
 						load_exr(idx);
 					}
 
@@ -924,7 +905,6 @@ namespace Raytracer
 			scene_data.exr_angle = wrap_number(scene_data.exr_angle, 0.0f, 360.0f);
 
 			static std::string selected_mesh_name = AssetManager::get_meshes().begin()->second.name;
-			static uint selected_mesh_idx = 0;
 
 			if(ImGui::BeginCombo("Mesh Instances", selected_mesh_name.c_str()))
 			{
@@ -934,7 +914,6 @@ namespace Raytracer
 					if (ImGui::Selectable(mesh.name.c_str(), mesh.name == selected_mesh_name))
 					{
 						selected_mesh_name = mesh.name;
-						selected_mesh_idx = idx;
 					}
 
 					idx++;
@@ -945,7 +924,11 @@ namespace Raytracer
 
 			if(ImGui::Button("Add Instance"))
 			{
-				internal.selected_instance_idx = WorldManager::add_instance_of_mesh(selected_mesh_idx);
+				auto meshes = AssetManager::get_meshes();
+
+				u32 selected_mesh_index = (u32)std::distance(meshes.begin(),meshes.find(selected_mesh_name));
+
+				internal.selected_instance_idx = WorldManager::add_instance_of_mesh(selected_mesh_index);
 				internal.render_dirty = true;
 			}
 
