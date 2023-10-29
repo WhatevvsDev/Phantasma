@@ -461,7 +461,6 @@ namespace Raytracer
 
 		if(camera_is_moving)
 		{
-
 			glm::vec3 camera_move_delta = glm::vec3(move_dir * delta_time_ms * 0.01f) * camera_speed_t_to_m_per_second();
 			
 			internal.render_dirty = true;
@@ -470,14 +469,26 @@ namespace Raytracer
 		}
 
 		ImVec2 mouse_delta = ImGui::GetIO().MouseDelta;
-		glm::vec3 camera_angular_delta = glm::vec3(-mouse_delta.y, -mouse_delta.x, 0);
+		glm::vec3 camera_delta = glm::vec3(-mouse_delta.y, -mouse_delta.x, 0);
 
-		bool camera_is_rotating = (glm::dot(camera_angular_delta, camera_angular_delta) != 0.0f);
+		bool pan = ImGui::GetIO().MouseDown[2];
+
+		bool camera_updating = (glm::dot(camera_delta, camera_delta) != 0.0f);
 		bool allow_camera_rotation = !internal.show_debug_ui;
 
-		if(allow_camera_rotation && camera_is_rotating)
+		if(pan && camera_updating)
 		{
-			host_camera.rotation += camera_angular_delta * 0.1f;
+			glm::vec3 pan_vector = glm::vec3(camera_delta.y, -camera_delta.x, 0.0f) * 0.001f;
+
+			pan_vector = pan_vector * glm::mat3(glm::eulerAngleXY(glm::radians(-host_camera.rotation.x), glm::radians(-host_camera.rotation.y)));
+		
+			host_camera.position += pan_vector;
+
+			internal.render_dirty = true;
+		}
+		else if(allow_camera_rotation && camera_updating)
+		{
+			host_camera.rotation += camera_delta * 0.1f;
 
 			bool pitch_exceeds_limit = (fabs(host_camera.rotation.x) > 89.9f);
 
