@@ -84,11 +84,13 @@ float wrap_float(float val, float min, float max)
 
 #define EPSILON 0.00001f
 
-float3 get_sun_direction(uint exr_width, uint exr_height, uint max_luma_idx)
+float3 get_sun_direction(uint exr_width, uint exr_height, uint max_luma_idx, float exr_angle)
 {
 	float sun_u = (float)(max_luma_idx % exr_width) / (float)exr_width;
 	float sun_v = (float)(max_luma_idx / exr_width) / (float)exr_height;
-	
+
+	sun_u = wrap_float(sun_u + exr_angle / 360.0f, 0.0f, 1.0f);
+
 	float sun_yaw = radians(sun_u * 360.0f);
 	float sun_pitch = radians(sun_v * 360.0f - 180.0f) * 0.5f; 
 	
@@ -130,14 +132,14 @@ float3 get_exr_color(float3 direction, float* exr, uint exr_width, uint exr_heig
 #if (NEE_SUN == 1)
 	if(!include_sun)
 	{
-		float3 sun_direction = get_sun_direction(exr_width, exr_height, max_luma_idx);
+		float3 sun_direction = get_sun_direction(exr_width, exr_height, max_luma_idx, -exr_angle);
 
 		// - Epsilon otherwise we get weird dot artefact in the middle of sun disk?
 		bool is_pointing_at_sun = (degrees(acos(dot(direction, -sun_direction) - EPSILON))) < sun_angle;
 		
 		if(is_pointing_at_sun)
 		{
-			return (float3)(0, 0, 0);
+			return 0.0f;
 		}
 	}
 #endif
@@ -475,7 +477,7 @@ float3 trace(TraceArgs* args)
 
 		if(!hit_anything)
 		{
-			float3 exr_color = get_exr_color(current_ray.D, args->exr, args->exr_width, args->exr_height, args->exr_angle, args->max_luma_idx, false);
+			float3 exr_color = get_exr_color(current_ray.D, args->exr, args->exr_width, args->exr_height, args->exr_angle, args->max_luma_idx, is_primary_ray);
 
 			// Hacky way to get rid of fireflies
 			//exr_color = clamp(exr_color, 0.0f , 32.0f);
@@ -528,7 +530,7 @@ float3 trace(TraceArgs* args)
 #if(NEE_SUN == 1)
 			float light_ray_t = 1e30f;
 
-			float3 to_sun_dir = -get_sun_direction(args->exr_width, args->exr_height, args->max_luma_idx);;
+			float3 to_sun_dir = -get_sun_direction(args->exr_width, args->exr_height, args->max_luma_idx, args->exr_angle);
 			float3 sun_sample_dir = tangent_to_base_vector( get_sun_sample(args->rand_seed), to_sun_dir);
 
 			// Shadow ray for NEE

@@ -42,7 +42,6 @@
 			- Follow camera rotation? so we can see the model w the same lighting from all angles
 
 	// 4. For blur:
-			- Set focus distance to a point, so something can always be in focus?
 			- Replace "Blur amount" with an actual real-world value or sm
 
 */
