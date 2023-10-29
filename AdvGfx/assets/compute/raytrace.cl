@@ -399,6 +399,8 @@ float3 uniform_hemisphere_tangent(uint* rand_seed)
 
 float3 tangent_to_base_vector(float3 tangent_dir, float3 normal)
 {
+	normal = normalize(normal);
+
 	if(fabs(normal.y) == 1.0f)
 		return tangent_dir * sign(normal.y);
 

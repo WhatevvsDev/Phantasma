@@ -65,7 +65,7 @@ namespace Raytracer
 
 	ImGuizmo::OPERATION all_axis_bits = (ImGuizmo::OPERATION)(axis_bits[0] | axis_bits[1] | axis_bits[2]);;
 
-	Material default_material = {glm::vec4(1.0f, 0.5f, 0.7f, 1.0f), 1.5f, 0.1f, MaterialType::Diffuse, 0.0f};
+	Material default_material = {glm::vec4(1.0f, 0.5f, 0.7f, 0.0f), 1.5f, 0.1f, MaterialType::Diffuse, 0.0f};
 
 	std::vector<Material> materials = {default_material};
 
@@ -362,11 +362,6 @@ namespace Raytracer
 		// TODO: make this "automatic", keep track of things in asset folder
 		// make them loadable to CPU, and then also optionally GPU using a free list or sm [2]
 		AssetManager::init();
-		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\stanfordbunny.gltf");
-		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\flat_vs_smoothed.gltf");
-		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\mid_poly_sphere.gltf");
-		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\sah_test.gltf");
-		AssetManager::load_mesh(get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\plane.gltf");
 		
 		load_exr();
 	}
@@ -904,18 +899,19 @@ namespace Raytracer
 			
 			scene_data.exr_angle = wrap_number(scene_data.exr_angle, 0.0f, 360.0f);
 
-			static std::string selected_mesh_name = AssetManager::get_meshes().begin()->second.name;
-
+			static std::string selected_mesh_name = AssetManager::get_disk_files_by_extension("gltf").begin()->file_name;
+			static u32 selected_mesh_idx = 0;
+			
+			u32 idx = 0;
 			if(ImGui::BeginCombo("Mesh Instances", selected_mesh_name.c_str()))
 			{
-				uint idx = 0;
-				for(auto& [key, mesh] : AssetManager::get_meshes())
+				for(auto& mesh : AssetManager::get_disk_files_by_extension("gltf"))
 				{
-					if (ImGui::Selectable(mesh.name.c_str(), mesh.name == selected_mesh_name))
+					if (ImGui::Selectable(mesh.file_name.c_str(), mesh.file_name == selected_mesh_name))
 					{
-						selected_mesh_name = mesh.name;
+						selected_mesh_name = mesh.file_name;
+						selected_mesh_idx = idx;
 					}
-
 					idx++;
 				}
 
@@ -924,11 +920,9 @@ namespace Raytracer
 
 			if(ImGui::Button("Add Instance"))
 			{
-				auto meshes = AssetManager::get_meshes();
+				auto meshes = AssetManager::get_disk_files_by_extension("gltf");
 
-				u32 selected_mesh_index = (u32)std::distance(meshes.begin(),meshes.find(selected_mesh_name));
-
-				internal.selected_instance_idx = WorldManager::add_instance_of_mesh(selected_mesh_index);
+				internal.selected_instance_idx = WorldManager::add_instance_of_mesh(selected_mesh_idx);
 				internal.render_dirty = true;
 			}
 

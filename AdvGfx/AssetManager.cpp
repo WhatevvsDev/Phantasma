@@ -30,15 +30,15 @@ void find_disk_assets()
 	internal.disk_assets.insert({"exr", std::vector<DiskAsset>()});
 	internal.disk_assets.insert({"cl", std::vector<DiskAsset>()});
 
-	std::string compute_directory = get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\";
-	for (const auto & asset_path : std::filesystem::recursive_directory_iterator(compute_directory))
+	std::string assets_directory = get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\";
+	for (const auto & asset_path : std::filesystem::recursive_directory_iterator(assets_directory))
 	{
 		std::string file_path = asset_path.path().string();
 		std::string file_name_with_extension = file_path.substr(file_path.find_last_of("/\\") + 1);
 		std::string file_extension = file_name_with_extension.substr(file_name_with_extension.find_last_of(".") + 1);
 		std::string file_name = file_name_with_extension.substr(0, file_name_with_extension.length() - file_extension.length() - 1);
 
-		bool wrong_file_extension = (file_extension != "cl") && (file_extension != "exr");
+		bool wrong_file_extension = (file_extension != "cl") && (file_extension != "exr") && (file_extension != "gltf");
 		bool kernel_already_exists = (file_extension == "cl") && Compute::kernel_exists(file_name);
 		bool file_is_common_source = (file_name == "common");
 
@@ -60,6 +60,13 @@ void find_disk_assets()
 		{
 			//internal.exr_assets_on_disk.push_back({asset_path, file_name});
 			internal.disk_assets["exr"].push_back(disk_asset);
+			continue;
+		}
+
+		if(file_extension == "gltf")
+		{
+			AssetManager::load_mesh(file_path);
+			internal.disk_assets["gltf"].push_back(disk_asset);
 			continue;
 		}
 	}
