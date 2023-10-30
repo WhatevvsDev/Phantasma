@@ -89,7 +89,7 @@ float3 get_sun_direction(uint exr_width, uint exr_height, uint max_luma_idx, flo
 	float sun_u = (float)(max_luma_idx % exr_width) / (float)exr_width;
 	float sun_v = (float)(max_luma_idx / exr_width) / (float)exr_height;
 
-	sun_u = wrap_float(sun_u + exr_angle / 360.0f, 0.0f, 1.0f);
+	sun_u = wrap_float(sun_u - exr_angle / 360.0f, 0.0f, 1.0f);
 
 	float sun_yaw = radians(sun_u * 360.0f);
 	float sun_pitch = radians(sun_v * 360.0f - 180.0f) * 0.5f; 
@@ -523,7 +523,7 @@ float3 trace(TraceArgs* args)
 #if(NEE_SUN == 1)
 			bool light_ray_hit_anything = false;
 
-			float3 to_sun_dir = -get_sun_direction(args->exr_width, args->exr_height, args->max_luma_idx, args->exr_angle);
+			float3 to_sun_dir = get_sun_direction(args->exr_width, args->exr_height, args->max_luma_idx, args->exr_angle);
 			float3 sun_sample_dir = tangent_to_base_vector(get_sun_sample(args->rand_seed), to_sun_dir);
 
 			// Shadow ray for NEE
@@ -548,7 +548,9 @@ float3 trace(TraceArgs* args)
 
 			if(!light_ray_hit_anything)
 			{
-				current_ray.light += get_exr_color(sun_sample_dir, args->exr, args->exr_width, args->exr_height, args->exr_angle, args->max_luma_idx, true);
+				float sun_part_of_sphere = PI * (1 - cos(radians(SUN_ANGLE * 0.5f))) * 0.5f;
+
+				current_ray.light += sun_part_of_sphere * 0.5f * get_exr_color(sun_sample_dir, args->exr, args->exr_width, args->exr_height, args->exr_angle, args->max_luma_idx, true);
 			}
 #endif
 
