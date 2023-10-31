@@ -1,6 +1,6 @@
 #define COSINE_WEIGHTED_BIAS 1
 #define STRATIFIED_4x4 1
-#define NEE_SUN 1
+#define NEE_SUN 0
 
 typedef struct Tri 
 { 
