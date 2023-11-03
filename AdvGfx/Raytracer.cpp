@@ -298,8 +298,8 @@ namespace Raytracer
 		scene_data.exr_height = (u32)height;
 
 		// Finding the brightest spot on the exr, assumed to be the sun for NEE
-		f32 max_luma = -1e34;
-		for(u32 idx = 0; idx < width * height; idx++)
+		f32 max_luma = -1e34f;
+		for(u32 idx = 0; idx < (u32)width * (u32)height; idx++)
 		{
 			glm::vec4 value = *(((glm::vec4*)internal.loaded_exr_data) + idx);
 			f32 luma = (value.x * 0.2126f + value.y * 0.7152f + value.z * 0.0722f) * value.w;
