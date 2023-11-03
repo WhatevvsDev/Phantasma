@@ -800,9 +800,6 @@ namespace Raytracer
 					internal.render_dirty |= ImGui::DragFloat("Rotated T", &internal.orbit_camera_t, 0.001f);
 				
 				internal.orbit_camera_t = wrap_number(internal.orbit_camera_t, 0.0f, 1.0f); 
-
-				if(settings.orbit_automatically)
-					ImGui::EndDisabled();
 			}
 
 			static float blur_radius_proxy;
@@ -943,7 +940,7 @@ namespace Raytracer
 			if(ImGui::Button("Add Instance"))
 			{
 				internal.selected_instance_idx = WorldManager::add_instance_of_mesh(selected_mesh_idx);
-				internal.render_dirty = true;
+				internal.world_dirty = true;
 			}
 
 			if(ImGui::Button("Kill it"))

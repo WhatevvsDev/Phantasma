@@ -26,10 +26,7 @@ typedef struct Ray
     float3 O;
     float3 D; 
     float t;
-	float3 light;
 	int depth;
-	uint bvh_hits;
-	uint ray_parent;
 	RayIntersection intersection;
 } Ray;
 
@@ -416,11 +413,7 @@ int intersect_tlas(BVHArgs* args)
 float3 trace(TraceArgs* args)
 {
 	// Keeping track of current ray in the stack
-	const int ray_stack_size = 32;
-	Ray ray_stack[ray_stack_size];
-	int ray_stack_idx = 1;
-
-	ray_stack[0] = *args->primary_ray;
+	Ray current_ray = *args->primary_ray;
 
 	float3 color = (float3)(0.0f);
 
@@ -435,55 +428,26 @@ float3 trace(TraceArgs* args)
 	bvh_args.blas_hits = 0;
 	bvh_args.tlas_hits = 0;
 
+	float3 e = 0;
+	float3 t = 1;
 
-	while(ray_stack_idx > 0)
+	while(current_ray.depth > 0)
 	{
 		// Go through ray stack, return if empty
-		ray_stack_idx--;
-		if(ray_stack_idx < 0)
-			return color;
-
-		Ray current_ray = ray_stack[ray_stack_idx];
-
-		bool out_of_scope = (dot(current_ray.light, current_ray.light) < EPSILON || ( current_ray.depth <= 0 ));
+		bool out_of_scope = (dot(t, t) < EPSILON);
 
 		if(out_of_scope)
-		{
-			continue;
-		}
+			break;
 
 		float oldt = current_ray.t;
 		int hit_header_idx = -1;
 
 		bvh_args.ray = &current_ray;
 
-#if (TLAS == 1)
 		if(args->world_data->mesh_count > 0)
 		{
 			hit_header_idx = intersect_tlas(&bvh_args);
-
-			//return bvh_args.tlas_hits / 20.0f;
 		}
-#else
-		// Do raytracing bits
-		for(uint i = 0; i < (*args->world_data).mesh_count; i++)
-		{
-		 	MeshInstanceHeader* instance = &(*args->world_data).instances[i];
-		 	MeshHeader* mesh = &args->mesh_headers[instance->mesh_idx];
-
-		 	bvh_args.mesh_header = &args->mesh_headers[instance->mesh_idx];
-		 	bvh_args.inverse_transform = instance->inverse_transform;
-
-		 	intersect_bvh(&bvh_args);
-
-		 	if(current_ray.t < oldt)
-		 	{
-		 		hit_header_idx = (int)i;
-		 		oldt = current_ray.t;
-		 	}
-		}
-
-#endif
 
 		bool is_primary_ray = (current_ray.depth == DEPTH);
 
@@ -502,8 +466,8 @@ float3 trace(TraceArgs* args)
 			// Hacky way to get rid of fireflies
 			exr_color = clamp(exr_color, 0.0f , 32.0f);
 
-			color += current_ray.light * exr_color;
-			continue;
+			e += t * exr_color;
+			break;
 		}
 		else
 		{
@@ -539,47 +503,51 @@ float3 trace(TraceArgs* args)
 			if(inner_normal)
 				normal = -normal;
 
-			Ray new_ray;
-			new_ray.O = hit_pos + hemisphere_normal * EPSILON;
-			new_ray.t = 1e30f;
-			new_ray.depth = current_ray.depth - 1;
-			new_ray.ray_parent = ray_stack_idx;
+			float old_ray_distance = current_ray.t;
+			current_ray.O = hit_pos + hemisphere_normal * EPSILON;
+			current_ray.t = 1e30f;
+			current_ray.depth--;
 
 			float3 reflected_dir = reflected(current_ray.D, normal);
 			float random = RandomFloat(args->rand_seed);
 
 			float3 material_color = mat.albedo.xyz * (mat.albedo.a + 1.0f);
 
+			// <Russian roulette>
+			float die_chance = max(max((float)material_color.x, (float)material_color.y), (float)material_color.z);
+			die_chance = clamp(die_chance, 0.0f, 1.0f);
+
+			if(RandomFloat(args->rand_seed) > die_chance)
+				break;
+				
+			material_color /= die_chance;
+			// </Russian roulette>
+
 			switch(mat.type)
 			{
 				case Diffuse:
 				{
-					new_ray.D = (mat.specularity < random)
+					current_ray.D = (mat.specularity < random)
 						 ? hemisphere_normal
 						 : reflected_dir;
 					
 					float3 brdf = material_color / PI;
 
-					#if(COSINE_WEIGHTED_BIAS == 0)
-					float3 diffuse = current_ray.light * brdf * dot(normal, new_ray.D) * 2.0f;
-					#else
-					float3 diffuse = current_ray.light * brdf * 2.0f;;
-					#endif
-					float3 specular = current_ray.light * material_color;
+					float3 diffuse =  brdf * 2.0f * dot(normal, current_ray.D);
+					float3 specular = material_color;
 
-					ray_stack[ray_stack_idx++] = new_ray;
-					ray_stack[current_ray.ray_parent].light = lerp(diffuse, specular, mat.specularity) * (1.0f - mat.absorbtion_coefficient);
+					float3 final_color = lerp(diffuse, specular, mat.specularity) * (1.0f - mat.absorbtion_coefficient);
+
+					e += t * final_color;
+					t *= dot(normal, current_ray.D) * brdf * 2.0f;
+
 					continue;
 				}
 				case Metal:
 				{
 					float3 reflected_dir = reflected(current_ray.D, normal) * (1.0f + EPSILON);
 					
-					new_ray.D = normalize(reflected_dir + random_unit_vector(args->rand_seed, normal) * (1.0f - mat.specularity));
-
-					ray_stack[ray_stack_idx++] = new_ray;
-
-					ray_stack[current_ray.ray_parent].light = current_ray.light * material_color * (1.0f - mat.absorbtion_coefficient);
+					current_ray.D = normalize(reflected_dir + random_unit_vector(args->rand_seed, normal) * (1.0f - mat.specularity));
 					continue;
 				}
 				case Dielectric:
@@ -588,23 +556,21 @@ float3 trace(TraceArgs* args)
 
 					float reflectance = fresnel(current_ray.D, normal, refraction_ratio);
 					float transmittance = 1.0f - reflectance;
-					
+				
 					if(reflectance > random)
 					{
-						new_ray.D = reflected(current_ray.D, normal);
-						ray_stack[ray_stack_idx++] = new_ray;
+						current_ray.D = reflected(current_ray.D, normal);
+						e *= t * material_color;
+						t *= material_color;
 
-						ray_stack[current_ray.ray_parent].light = current_ray.light * material_color;
 					}
 					else
 					{
-						new_ray.D = refracted(current_ray.D, normal, refraction_ratio);
-						ray_stack[ray_stack_idx++] = new_ray;
+						current_ray.D = refracted(current_ray.D, normal, refraction_ratio);
+						float transmission_factor = inner_normal ? beers_law(old_ray_distance, mat.absorbtion_coefficient) : 1.0f;
 
-						float transmission_factor = inner_normal ? beers_law(current_ray.t, mat.absorbtion_coefficient) : 1.0f;
-
-						ray_stack[current_ray.ray_parent].light = current_ray.light * (material_color) * transmission_factor;
-					
+						e *= material_color * transmission_factor * t;
+						t *= material_color * transmission_factor;
 					}
 					continue;
 				}
@@ -613,7 +579,7 @@ float3 trace(TraceArgs* args)
 			
 		}
 	}
-	return color;
+	return e;
 }
 
 float3 to_float3(float* array)
@@ -674,9 +640,7 @@ void kernel raytrace(global float* accumulation_buffer, global int* mouse, globa
 	ray.O = cam_pos + disk_pos_world;
     ray.D = normalize(ray_dir);
     ray.t = 1e30f;
-	ray.light = 1.0f;
 	ray.depth = DEPTH;
-	ray.bvh_hits = 0;
 
 	struct TraceArgs trace_args;
 	trace_args.primary_ray = &ray;
@@ -712,9 +676,6 @@ void kernel raytrace(global float* accumulation_buffer, global int* mouse, globa
 			*distance = -1.0f;
 		}
 	}
-
-	//color = lerp(ray.bvh_hits / 5.0f, color, 0.5f);
-	//color = ray.bvh_hits / 50.0f;
 
 	if(sceneData->reset_accumulator)
 	{

@@ -333,8 +333,8 @@ TLASBuilder::TLASBuilder()
 
 	if(instance_count == 0)
 	{
-		nodes.resize(1);
-		tri_idx.resize(1);
+		nodes.resize(2);
+		tri_idx.resize(2);
 		return;
 	}
 

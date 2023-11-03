@@ -5,9 +5,9 @@
 struct BVHNode
 {
 	glm::vec3 min { 1e30f };
-	uint left_first;
+	uint left_first { 0 };
 	glm::vec3 max { -1e30f };
-	uint tri_count;
+	uint tri_count { 0 };
 };
 
 struct BVH
