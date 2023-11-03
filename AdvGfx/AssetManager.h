@@ -1,6 +1,7 @@
 #pragma once
 #include "Compute.h"
 #include "Mesh.h"
+#include "BVH.h"
 
 struct MeshHeader
 {
@@ -41,4 +42,6 @@ namespace AssetManager
 	std::unordered_map<std::string, Mesh>& get_meshes();
 
 	std::vector<DiskAsset>& get_disk_files_by_extension(const std::string& extension);
+
+	BVHNode get_root_bvh_node_of_mesh(u32 idx);
 }

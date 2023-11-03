@@ -1,6 +1,8 @@
 #define COSINE_WEIGHTED_BIAS 1
 #define STRATIFIED_4x4 1
-#define NEE_SUN 0
+#define TLAS 1
+
+#define DEPTH 16
 
 typedef struct Tri 
 { 
@@ -26,7 +28,6 @@ typedef struct Ray
     float t;
 	float3 light;
 	int depth;
-	float3 D_reciprocal;
 	uint bvh_hits;
 	uint ray_parent;
 	RayIntersection intersection;
@@ -70,48 +71,6 @@ typedef struct WorldManagerDeviceData
 	MeshInstanceHeader instances[256];
 } WorldManagerDeviceData;
 
-#define PI 3.14159265359f
-
-float4 sample_exr(float* exr, uint idx)
-{
-	return (float4)(exr[idx + 0], exr[idx + 1], exr[idx + 2], exr[idx + 3]);
-};
-
-float wrap_float(float val, float min, float max) 
-{
-    return val + (max - min) * sign((float)(val < min) - (float)(val > max));
-}
-
-#define EPSILON 0.00001f
-
-float3 get_sun_direction(uint exr_width, uint exr_height, uint max_luma_idx, float exr_angle)
-{
-	float sun_u = (float)(max_luma_idx % exr_width) / (float)exr_width;
-	float sun_v = (float)(max_luma_idx / exr_width) / (float)exr_height;
-
-	sun_u = wrap_float(sun_u - exr_angle / 360.0f, 0.0f, 1.0f);
-
-	float sun_yaw = radians(sun_u * 360.0f);
-	float sun_pitch = radians(sun_v * 360.0f - 180.0f) * 0.5f; 
-	
-	float3 sun_dir = (float3)(cos(sun_pitch) * cos(sun_yaw), sin(sun_pitch), cos(sun_pitch) * sin(sun_yaw));
-
-	return sun_dir;
-}
-
-#define SUN_ANGLE 3.0f
-
-float3 get_sun_sample(uint* rand_seed)
-{
-	float sun_angle = SUN_ANGLE * RandomFloat(rand_seed);
-	float a = radians(-90.0f + sun_angle);
-	float b = radians(100.0f);
-
-	float3 sample_dir = (float3)(cos(a) * cos(b), sin(a), cos(a) * sin(b));
-
-	return sample_dir;
-}
-
 float3 get_exr_color(float3 direction, float* exr, uint exr_width, uint exr_height, float exr_angle, uint max_luma_idx, bool include_sun)
 {	
 	float theta = acos(direction.y);
@@ -129,22 +88,6 @@ float3 get_exr_color(float3 direction, float* exr, uint exr_width, uint exr_heig
 	j = clamp(j, 0u, exr_height - 1u);
 
 	uint idx = (i + j * exr_width);
-	float sun_angle = SUN_ANGLE;
-
-#if (NEE_SUN == 1)
-	if(!include_sun)
-	{
-		float3 sun_direction = get_sun_direction(exr_width, exr_height, max_luma_idx, -exr_angle);
-
-		// - Epsilon otherwise we get weird dot artefact in the middle of sun disk?
-		bool is_pointing_at_sun = (degrees(acos(dot(direction, -sun_direction) - EPSILON))) < sun_angle;
-		
-		if(is_pointing_at_sun)
-		{
-			return 0.0f;
-		}
-	}
-#endif
 
 	float4 color = sample_exr(exr, idx * 4u);
 
@@ -180,11 +123,11 @@ void intersect_tri(Ray* ray, Tri* tris, uint triIdx, MeshHeader* header)
 
 float intersect_aabb(Ray* ray, BVHNode* node )
 {
-	float tx1 = (node->minx - ray->O.x) * ray->D_reciprocal.x, tx2 = (node->maxx - ray->O.x)  * ray->D_reciprocal.x;
+	float tx1 = (node->minx - ray->O.x) / ray->D.x, tx2 = (node->maxx - ray->O.x) / ray->D.x;
 	float tmin = min( tx1, tx2 ), tmax = max( tx1, tx2 );
-	float ty1 = (node->miny - ray->O.y)  * ray->D_reciprocal.y, ty2 = (node->maxy - ray->O.y)  * ray->D_reciprocal.y;
+	float ty1 = (node->miny - ray->O.y) / ray->D.y, ty2 = (node->maxy - ray->O.y) / ray->D.y;
 	tmin = max( tmin, min( ty1, ty2 ) ), tmax = min( tmax, max( ty1, ty2 ) );
-	float tz1 = (node->minz - ray->O.z)  * ray->D_reciprocal.z, tz2 = (node->maxz - ray->O.z)  * ray->D_reciprocal.z;
+	float tz1 = (node->minz - ray->O.z) / ray->D.z, tz2 = (node->maxz - ray->O.z) / ray->D.z;
 	tmin = max( tmin, min( tz1, tz2 ) ), tmax = min( tmax, max( tz1, tz2 ) );
 	if (tmax >= tmin && tmin < ray->t && tmax > 0) 
 		return tmin; 
@@ -192,35 +135,57 @@ float intersect_aabb(Ray* ray, BVHNode* node )
 		return 1e30f;
 }
 
-void intersect_bvh(Ray* ray, uint nodeIdx, BVHNode* nodes, Tri* tris, uint* trisIdx, MeshHeader* mesh_header, float* inverse_transform)
+typedef struct BVHArgs
+{
+	Ray* ray;
+
+	BVHNode* blas_nodes;
+	BVHNode* tlas_nodes;
+
+	WorldManagerDeviceData* world_data;
+	MeshHeader* mesh_headers;
+
+	Tri* tris;
+	uint* trisIdx;
+
+	MeshHeader* mesh_header;
+	float* inverse_transform;
+
+	uint* tlas_idx;
+
+	uint blas_hits;
+	uint tlas_hits;
+
+} BVHArgs;
+
+void intersect_bvh(BVHArgs* args)
 {
 	// Keeping track of current node in the stack
-	uint node_offset = mesh_header->root_bvh_node_idx;
-	BVHNode* node = &nodes[nodeIdx];
+	uint node_offset = args->mesh_header->root_bvh_node_idx;
+	BVHNode* node = &args->blas_nodes[node_offset];
 	BVHNode* traversal_stack[32];
 	uint stack_ptr = 0; 
 
-	float3 org_dir = ray->D;
-	float3 org_pos = ray->O;
-	ray->D = transform((float4)(ray->D, 0), inverse_transform).xyz;
-	ray->O = transform((float4)(ray->O, 1), inverse_transform).xyz;
-	ray->D_reciprocal = 1.0f / ray->D;
+	float3 org_dir = args->ray->D;
+	float3 org_pos = args->ray->O;
+	args->ray->D = transform((float4)(args->ray->D, 0), args->inverse_transform).xyz;
+	args->ray->O = transform((float4)(args->ray->O, 1), args->inverse_transform).xyz;
 
-	if (intersect_aabb( ray, node ) == 1e30f)
+	if (intersect_aabb( args->ray, node ) == 1e30f)
 	{
-		ray->D = org_dir;
-		ray->O = org_pos;
+		args->ray->D = org_dir;
+		args->ray->O = org_pos;
 		return;
 	}
 
 	while(1)
 	{
-		ray->bvh_hits++;
+		args->blas_hits++;
 
 		if(node->tri_count > 0)
 		{
 			for (uint i = 0; i < node->tri_count; i++ )
-				intersect_tri( ray, &tris[mesh_header->tris_offset], trisIdx[node->left_first + i + mesh_header->tri_idx_offset], mesh_header);
+				intersect_tri( args->ray, &args->tris[args->mesh_header->tris_offset], args->trisIdx[node->left_first + i + args->mesh_header->tri_idx_offset], args->mesh_header);
 
 			if(stack_ptr == 0)
 				break;
@@ -229,10 +194,10 @@ void intersect_bvh(Ray* ray, uint nodeIdx, BVHNode* nodes, Tri* tris, uint* tris
 		}
 		else
 		{
-			BVHNode* left_child = &nodes[node->left_first + node_offset];
-			BVHNode* right_child = &nodes[node->left_first + node_offset + 1];
-			float left_dist = intersect_aabb(ray, left_child);
-			float right_dist = intersect_aabb(ray, right_child);
+			BVHNode* left_child = &args->blas_nodes[node->left_first + node_offset];
+			BVHNode* right_child = &args->blas_nodes[node->left_first + node_offset + 1];
+			float left_dist = intersect_aabb(args->ray, left_child);
+			float right_dist = intersect_aabb(args->ray, right_child);
 
 			if(left_dist > right_dist)
 			{
@@ -259,11 +224,9 @@ void intersect_bvh(Ray* ray, uint nodeIdx, BVHNode* nodes, Tri* tris, uint* tris
 		}
 	}
 
-	ray->D = org_dir;
-	ray->O = org_pos;
+	args->ray->D = org_dir;
+	args->ray->O = org_pos;
 }
-
-#define DEPTH 16
 
 float3 tri_normal(Tri* tri)
 {
@@ -272,28 +235,6 @@ float3 tri_normal(Tri* tri)
 	float3 c = (*tri).vertex2;
 
 	return normalize(cross(a - b, a - c));
-}
-
-float3 random_unit_vector(uint* rand_seed, float3 normal)
-{
-	float3 result = (float3)(RandomFloat(rand_seed), RandomFloat(rand_seed), RandomFloat(rand_seed));
-
-	result *= 2;
-	result -= 1;
-
-	int failsafe = 8;
-	while(failsafe--)
-	{
-		if(dot(result,result) < 1.0f)
-		{
-			return normalize(result);
-		}
-		result = (float3)(RandomFloat(rand_seed), RandomFloat(rand_seed), RandomFloat(rand_seed));
-		result *= 2;
-		result -= 1;
-	}
-
-	return normal;
 }
 
 float beers_law(float thickness, float absorbtion_coefficient)
@@ -333,7 +274,7 @@ typedef struct Material
 typedef struct TraceArgs
 {
 	Ray* primary_ray;
-	BVHNode* nodes;
+	BVHNode* blas_nodes;
 	float4* normals;
 	Tri* tris;
 	uint* trisIdx;
@@ -350,18 +291,9 @@ typedef struct TraceArgs
 	float focal_distance;
 	float blur_radius;
 	uint max_luma_idx;
+	BVHNode* tlas_nodes;
+	uint* tlas_idx;
 } TraceArgs;
-
-float2 sample_uniform_disk(uint* rand_seed)
-{
-	float azimuth = RandomFloat(rand_seed) * PI * 2;
-	float len = sqrt(RandomFloat(rand_seed));
-
-	float x = cos(azimuth) * len;
-	float z = sin(azimuth) * len;
-
-	return (float2)(x, z);
-}
 
 float4 malleys_method(uint* rand_seed)
 {
@@ -376,15 +308,6 @@ float4 malleys_method(uint* rand_seed)
 	float y = sqrt(max(1.0f - powx - powz, 0.0f));
 
 	return (float4)(normalize((float3)(x, y, z)), y);
-}
-
-float3 uniform_hemisphere(uint* rand_seed, float3 normal)
-{
-	float3 hemisphere_normal = random_unit_vector(rand_seed, normal);
-		if(dot(hemisphere_normal, normal) < 0.0f)
-			hemisphere_normal = -hemisphere_normal;
-
-	return hemisphere_normal;
 }
 
 float3 uniform_hemisphere_tangent(uint* rand_seed)
@@ -412,6 +335,84 @@ float3 tangent_to_base_vector(float3 tangent_dir, float3 normal)
 	return normalize(new_tang);
 }
 
+int intersect_tlas(BVHArgs* args)
+{
+	// Keeping track of current node in the stack
+	BVHNode* node = &args->tlas_nodes[0];
+	BVHNode* traversal_stack[32];
+	uint stack_ptr = 0; 
+
+	int hit = -1;
+
+	if (intersect_aabb( args->ray, node ) == 1e30f)
+	{
+		return hit;
+	}
+
+	float dist = 1e30f;
+
+	while(1)
+	{
+		args->tlas_hits++;
+
+		if(node->tri_count > 0)
+		{
+			for (uint i = 0; i < node->tri_count; i++ )
+			{
+				MeshInstanceHeader* instance = &args->world_data->instances[node->left_first + i];
+
+				args->mesh_header = &args->mesh_headers[instance->mesh_idx];
+				args->inverse_transform = instance->inverse_transform;
+
+				intersect_bvh(args);
+
+				if(args->ray->t < dist)
+				{
+					hit = node->left_first + i;
+					dist = args->ray->t;
+				}
+			}
+			
+			if(stack_ptr == 0)
+				break;
+
+			node = traversal_stack[--stack_ptr];
+		}
+		else
+		{
+			BVHNode* left_child = &args->tlas_nodes[node->left_first];
+			BVHNode* right_child = &args->tlas_nodes[node->left_first + 1];
+			float left_dist = intersect_aabb(args->ray, left_child);
+			float right_dist = intersect_aabb(args->ray, right_child);
+
+			if(left_dist > right_dist)
+			{
+				// Swap around dist and node
+				float d = left_dist; left_dist = right_dist; right_dist = d;
+				
+				BVHNode* n = left_child; left_child = right_child; right_child = n;
+			}
+
+			if(left_dist == 1e30f)
+			{
+				if(stack_ptr == 0)
+					break;
+
+				node = traversal_stack[--stack_ptr];
+			}
+			else
+			{
+				node = left_child;
+
+            	if (right_dist != 1e30f) 
+					traversal_stack[stack_ptr++] = right_child;
+			}
+		}
+	}
+
+	return hit;
+}
+
 float3 trace(TraceArgs* args)
 {
 	// Keeping track of current ray in the stack
@@ -422,6 +423,18 @@ float3 trace(TraceArgs* args)
 	ray_stack[0] = *args->primary_ray;
 
 	float3 color = (float3)(0.0f);
+
+	BVHArgs bvh_args;
+	bvh_args.blas_nodes = args->blas_nodes;
+	bvh_args.tlas_nodes = args->tlas_nodes;
+	bvh_args.tris = args->tris;
+	bvh_args.trisIdx = args->trisIdx;
+	bvh_args.tlas_idx = args->tlas_idx;
+	bvh_args.mesh_headers = args->mesh_headers;
+	bvh_args.world_data = args->world_data;
+	bvh_args.blas_hits = 0;
+	bvh_args.tlas_hits = 0;
+
 
 	while(ray_stack_idx > 0)
 	{
@@ -442,26 +455,40 @@ float3 trace(TraceArgs* args)
 		float oldt = current_ray.t;
 		int hit_header_idx = -1;
 
+		bvh_args.ray = &current_ray;
+
+#if (TLAS == 1)
+		if(args->world_data->mesh_count > 0)
+		{
+			hit_header_idx = intersect_tlas(&bvh_args);
+
+			//return bvh_args.tlas_hits / 20.0f;
+		}
+#else
 		// Do raytracing bits
 		for(uint i = 0; i < (*args->world_data).mesh_count; i++)
 		{
-			MeshInstanceHeader* instance = &(*args->world_data).instances[i];
-			MeshHeader* mesh = &args->mesh_headers[instance->mesh_idx];
+		 	MeshInstanceHeader* instance = &(*args->world_data).instances[i];
+		 	MeshHeader* mesh = &args->mesh_headers[instance->mesh_idx];
 
-			intersect_bvh(&current_ray, mesh->root_bvh_node_idx, args->nodes, args->tris, args->trisIdx, &args->mesh_headers[instance->mesh_idx], instance->inverse_transform);
+		 	bvh_args.mesh_header = &args->mesh_headers[instance->mesh_idx];
+		 	bvh_args.inverse_transform = instance->inverse_transform;
 
-			if(current_ray.t < oldt)
-			{
-				hit_header_idx = (int)i;
-				oldt = current_ray.t;
-			}
+		 	intersect_bvh(&bvh_args);
+
+		 	if(current_ray.t < oldt)
+		 	{
+		 		hit_header_idx = (int)i;
+		 		oldt = current_ray.t;
+		 	}
 		}
+
+#endif
 
 		bool is_primary_ray = (current_ray.depth == DEPTH);
 
 		if(is_primary_ray)
 		{
-			args->primary_ray->bvh_hits = current_ray.bvh_hits;			
 			args->primary_ray->t = current_ray.t;
 			args->primary_ray->intersection.header_tri_count = hit_header_idx;
 		}
@@ -473,7 +500,7 @@ float3 trace(TraceArgs* args)
 			float3 exr_color = get_exr_color(current_ray.D, args->exr, args->exr_width, args->exr_height, args->exr_angle, args->max_luma_idx, is_primary_ray);
 
 			// Hacky way to get rid of fireflies
-			//exr_color = clamp(exr_color, 0.0f , 32.0f);
+			exr_color = clamp(exr_color, 0.0f , 32.0f);
 
 			color += current_ray.light * exr_color;
 			continue;
@@ -501,12 +528,13 @@ float3 trace(TraceArgs* args)
 
 			bool inner_normal = dot(geo_normal, current_ray.D) > 0.0f;
 
-			float4 new_hemisphere_normal = malleys_method(args->rand_seed);
-			float3 hemisphere_normal = tangent_to_base_vector(new_hemisphere_normal.xyz, normal);
-
 #if(COSINE_WEIGHTED_BIAS == 0)
-			hemisphere_normal = uniform_hemisphere(args->rand_seed, normal);
+			float3 hemisphere_normal = malleys_method(args->rand_seed).xyz;
+#else
+			float3 hemisphere_normal = uniform_hemisphere_tangent(args->rand_seed).xyz;
 #endif
+
+			hemisphere_normal = tangent_to_base_vector(hemisphere_normal, normal);
 
 			if(inner_normal)
 				normal = -normal;
@@ -520,40 +548,6 @@ float3 trace(TraceArgs* args)
 			float3 reflected_dir = reflected(current_ray.D, normal);
 			float random = RandomFloat(args->rand_seed);
 
-#if(NEE_SUN == 1)
-			bool light_ray_hit_anything = false;
-
-			float3 to_sun_dir = get_sun_direction(args->exr_width, args->exr_height, args->max_luma_idx, args->exr_angle);
-			float3 sun_sample_dir = tangent_to_base_vector(get_sun_sample(args->rand_seed), to_sun_dir);
-
-			// Shadow ray for NEE
-			for(uint i = 0; i < (*args->world_data).mesh_count; i++)
-			{
-				Ray light_ray;
-				light_ray.O = hit_pos + normal * EPSILON;
-				light_ray.D = sun_sample_dir;
-				light_ray.t = 1e30f;
-
-				MeshInstanceHeader* instance = &(*args->world_data).instances[i];
-				MeshHeader* mesh = &args->mesh_headers[instance->mesh_idx];
-
-				intersect_bvh(&light_ray, mesh->root_bvh_node_idx, args->nodes, args->tris, args->trisIdx, &args->mesh_headers[instance->mesh_idx], instance->inverse_transform);
-			
-				if(light_ray.t != 1e30f)
-				{
-					light_ray_hit_anything = true;
-					break;
-				}
-			}
-
-			if(!light_ray_hit_anything)
-			{
-				float sun_part_of_sphere = PI * (1 - cos(radians(SUN_ANGLE * 0.5f))) * 0.5f;
-
-				current_ray.light += sun_part_of_sphere * 0.5f * get_exr_color(sun_sample_dir, args->exr, args->exr_width, args->exr_height, args->exr_angle, args->max_luma_idx, true);
-			}
-#endif
-
 			float3 material_color = mat.albedo.xyz * (mat.albedo.a + 1.0f);
 
 			switch(mat.type)
@@ -564,12 +558,12 @@ float3 trace(TraceArgs* args)
 						 ? hemisphere_normal
 						 : reflected_dir;
 					
-					float3 brdf = material_color;
+					float3 brdf = material_color / PI;
 
 					#if(COSINE_WEIGHTED_BIAS == 0)
 					float3 diffuse = current_ray.light * brdf * dot(normal, new_ray.D) * 2.0f;
 					#else
-					float3 diffuse = current_ray.light * brdf;
+					float3 diffuse = current_ray.light * brdf * 2.0f;;
 					#endif
 					float3 specular = current_ray.light * material_color;
 
@@ -615,6 +609,8 @@ float3 trace(TraceArgs* args)
 					continue;
 				}
 			}
+
+			
 		}
 	}
 	return color;
@@ -625,7 +621,7 @@ float3 to_float3(float* array)
 	return (float3)(array[0], array[1], array[2]);
 }
 
-void kernel raytrace(global float* accumulation_buffer, global int* mouse, global float* distance, global float4* normals, global struct Tri* tris, global struct BVHNode* nodes, global uint* trisIdx, global struct MeshHeader* mesh_headers, global struct SceneData* sceneData, global float* exr, global struct WorldManagerDeviceData* world_manager_data, global struct Material* materials)
+void kernel raytrace(global float* accumulation_buffer, global int* mouse, global float* distance, global float4* normals, global struct Tri* tris, global struct BVHNode* blas_nodes, global uint* trisIdx, global struct MeshHeader* mesh_headers, global struct SceneData* sceneData, global float* exr, global struct WorldManagerDeviceData* world_manager_data, global struct Material* materials, global BVHNode* tlas_nodes)
 {     
 	int width = sceneData->resolution_x;
 	int height = sceneData->resolution_y;
@@ -680,10 +676,11 @@ void kernel raytrace(global float* accumulation_buffer, global int* mouse, globa
     ray.t = 1e30f;
 	ray.light = 1.0f;
 	ray.depth = DEPTH;
+	ray.bvh_hits = 0;
 
 	struct TraceArgs trace_args;
 	trace_args.primary_ray = &ray;
-	trace_args.nodes = nodes;
+	trace_args.blas_nodes = blas_nodes;
 	trace_args.normals = normals;
 	trace_args.tris = tris;
 	trace_args.trisIdx = trisIdx;
@@ -697,6 +694,7 @@ void kernel raytrace(global float* accumulation_buffer, global int* mouse, globa
 	trace_args.material_idx = sceneData->material_idx;
 	trace_args.materials = materials;
 	trace_args.max_luma_idx = sceneData->max_luma_idx;
+	trace_args.tlas_nodes = tlas_nodes;
 
 	float3 color = trace(&trace_args);
 
@@ -715,8 +713,9 @@ void kernel raytrace(global float* accumulation_buffer, global int* mouse, globa
 		}
 	}
 
+	//color = lerp(ray.bvh_hits / 5.0f, color, 0.5f);
 	//color = ray.bvh_hits / 50.0f;
-	
+
 	if(sceneData->reset_accumulator)
 	{
 		accumulation_buffer[pixel_dest * 4 + 0] = color.x;

@@ -30,6 +30,7 @@
 #include <CL/opencl.hpp>
 
 #define GLM_ENABLE_EXPERIMENTAL
+#define GLM_FORCE_PURE
 #include <glm/glm.hpp> // vec2, vec3, mat4, radians
 
 // Include all GLM extensions

@@ -129,6 +129,7 @@ namespace Raytracer
 		bool show_debug_ui { false };
 		bool save_render_to_file { false };
 		bool render_dirty { true };
+		bool world_dirty { true };
 		bool focus_on_clicked { false };
 
 		f32 distance_to_hovered { 0.0f };
@@ -592,7 +593,7 @@ namespace Raytracer
 		scene_data.frame_number++;
 
 		// TODO: we currently don't take into account world changes!
-		if(internal.render_dirty || !settings.accumulate_frames)
+		if(internal.render_dirty || !settings.accumulate_frames || internal.world_dirty)
 		{
 			scene_data.reset_accumulator = true;
 			internal.render_dirty = false;
@@ -612,13 +613,23 @@ namespace Raytracer
 
 		bool stop_accumulating_frames = settings.limit_accumulated_frames && (internal.accumulated_frames > (u32)settings.accumulated_frame_limit);
 
+		static std::vector<BVHNode> tlas { BVHNode() };
+
+		if(internal.world_dirty)
+		{
+			auto built_tlas = TLASBuilder();
+
+			tlas = built_tlas.nodes;
+			internal.world_dirty = false;
+		}
+
 		if(stop_accumulating_frames)
 			goto skip_rendering_goto;
 
 		internal.accumulated_frames++;
 
 		ComputeOperation("raytrace.cl")
-			.read_write(*internal.gpu_accumulation_buffer)
+			.read_write(*internal.gpu_accumulation_buffer)	
 			.read(ComputeReadBuffer({&internal.hovered_instance_idx, 1}))
 			.read(ComputeReadBuffer({&internal.distance_to_hovered, 1}))
 			.write(AssetManager::get_normals_compute_buffer())
@@ -630,6 +641,7 @@ namespace Raytracer
 			.write(*exr_buffer)
 			.write({&WorldManager::get_world_device_data(), 1})
 			.write(materials)
+			.write(tlas)
 			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
 			.execute();
 
@@ -701,7 +713,7 @@ namespace Raytracer
 
 		ImGui::SeparatorText("Transform");
 
-		auto& instance = WorldManager::get_world_device_data().instances[internal.selected_instance_idx];
+		MeshInstanceHeader& instance = WorldManager::get_world_device_data().instances[internal.selected_instance_idx];
 		bool transformed = false;
 
 		glm::vec3 translation;
@@ -720,6 +732,7 @@ namespace Raytracer
 		{
 			instance.inverse_transform = glm::inverse(instance.transform);
 			internal.render_dirty = true;
+			internal.world_dirty = true;
 		}
 
 		ImGui::Dummy({0, 20});
@@ -929,10 +942,27 @@ namespace Raytracer
 
 			if(ImGui::Button("Add Instance"))
 			{
-				auto meshes = AssetManager::get_disk_files_by_extension("gltf");
-
 				internal.selected_instance_idx = WorldManager::add_instance_of_mesh(selected_mesh_idx);
 				internal.render_dirty = true;
+			}
+
+			if(ImGui::Button("Kill it"))
+			{
+				auto& world_data = WorldManager::get_world_device_data();
+				int current_idx = 0;
+
+				for(int z = 0; z < 50; z++)
+				{
+					for(int x = 0; x < 50; x++)
+					{
+						current_idx = WorldManager::add_instance_of_mesh(selected_mesh_idx);
+
+						world_data.instances[current_idx].transform = glm::translate(glm::vec3(x * 2.0f, 0, z * 2.0f));
+						world_data.instances[current_idx].inverse_transform = glm::inverse(world_data.instances[current_idx].transform);
+
+					}
+				}
+				internal.world_dirty = true;
 			}
 
 			ImGui::Dummy({0, 20});
@@ -986,14 +1016,15 @@ namespace Raytracer
 			i32 transform_idx = internal.selected_instance_idx;
 
 			MeshInstanceHeader& instance = WorldManager::get_world_device_data().instances[transform_idx];
-			glm::mat4& transform = instance.transform;
+			glm::mat4 transform = instance.transform;
 
 			glm::mat4 projection = glm::perspectiveRH(glm::radians(90.0f), (f32)internal.render_width_px / (f32)internal.render_height_px, 0.1f, 1000.0f);
 
 			if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection), (ImGuizmo::OPERATION)(internal.current_gizmo_operation & internal.axis_gizmo_bitmask), ImGuizmo::LOCAL, glm::value_ptr(transform)))
 			{
+				instance.transform = transform;
 				instance.inverse_transform = glm::inverse(transform);
-				internal.render_dirty = true;
+				internal.world_dirty = true;
 			}
 		}
 

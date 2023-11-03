@@ -1,7 +1,42 @@
 // Constants
 #define EULER 2.71828f
+#define PI 3.14159265359f
+#define EPSILON 0.00001f
+
+// Random numbers
+
+uint WangHash( uint s ) 
+{ 
+	s = (s ^ 61) ^ (s >> 16);
+	s *= 9, s = s ^ (s >> 4);
+	s *= 0x27d4eb2d;
+	s = s ^ (s >> 15); 
+	return s; 
+}
+uint RandomInt( uint* s ) // Marsaglia's XOR32 RNG
+{ 
+	*s ^= *s << 13;
+	*s ^= *s >> 17;
+	* s ^= *s << 5; 
+	return *s; 
+}
+float RandomFloat( uint* s ) 
+{ 
+	return RandomInt( s ) * 2.3283064365387e-10f; // = 1 / (2^32-1)
+}
 
 // Math
+
+float4 sample_exr(float* exr, uint idx)
+{
+	return (float4)(exr[idx + 0], exr[idx + 1], exr[idx + 2], exr[idx + 3]);
+};
+
+float wrap_float(float val, float min, float max) 
+{
+    return val + (max - min) * sign((float)(val < min) - (float)(val > max));
+}
+
 float3 lerp(float3 a, float3 b, float t)
 {
     return a + t*(b-a);
@@ -105,26 +140,37 @@ float fresnel(float3 ray_dir, float3 normal, float ior)
 	return reflection;
 }
 
-// Random numbers
+float2 sample_uniform_disk(uint* rand_seed)
+{
+	float azimuth = RandomFloat(rand_seed) * PI * 2;
+	float len = sqrt(RandomFloat(rand_seed));
 
-uint WangHash( uint s ) 
-{ 
-	s = (s ^ 61) ^ (s >> 16);
-	s *= 9, s = s ^ (s >> 4);
-	s *= 0x27d4eb2d;
-	s = s ^ (s >> 15); 
-	return s; 
+	float x = cos(azimuth) * len;
+	float z = sin(azimuth) * len;
+
+	return (float2)(x, z);
 }
-uint RandomInt( uint* s ) // Marsaglia's XOR32 RNG
-{ 
-	*s ^= *s << 13;
-	*s ^= *s >> 17;
-	* s ^= *s << 5; 
-	return *s; 
-}
-float RandomFloat( uint* s ) 
-{ 
-	return RandomInt( s ) * 2.3283064365387e-10f; // = 1 / (2^32-1)
+
+float3 random_unit_vector(uint* rand_seed, float3 normal)
+{
+	float3 result = (float3)(RandomFloat(rand_seed), RandomFloat(rand_seed), RandomFloat(rand_seed));
+
+	result *= 2;
+	result -= 1;
+
+	int failsafe = 8;
+	while(failsafe--)
+	{
+		if(dot(result,result) < 1.0f)
+		{
+			return normalize(result);
+		}
+		result = (float3)(RandomFloat(rand_seed), RandomFloat(rand_seed), RandomFloat(rand_seed));
+		result *= 2;
+		result -= 1;
+	}
+
+	return normal;
 }
 
 // Structs

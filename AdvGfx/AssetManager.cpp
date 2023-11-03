@@ -182,3 +182,10 @@ std::unordered_map<std::string, Mesh>& AssetManager::get_meshes()
 {
 	return internal.meshes;
 }
+
+BVHNode AssetManager::get_root_bvh_node_of_mesh(u32 idx)
+{
+	auto mesh_header = internal.headers[idx];
+
+	return internal.consolidated_nodes[mesh_header.root_bvh_node_idx];
+}

@@ -13,7 +13,7 @@ struct MeshInstanceHeader
 struct WorldManagerDeviceData
 {
 	u32 instance_count;
-	MeshInstanceHeader instances[256];
+	MeshInstanceHeader instances[4096];
 };
 
 namespace WorldManager
