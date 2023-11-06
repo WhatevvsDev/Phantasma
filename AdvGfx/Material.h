@@ -4,7 +4,8 @@ enum class MaterialType : u32
 {
 	Diffuse,
 	Metal,
-	Dielectric
+	Dielectric,
+	CookTorranceBRDF
 };
 
 struct Material
@@ -14,4 +15,6 @@ struct Material
 	float absorbtion_coefficient { 0.0f };
 	MaterialType type { MaterialType::Diffuse };
 	float specularity { 0.0f };
+	float metallic { 0.0f };
+	float roughness { 0.0f };
 };

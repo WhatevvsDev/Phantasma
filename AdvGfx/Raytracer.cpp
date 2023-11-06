@@ -664,6 +664,7 @@ namespace Raytracer
 		"Diffuse",
 		"Metal",
 		"Dielectric"
+		"Cook-Torrance"
 	};
 
 	void ui_material_editor(Material& material)
@@ -671,6 +672,7 @@ namespace Raytracer
 		bool is_diffuse = material.type == MaterialType::Diffuse;
 		bool is_metal = material.type == MaterialType::Metal;
 		bool is_dielectric = material.type == MaterialType::Dielectric;
+		bool is_cook_torrance = material.type == MaterialType::CookTorranceBRDF;
 
 		
 		internal.render_dirty |= ImGui::ColorPicker3("Albedo", glm::value_ptr(material.albedo), ImGuiColorEditFlags_NoInputs);
@@ -680,9 +682,15 @@ namespace Raytracer
 		if(is_dielectric)
 		internal.render_dirty |= ImGui::DragFloat("IOR", &material.ior, 0.01f, 1.0f, 2.0f);
 					
-		if(is_diffuse || is_metal)
+		if(is_diffuse || is_metal || is_cook_torrance)
 		internal.render_dirty |= ImGui::DragFloat("Specularity", &material.specularity, 0.01f, 0.0f, 1.0f);
 		
+		if(is_cook_torrance)
+		internal.render_dirty |= ImGui::DragFloat("Roughness", &material.roughness, 0.01f, 0.0f, 1.0f);
+
+		if(is_cook_torrance)
+		internal.render_dirty |= ImGui::DragFloat("Metallic", &material.metallic, 0.01f, 0.0f, 1.0f);
+
 		MaterialType old_type = material.type;
 		std::string material_name = material_types_as_strings[(u32)material.type];
 
@@ -696,6 +704,9 @@ namespace Raytracer
 
 			if(ImGui::Selectable("Dielectric", is_dielectric))
 				material.type = MaterialType::Dielectric;
+
+			if(ImGui::Selectable("Cook-Torrance", is_dielectric))
+				material.type = MaterialType::CookTorranceBRDF;
 
 			ImGui::EndCombo();
 		}

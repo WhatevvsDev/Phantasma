@@ -256,7 +256,8 @@ typedef enum MaterialType
 {
 	Diffuse 	= 0,
 	Metal		= 1,
-	Dielectric	= 2
+	Dielectric	= 2,
+	CookTorranceBRDF = 3
 } MaterialType;
 
 typedef struct Material
@@ -266,6 +267,8 @@ typedef struct Material
 	float absorbtion_coefficient;
 	MaterialType type;
 	float specularity;
+	float metallic;
+	float roughness;
 } Material;
 
 typedef struct TraceArgs
@@ -533,13 +536,13 @@ float3 trace(TraceArgs* args)
 					
 					float3 brdf = material_color / PI;
 
-					float3 diffuse =  brdf * 2.0f * dot(normal, current_ray.D);
-					float3 specular = material_color;
+					float3 diffuse = brdf * 2.0f * dot(normal, current_ray.D);
+					float3 specular = material_color * (1.0f - mat.specularity);
 
 					float3 final_color = lerp(diffuse, specular, mat.specularity) * (1.0f - mat.absorbtion_coefficient);
 
 					e += t * final_color;
-					t *= dot(normal, current_ray.D) * brdf * 2.0f;
+					t *= lerp(diffuse, 1.0f, mat.specularity);
 
 					continue;
 				}
