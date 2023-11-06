@@ -17,4 +17,5 @@ struct Material
 	float specularity { 0.0f };
 	float metallic { 0.0f };
 	float roughness { 0.0f };
+	float pad[2];
 };
