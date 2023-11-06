@@ -577,9 +577,11 @@ float3 trace(TraceArgs* args)
 					}
 					continue;
 				}
+				case CookTorranceBRDF:
+				{
+					return (float3)(0.0f, 1.0f, 0.0f);
+				}
 			}
-
-			
 		}
 	}
 	return e;

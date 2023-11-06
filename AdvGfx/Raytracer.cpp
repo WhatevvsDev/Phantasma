@@ -659,12 +659,12 @@ namespace Raytracer
 		raytrace_save_render_to_file();
 	}
 
-	std::string material_types_as_strings[3] =
+	std::string material_types_as_strings[] =
 	{
 		"Diffuse",
 		"Metal",
-		"Dielectric"
-		"Cook-Torrance"
+		"Dielectric",
+		"Cook-Torrance",
 	};
 
 	void ui_material_editor(Material& material)
