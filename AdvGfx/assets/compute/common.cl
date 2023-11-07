@@ -140,6 +140,79 @@ float fresnel(float3 ray_dir, float3 normal, float ior)
 	return reflection;
 }
 
+float fresnel_schlick(float f0, float3 view, float3 halfway)
+{
+	return f0 + ((1.0f - f0) * pow(1.0f - dot(view, halfway), 5.0f));
+}
+
+// Blinn
+// Beckmann
+// GGX <- We use this one
+float normal_distribution_ggx(float3 view, float3 halfway, float roughness)
+{
+	float a = roughness * roughness;
+
+	float n_dot_h = dot(view, halfway);
+
+	float d = ((n_dot_h * a - n_dot_h) * n_dot_h + -1.0f);
+
+	return clamp(a / (PI * d * d), 0.0f, 1.0f);
+}
+
+// Beckmann
+// GGX
+// Schlick-GGX
+float geometry_one_term(float3 direction, float3 normal, float roughness)
+{
+	float k = (roughness * roughness) * 0.5f;
+
+	float n_dot_v = fabs(dot(normal, direction));
+
+	return n_dot_v / ((n_dot_v * (1.0f - k)) + k);
+}
+
+float geometry_term(float3 view, float3 normal, float3 light, float roughness)
+{
+	return geometry_one_term(light, normal, roughness) * geometry_one_term(view, normal, roughness);
+}
+
+//      pdf = D * NdotH / (4 * HdotV)
+/*
+float3 get_ggx_microfacet(uint* rand_seed, float roughness)
+{
+	// Get our uniform random numbers
+	float2 randVal = (float2)(RandomFloat(rand_seed), RandomFloat(rand_seed));
+
+	// GGX NDF sampling
+	float a2 = roughness * roughness;
+	float cosThetaH = sqrt(max(0.0f, (1.0f-randVal.x)/((a2-1.0f)*randVal.x+1)));
+	float sinThetaH = sqrt(max(0.0f, 1.0f - cosThetaH * cosThetaH));
+	float phiH = randVal.y * M_PI * 2.0f;
+
+	// Get our GGX NDF sample (i.e., the half vector)
+	return (float3)((sinThetaH * cos(phiH)), (sinThetaH * sin(phiH)), cosThetaH);
+}*/
+
+float3 get_ggx_microfacet(uint* randSeed, float roughness, float3 hitNorm)
+{
+	float2 randVal = (float2)(RandomFloat(randSeed), RandomFloat(randSeed));
+
+	// Get an orthonormal basis from the normal
+	float3 B = cross(hitNorm, (fabs(hitNorm.y) == 1.0f) ? (float3)(0.0f, 0.0f, 1.0f) : (float3)(0.0f, sign(hitNorm.y), 0.0f));
+	float3 T = cross(B, hitNorm);
+
+	// GGX NDF sampling
+	float a2 = roughness * roughness;
+	float cosThetaH = sqrt(max(0.0f, (1.0f -randVal.x)/((a2-1.0f )*randVal.x+1) ));
+	float sinThetaH = sqrt(max(0.0f, 1.0f - cosThetaH * cosThetaH));
+	float phiH = randVal.y * M_PI * 2.0f;
+
+	// Get our GGX NDF sample (i.e., the half vector)
+	return T * (sinThetaH * cos(phiH)) +
+           B * (sinThetaH * sin(phiH)) +
+           hitNorm * cosThetaH;
+}
+
 float2 sample_uniform_disk(uint* rand_seed)
 {
 	float azimuth = RandomFloat(rand_seed) * PI * 2;
@@ -171,6 +244,11 @@ float3 random_unit_vector(uint* rand_seed, float3 normal)
 	}
 
 	return normal;
+}
+
+float saturate(float value)
+{
+	return clamp(value, 0.0f, 1.0f);
 }
 
 // Structs

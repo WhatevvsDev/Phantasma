@@ -65,7 +65,7 @@ namespace Raytracer
 
 	ImGuizmo::OPERATION all_axis_bits = (ImGuizmo::OPERATION)(axis_bits[0] | axis_bits[1] | axis_bits[2]);;
 
-	Material default_material = {glm::vec4(1.0f, 0.5f, 0.7f, 0.0f), 1.5f, 0.1f, MaterialType::Diffuse, 0.0f};
+	Material default_material = {glm::vec4(1.0f, 0.5f, 0.7f, 0.0f), 1.5f, 0.1f, MaterialType::Diffuse, 0.0f, 0.0f, 0.0f};
 
 	std::vector<Material> materials = {default_material};
 
@@ -664,7 +664,7 @@ namespace Raytracer
 		"Diffuse",
 		"Metal",
 		"Dielectric",
-		"Cook-Torrance",
+		"Cook-Torrance - NOT IMPLEMENTED"
 	};
 
 	void ui_material_editor(Material& material)
@@ -705,7 +705,7 @@ namespace Raytracer
 			if(ImGui::Selectable("Dielectric", is_dielectric))
 				material.type = MaterialType::Dielectric;
 
-			if(ImGui::Selectable("Cook-Torrance", is_dielectric))
+			if(ImGui::Selectable("Cook-Torrance - NOT IMPLEMENTED", is_dielectric))
 				material.type = MaterialType::CookTorranceBRDF;
 
 			ImGui::EndCombo();

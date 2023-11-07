@@ -542,7 +542,7 @@ float3 trace(TraceArgs* args)
 					float3 final_color = lerp(diffuse, specular, mat.specularity) * (1.0f - mat.absorbtion_coefficient);
 
 					e += t * final_color;
-					t *= lerp(diffuse, 1.0f, mat.specularity);
+					t *= lerp(final_color, 1.0f, mat.specularity);
 
 					continue;
 				}
@@ -565,7 +565,6 @@ float3 trace(TraceArgs* args)
 						current_ray.D = reflected(current_ray.D, normal);
 						e *= t * material_color;
 						t *= material_color;
-
 					}
 					else
 					{
@@ -579,7 +578,96 @@ float3 trace(TraceArgs* args)
 				}
 				case CookTorranceBRDF:
 				{
-					return (float3)(0.0f, 1.0f, 0.0f);
+
+					bool ray_is_diffuse = RandomFloat(args->rand_seed) > mat.specularity;
+
+					if(ray_is_diffuse)
+					{
+						current_ray.D = hemisphere_normal;
+
+						float3 brdf = material_color / PI;
+						float3 diffuse = brdf * 2.0f * dot(normal, current_ray.D) * (1.0f - mat.specularity);
+
+						e += t * diffuse;
+						t *= diffuse;
+						continue;
+					}
+					else // ray_is_specular
+					{
+						/*
+						float3 microfacet = get_ggx_microfacet(args->rand_seed, mat.roughness);
+						microfacet = tangent_to_base_vector(microfacet, normal);
+						float3 halfway = normalize(normalize(current_ray.D) + normalize(hemisphere_normal));
+
+						float d = 1.0f - clamp(normal_distribution_ggx(normal, halfway, mat.roughness), 0.0f ,1.0f);
+						float g = clamp(geometry_term(current_ray.D, normal, microfacet, mat.roughness), 0.0f, 1.0f);
+						float f = fresnel_schlick(mat.specularity, microfacet, halfway);
+						float ggx = d * g * f / (4 * saturate(dot(normal, microfacet)) * saturate(dot(normal, current_ray.D)));
+
+						float pdf = d * dot(normal, halfway) / (4.0f * dot(microfacet, halfway));
+
+						//pdf = saturate(pdf);
+
+						current_ray.D = reflected(current_ray.D, normal);
+
+						float3 specular = dot(normal, microfacet) * mat.albedo.xyz * ggx / pdf * mat.specularity;
+
+						specular.x = saturate(specular.x);
+						specular.y = saturate(specular.y);
+						specular.z = saturate(specular.z);
+
+						e += t * specular;
+						t *= specular;
+
+						continue;
+						*/
+
+						float rough = mat.roughness;
+
+						float3 V = current_ray.D;
+						float3 N = normal;
+
+						// Randomly sample the NDF to get a microfacet in our BRDF 
+						float3 H = get_ggx_microfacet(args->rand_seed, rough, N);
+						//H = tangent_to_base_vector(H, normal);
+
+						// Compute outgoing direction based on this (perfectly reflective) facet
+						float3 L = reflected(current_ray.D, normal);
+
+						// Compute our color by tracing a ray in this direction
+						float3 bounceColor = mat.albedo.xyz;//shootIndirectRay(hit, L, gMinT, 0, rndSeed, rayDepth);
+
+						// Compute some dot products needed for shading
+						float  NdotL = saturate(dot(N, L));
+						float  NdotH = saturate(dot(N, H));
+						float  LdotH = saturate(fabs(dot(L, H)));
+						float  NdotV = saturate(fabs(dot(N, V)));
+
+						// Evaluate our BRDF using a microfacet BRDF model
+						float  D = 1.0f - (normal_distribution_ggx(N, H, rough));          
+						float  G = fabs(geometry_term(V, N, L, rough)); 
+						float3 F = 1.0f;//fresnel_schlick(mat.specularity, V, H);                 
+						float3 ggxTerm = D * G * F / (4 * NdotL * NdotV); 
+
+						// What's the probability of sampling vector H from getGGXMicrofacet()?
+						float  ggxProb = D * NdotH / (4 * LdotH);
+
+						// Accumulate color:  ggx-BRDF * lightIn * NdotL / probability-of-sampling
+						//    -> Note: Should really cancel and simplify the math above
+						float3 cccolor = NdotL * bounceColor * ggxTerm / (ggxProb);
+					
+						cccolor.x = saturate(cccolor.x);
+						cccolor.y = saturate(cccolor.y);
+						cccolor.z = saturate(cccolor.z);
+
+						cccolor = cccolor * mat.specularity * 0.5f;
+
+						current_ray.D = H;
+
+						e += t * cccolor;
+						t *= cccolor;
+						continue;
+					}
 				}
 			}
 		}
