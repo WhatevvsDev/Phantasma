@@ -263,7 +263,7 @@ typedef struct SceneData
 	uint resolution_y;
 	uint mouse_x;
 	uint mouse_y;
-	int frame_number;
+	int accumulated_frames;
 	uint exr_width;
 	uint exr_height;
 	bool reset_accumulator;
@@ -273,6 +273,22 @@ typedef struct SceneData
 	float focal_distance;
 	float blur_radius;
 	uint max_luma_idx;
+	uint selected_object_idx;
+	uint pad[3];
 } SceneData;
+
+#endif
+
+#ifndef PIXELDETAILINFORMATION
+
+#define PIXELDETAILINFORMATION
+
+typedef struct PixelDetailInformation
+{
+	uint hit_object;
+	uint blas_hits;
+	uint tlas_hits;
+	uint pad;
+} PixelDetailInformation;
 
 #endif

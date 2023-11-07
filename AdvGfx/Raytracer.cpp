@@ -50,6 +50,14 @@
 
 namespace Raytracer
 {	
+	struct PixelDetailInformation
+	{
+		u32 hit_object;
+		u32 blas_hits;
+		u32 tlas_hits;
+		u32 pad;
+	};
+
 	enum class LockAxis
 	{
 		X,
@@ -107,7 +115,7 @@ namespace Raytracer
 	{
 		u32 resolution[2] { 0, 0 };
 		u32 mouse_pos[2] { 0, 0 };
-		u32 frame_number { 0 };
+		u32 accumulated_frames { 0 };
 		u32 exr_width { 0 };
 		u32 exr_height { 0 };
 		u32 reset_accumulator { false };
@@ -117,6 +125,8 @@ namespace Raytracer
 		f32 focal_distance { 1.0f };
 		f32 blur_radius { 0.0f };
 		u32 max_luma_idx { 0 };
+		u32 selected_object_idx { UINT_MAX };
+		u32 pad[3];
 	} scene_data;
 
 	struct
@@ -143,6 +153,7 @@ namespace Raytracer
 		ImGuizmo::OPERATION axis_gizmo_bitmask { all_axis_bits };
 
 		ComputeGPUOnlyBuffer* gpu_accumulation_buffer { nullptr };
+		ComputeGPUOnlyBuffer* gpu_detail_buffer { nullptr };
 
 		//std::vector<DiskAsset> exr_assets_on_disk;
 		f32* loaded_exr_data { nullptr };
@@ -324,6 +335,7 @@ namespace Raytracer
 		u32 render_area_px = internal.render_width_px * internal.render_height_px;
 
 		internal.gpu_accumulation_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * internal.render_channel_count * sizeof(float)));
+		internal.gpu_detail_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * sizeof(PixelDetailInformation)));
 
 		internal.performance.timer.start();
 
@@ -563,16 +575,17 @@ namespace Raytracer
 	}
 
 	// Averages out acquired samples, and renders them to the screen
-	void raytrace_average_samples(const ComputeReadWriteBuffer& screen_buffer, const ComputeGPUOnlyBuffer& accumulated_samples)
+	void raytrace_average_samples(const ComputeReadWriteBuffer& screen_buffer)
 	{
 		f32 samples_reciprocal = 1.0f / (f32)internal.accumulated_frames;
 
 		// TODO: pass this a buffer of heatmap colors, instead of hardcoding it into the shader
 		ComputeOperation("average_accumulated.cl")
-			.read_write(accumulated_samples)
+			.read_write((*internal.gpu_accumulation_buffer))
 			.read_write(screen_buffer)
 			.write({&samples_reciprocal, 1})
 			.write({&scene_data, 1})
+			.read_write(*internal.gpu_detail_buffer)
 			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
 			.execute();
 	}
@@ -590,7 +603,6 @@ namespace Raytracer
 	void raytrace()
 	{
 		internal.performance.timer.reset();
-		scene_data.frame_number++;
 
 		// TODO: we currently don't take into account world changes!
 		if(internal.render_dirty || !settings.accumulate_frames || internal.world_dirty)
@@ -599,6 +611,9 @@ namespace Raytracer
 			internal.render_dirty = false;
 			internal.accumulated_frames = 0;
 		}
+
+		scene_data.accumulated_frames = internal.accumulated_frames;
+		scene_data.selected_object_idx = internal.selected_instance_idx;
 
 		u32 render_area = internal.render_width_px * internal.render_height_px;
 		ComputeReadWriteBuffer screen_buffer({internal.buffer, (usize)(render_area)});
@@ -642,10 +657,11 @@ namespace Raytracer
 			.write({&WorldManager::get_world_device_data(), 1})
 			.write(materials)
 			.write(tlas)
+			.read_write(*internal.gpu_detail_buffer)
 			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
 			.execute();
 
-		raytrace_average_samples(screen_buffer, (*internal.gpu_accumulation_buffer));
+		raytrace_average_samples(screen_buffer);
 
 		scene_data.reset_accumulator = false;
 

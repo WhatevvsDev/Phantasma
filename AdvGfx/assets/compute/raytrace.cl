@@ -17,7 +17,6 @@ typedef struct RayIntersection
 	float u;
 	float v;
 	int tri_hit;
-	int header_tri_count;
 	float3 geo_normal;
 } RayIntersection;
 
@@ -113,7 +112,6 @@ void intersect_tri(Ray* ray, Tri* tris, uint triIdx, MeshHeader* header)
 		ray->intersection.tri_hit = triIdx;
 		ray->intersection.u = u;
 		ray->intersection.v = v;
-		ray->intersection.header_tri_count = header[0].tris_count;
 		ray->intersection.geo_normal = cross(edge1, edge2);
 	}
 }
@@ -293,6 +291,7 @@ typedef struct TraceArgs
 	uint max_luma_idx;
 	BVHNode* tlas_nodes;
 	uint* tlas_idx;
+	PixelDetailInformation* detail_buffer;
 } TraceArgs;
 
 float4 malleys_method(uint* rand_seed)
@@ -443,7 +442,7 @@ float3 trace(TraceArgs* args)
 			break;
 
 		float oldt = current_ray.t;
-		int hit_header_idx = -1;
+		int hit_header_idx = UINT_MAX;
 
 		bvh_args.ray = &current_ray;
 
@@ -457,7 +456,9 @@ float3 trace(TraceArgs* args)
 		if(is_primary_ray)
 		{
 			args->primary_ray->t = current_ray.t;
-			args->primary_ray->intersection.header_tri_count = hit_header_idx;
+			args->detail_buffer->tlas_hits = bvh_args.tlas_hits;
+			args->detail_buffer->blas_hits = bvh_args.blas_hits;
+			args->detail_buffer->hit_object = hit_header_idx;
 		}
 		
 		bool hit_anything = current_ray.t < 1e30;
@@ -680,51 +681,63 @@ float3 to_float3(float* array)
 	return (float3)(array[0], array[1], array[2]);
 }
 
-void kernel raytrace(global float* accumulation_buffer, global int* mouse, global float* distance, global float4* normals, global struct Tri* tris, global struct BVHNode* blas_nodes, global uint* trisIdx, global struct MeshHeader* mesh_headers, global struct SceneData* sceneData, global float* exr, global struct WorldManagerDeviceData* world_manager_data, global struct Material* materials, global BVHNode* tlas_nodes)
+void kernel raytrace(
+	global float* accumulation_buffer, 
+	global int* mouse, 
+	global float* distance, 
+	global float4* normals, 
+	global struct Tri* tris, 
+	global struct BVHNode* blas_nodes, 
+	global uint* trisIdx, 
+	global struct MeshHeader* mesh_headers, 
+	global struct SceneData* scene_data, 
+	global float* exr, 
+	global struct WorldManagerDeviceData* world_manager_data, 
+	global struct Material* materials, 
+	global BVHNode* tlas_nodes,
+	global PixelDetailInformation* detail_buffer
+	)
 {     
-	int width = sceneData->resolution_x;
-	int height = sceneData->resolution_y;
+	int width = scene_data->resolution_x;
+	int height = scene_data->resolution_y;
+	float aspect_ratio = (float)(scene_data->resolution_x) / (float)(scene_data->resolution_y);
 
 	int x = get_global_id(0);
 	int y = get_global_id(1);
 
 	uint pixel_dest = (x + y * width);
 
-	uint rand_seed = WangHash(pixel_dest + sceneData->frame_number * width * height);
+	uint rand_seed = WangHash(pixel_dest + scene_data->accumulated_frames * width * height);
 
-	uint strata_idx = sceneData->frame_number % (16);
+	uint strata_idx = scene_data->accumulated_frames % (16);
 	uint strata_x_idx = strata_idx % 4;
 	uint strata_y_idx = strata_idx / 4;
 
 	float strata_u = (RandomFloat(&rand_seed) * 0.25f) + (0.25f * (float)strata_x_idx);
 	float strata_v = (RandomFloat(&rand_seed) * 0.25f) + (0.25f * (float)strata_y_idx);
 
-	float x_t;
-	float y_t;
-
 #if(STRATIFIED_4x4 == 0)
-	x_t = ((((float)x + RandomFloat(&rand_seed)) / (float)width) - 0.5f) * 2.0f;
-	y_t = ((((float)y + RandomFloat(&rand_seed)) / (float)height)- 0.5f) * 2.0f;
+	float x_t = ((((float)x + RandomFloat(&rand_seed)) / (float)width) - 0.5f) * 2.0f;
+	float y_t = ((((float)y + RandomFloat(&rand_seed)) / (float)height)- 0.5f) * 2.0f;
 #else
-	x_t = ((((float)x + strata_u) / (float)width) - 0.5f) * 2.0f;
-	y_t = ((((float)y + strata_v) / (float)height) - 0.5f) * 2.0f;
+	float x_t = ((((float)x + strata_u) / (float)width) - 0.5f) * 2.0f;
+	float y_t = ((((float)y + strata_v) / (float)height) - 0.5f) * 2.0f;
 #endif
 
-	float aspect_ratio = (float)(sceneData->resolution_x) / (float)(sceneData->resolution_y);
 
 	float3 pixel_dir_tangent = 
 	(float3)(0.0f, 0.0f, -1.0f) + 
 	(float3)(1.0f, 0.0f, 0.0f) * x_t * aspect_ratio -
 	(float3)(0.0f, 1.0f, 0.0f) * y_t;
 
-	float3 disk_pos_tangent = (float3)(sample_uniform_disk(&rand_seed) * sceneData->blur_radius, 0.0f);
+	float3 disk_pos_tangent = (float3)(sample_uniform_disk(&rand_seed) * scene_data->blur_radius, 0.0f);
 
-	pixel_dir_tangent -= disk_pos_tangent / sceneData->focal_distance;
-	float3 pixel_dir_world = transform((float4)(pixel_dir_tangent, 0.0f), sceneData->camera_transform).xyz;;
-	float3 disk_pos_world = transform((float4)(disk_pos_tangent, 0.0f), sceneData->camera_transform).xyz;
+	pixel_dir_tangent -= disk_pos_tangent / scene_data->focal_distance;
+	float3 pixel_dir_world = transform((float4)(pixel_dir_tangent, 0.0f), scene_data->camera_transform).xyz;;
+	float3 disk_pos_world = transform((float4)(disk_pos_tangent, 0.0f), scene_data->camera_transform).xyz;
 	
 	// TODO: this is kinda dumb innit?
-	float3 cam_pos = transform((float4)(0.0f, 0.0f, 0.0f, 1.0f), sceneData->camera_transform).xyz;
+	float3 cam_pos = transform((float4)(0.0f, 0.0f, 0.0f, 1.0f), scene_data->camera_transform).xyz;
 
 	float3 ray_dir = (pixel_dir_world);
 
@@ -744,23 +757,24 @@ void kernel raytrace(global float* accumulation_buffer, global int* mouse, globa
 	trace_args.rand_seed = &rand_seed;
 	trace_args.mesh_headers = mesh_headers;
 	trace_args.exr = exr;
-	trace_args.exr_width = sceneData->exr_width;
-	trace_args.exr_height = sceneData->exr_height;
-	trace_args.exr_angle = sceneData->exr_angle;
+	trace_args.exr_width = scene_data->exr_width;
+	trace_args.exr_height = scene_data->exr_height;
+	trace_args.exr_angle = scene_data->exr_angle;
 	trace_args.world_data = world_manager_data;
-	trace_args.material_idx = sceneData->material_idx;
+	trace_args.material_idx = scene_data->material_idx;
 	trace_args.materials = materials;
-	trace_args.max_luma_idx = sceneData->max_luma_idx;
+	trace_args.max_luma_idx = scene_data->max_luma_idx;
 	trace_args.tlas_nodes = tlas_nodes;
+	trace_args.detail_buffer = &detail_buffer[pixel_dest];
 
 	float3 color = trace(&trace_args);
 
-	bool is_mouse_ray = (x == sceneData->mouse_x) && (y == sceneData->mouse_y);
+	bool is_mouse_ray = (x == scene_data->mouse_x) && (y == scene_data->mouse_y);
 	bool ray_hit_anything = ray.t < 1e30f;
 
 	if(is_mouse_ray)
 	{
-		*mouse = trace_args.primary_ray->intersection.header_tri_count;
+		*mouse = trace_args.detail_buffer->hit_object;
 		*distance = trace_args.primary_ray->t;
 
 		if(!ray_hit_anything)
@@ -770,7 +784,7 @@ void kernel raytrace(global float* accumulation_buffer, global int* mouse, globa
 		}
 	}
 
-	if(sceneData->reset_accumulator)
+	if(scene_data->reset_accumulator)
 	{
 		accumulation_buffer[pixel_dest * 4 + 0] = color.x;
 		accumulation_buffer[pixel_dest * 4 + 1] = color.y;
