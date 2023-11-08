@@ -112,6 +112,8 @@ void load_common_shader_source()
 
     bool common_source_updated = CompareFileTime(&current_write_time, &compute.common_source_last_write_time) != 0;
 
+    compute.common_source_last_write_time = current_write_time;
+
     if(!common_source_updated)
         return;
 

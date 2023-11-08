@@ -36,6 +36,29 @@ void Log::print(Log::MessageType type, const char* file, int line_number, const 
 	// Print and reset color
 	printf("[%s: %i | %s] - %s\n", fileName.c_str(), line_number, func, message.c_str());
 	SetConsoleTextAttribute(handle, 15);
+
+	ImGuiToastType toast_type = ImGuiToastType::None;
+
+	switch(type)
+	{
+		case Log::MessageType::Debug:
+		{
+			toast_type = ImGuiToastType::Info;
+			break;
+		}
+		case Log::MessageType::Default:
+		{
+			toast_type = ImGuiToastType::Success;
+			break;
+		}
+		case Log::MessageType::Error:
+		{
+			toast_type = ImGuiToastType::Error;
+			break;
+		}
+	}
+
+	ImGuiNotify::InsertNotification({toast_type, 3000, message.c_str()});
 }
 
 

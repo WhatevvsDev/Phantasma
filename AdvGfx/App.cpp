@@ -93,8 +93,6 @@ namespace App
 		raytracer_desc.height_px = desc.height;
 		raytracer_desc.screen_buffer_ptr = render_buffer;
 		
-		ImGuiNotify::InsertNotification({ImGuiToastType::Success, 3000, "That is a success! %s", "(Format here)"});
-
 		Raytracer::init(raytracer_desc);
 
 		while (!glfwWindowShouldClose(window))
