@@ -44,8 +44,6 @@
 	// 4. For blur:
 			- Replace "Blur amount" with an actual real-world value or sm
 
-	// 5. TLAS
-
 */
 
 namespace Raytracer
@@ -93,7 +91,6 @@ namespace Raytracer
 		bool accumulate_frames							{ true };
 		bool limit_accumulated_frames					{ false };
 		bool fps_limit_enabled							{ false };
-		bool recompile_changed_shaders_automatically	{ true };
 		 
 		// TODO: Replace this with an actual camera [1]
 		CameraMovementType camera_movement_type { CameraMovementType::Freecam };
@@ -160,15 +157,6 @@ namespace Raytracer
 		std::string current_exr { "None" };
 
 		f32 orbit_camera_t { 0.0f };
-
-		struct
-		{
-			Timer timer;
-			static const u32 data_samples { 256 };
-			f32 update_times_ms[data_samples] {};
-			f32 render_times_ms[data_samples] {};
-			f32 max_time = 0.0f;
-		} performance;
 	} internal;
 
 	namespace Input
@@ -176,10 +164,7 @@ namespace Raytracer
 		void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 		{
 			// Unused parameters
-			(void)window;
-			(void)scancode;
-			(void)action;
-			(void)mods;
+			(void)window; (void)scancode; (void)action; (void)mods;
 
 			bool key_is_pressed = (action == GLFW_PRESS);
 
@@ -269,7 +254,6 @@ namespace Raytracer
 			TryFromJSONVal(save_data, settings, accumulate_frames);
 			TryFromJSONVal(save_data, settings, limit_accumulated_frames);
 			TryFromJSONVal(save_data, settings, fps_limit_enabled);
-			TryFromJSONVal(save_data, settings, recompile_changed_shaders_automatically);
 
 			TryFromJSONVal(save_data, settings, camera_movement_type);
 			TryFromJSONVal(save_data, settings, orbit_camera_position);
@@ -337,10 +321,6 @@ namespace Raytracer
 		internal.gpu_accumulation_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * internal.render_channel_count * sizeof(float)));
 		internal.gpu_detail_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * sizeof(PixelDetailInformation)));
 
-		internal.performance.timer.start();
-
-		// TODO: make this "automatic", keep track of things in asset folder
-		// make them loadable to CPU, and then also optionally GPU using a free list or sm [2]
 		AssetManager::init();
 		
 		load_exr();
@@ -359,7 +339,6 @@ namespace Raytracer
 		ToJSONVal(save_data, settings, accumulate_frames);
 		ToJSONVal(save_data, settings, limit_accumulated_frames);
 		ToJSONVal(save_data, settings, fps_limit_enabled);
-		ToJSONVal(save_data, settings, recompile_changed_shaders_automatically);
 
 		ToJSONVal(save_data, settings, camera_movement_type);
 		ToJSONVal(save_data, settings, orbit_camera_position);
@@ -539,17 +518,15 @@ namespace Raytracer
 	}
 
 	void update(const f32 delta_time_ms)
-	{
-		internal.performance.timer.reset();
-		
-		bool pressed_move_key =	
+	{		
+		bool pressed_any_move_key =	
 			(ImGui::IsKeyDown(ImGuiKey_W) || 
 			ImGui::IsKeyDown(ImGuiKey_A) || 
 			ImGui::IsKeyDown(ImGuiKey_S) || 
 			ImGui::IsKeyDown(ImGuiKey_D)) &&
 			!ImGui::IsAnyItemFocused();
 
-		if(pressed_move_key)
+		if(pressed_any_move_key)
 			settings.camera_movement_type = CameraMovementType::Freecam;
 
 		settings.camera_movement_type == CameraMovementType::Orbit
@@ -559,19 +536,11 @@ namespace Raytracer
 		update_instance_selection_behavior();
 		update_instance_transform_hotkeys();
 
-		if(settings.recompile_changed_shaders_automatically)
-		{
-			bool recompiled_any_shaders = Compute::recompile_kernels(ComputeKernelRecompilationCondition::SourceChanged);
-			 
-			internal.render_dirty |= recompiled_any_shaders;
-		}
+		bool recompiled_any_shaders = Compute::recompile_kernels(ComputeKernelRecompilationCondition::SourceChanged);
+		internal.render_dirty |= recompiled_any_shaders;
 
 		settings.camera_speed_t += ImGui::GetIO().MouseWheel * 0.01f;
 		settings.camera_speed_t = glm::fclamp(settings.camera_speed_t, 0.0f, 1.0f);
-
-		rotate_array_right(internal.performance.update_times_ms, internal.performance.data_samples);
-		internal.performance.update_times_ms[0] = internal.performance.timer.to_now();
-		internal.performance.max_time = glm::max(internal.performance.max_time, internal.performance.update_times_ms[0]);
 	}
 
 	// Averages out acquired samples, and renders them to the screen
@@ -602,8 +571,6 @@ namespace Raytracer
 
 	void raytrace()
 	{
-		internal.performance.timer.reset();
-
 		// TODO: we currently don't take into account world changes!
 		if(internal.render_dirty || !settings.accumulate_frames || internal.world_dirty)
 		{
@@ -621,9 +588,8 @@ namespace Raytracer
 		glm::mat4 new_transform = glm::identity<glm::mat4>();
 
 		new_transform *= glm::translate(host_camera.position);
-		new_transform *= glm::eulerAngleY(glm::radians(host_camera.rotation.y));
-		new_transform *= glm::eulerAngleX(glm::radians(host_camera.rotation.x));
-				
+		new_transform *= glm::eulerAngleYX(glm::radians(host_camera.rotation.y), glm::radians(host_camera.rotation.x));
+
 		scene_data.camera_transform = new_transform;
 
 		bool stop_accumulating_frames = settings.limit_accumulated_frames && (internal.accumulated_frames > (u32)settings.accumulated_frame_limit);
@@ -666,11 +632,6 @@ namespace Raytracer
 		scene_data.reset_accumulator = false;
 
 		skip_rendering_goto:;
-
-		// We query performance here to avoid screenshot/ui code
-		rotate_array_right(internal.performance.render_times_ms, internal.performance.data_samples);
-		internal.performance.render_times_ms[0] = internal.performance.timer.to_now();
-		internal.performance.max_time = glm::max(internal.performance.max_time, internal.performance.render_times_ms[0]);
 
 		raytrace_save_render_to_file();
 	}
@@ -872,48 +833,7 @@ namespace Raytracer
 			ImGui::SeparatorText("Shaders");
 			ImGui::Indent();
 
-			if (ImGui::Button("Recompile Shaders"))
-				Compute::recompile_kernels(ComputeKernelRecompilationCondition::Force);
-
-			if (ImGui::Button("Recompile Changed Shaders"))
-				Compute::recompile_kernels(ComputeKernelRecompilationCondition::SourceChanged);
-
-		ImGui::Checkbox("Automatically recompile changed shaders?", &settings.recompile_changed_shaders_automatically);
-
 			ImGui::EndTabItem();
-		}
-
-		if(ImGui::BeginTabItem("Performance"))
-		{
-			ImGui::PushStyleColor(ImGuiCol_FrameBg, {0, 0, 0, 0});
-			ImPlot::SetNextAxisToFit(ImAxis_Y1);
-			if (ImPlot::BeginPlot("Performance plot (last 512 frames)", {-1, 0}, ImPlotFlags_NoInputs))
-			{
-				ImPlot::SetNextFillStyle({0, 0, 0, -1}, 0.2f);
-				ImPlot::PlotLine("Update time (ms)", internal.performance.update_times_ms, internal.performance.data_samples, 1.0f, 0.0f, ImPlotLineFlags_Shaded);
-				ImPlot::SetNextFillStyle({0, 0, 0, -1}, 0.2f);
-				ImPlot::PlotLine("Render time (ms)", internal.performance.render_times_ms, internal.performance.data_samples, 1.0f, 0.0f, ImPlotLineFlags_Shaded);
-				ImPlot::EndPlot();
-			}
-			ImGui::PopStyleColor();
-			ImGui::EndTabItem();
-
-			f32 min = 1e34f;
-			f32 max = -1e34f;
-			f32 avg = 0.0f;
-
-			for(auto& value : internal.performance.render_times_ms)
-			{
-				min = glm::fmin(min, value);
-				max = glm::fmax(max, value);
-				avg += value;
-			}
-
-			avg /= (f32)internal.performance.data_samples;
-
-			ImGui::Text("Average: %.2fms", avg);
-			ImGui::Text("Min: %.2fms", min);
-			ImGui::Text("Max: %.2fms", max);
 		}
 
 		if(ImGui::BeginTabItem("Scene Settings"))
@@ -967,25 +887,6 @@ namespace Raytracer
 			if(ImGui::Button("Add Instance"))
 			{
 				internal.selected_instance_idx = WorldManager::add_instance_of_mesh(selected_mesh_idx);
-				internal.world_dirty = true;
-			}
-
-			if(ImGui::Button("Kill it"))
-			{
-				auto& world_data = WorldManager::get_world_device_data();
-				int current_idx = 0;
-
-				for(int z = 0; z < 50; z++)
-				{
-					for(int x = 0; x < 50; x++)
-					{
-						current_idx = WorldManager::add_instance_of_mesh(selected_mesh_idx);
-
-						world_data.instances[current_idx].transform = glm::translate(glm::vec3(x * 2.0f, 0, z * 2.0f));
-						world_data.instances[current_idx].inverse_transform = glm::inverse(world_data.instances[current_idx].transform);
-
-					}
-				}
 				internal.world_dirty = true;
 			}
 
