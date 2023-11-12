@@ -329,7 +329,7 @@ void TLASBuilder::subdivide( uint nodeIdx)
 TLASBuilder::TLASBuilder()
 {
 	auto& world_data = WorldManager::get_world_device_data();
-	u32 instance_count = world_data.instance_count;
+	u32 instance_count = world_data.mesh_instance_count;
 
 	if(instance_count == 0)
 	{
@@ -346,14 +346,14 @@ TLASBuilder::TLASBuilder()
 	{
 		tri_idx[i] = i;
 
-		auto bvhnode = AssetManager::get_root_bvh_node_of_mesh(world_data.instances[i].mesh_idx);
+		auto bvhnode = AssetManager::get_root_bvh_node_of_mesh(world_data.mesh_instances[i].mesh_idx);
 
 		instance_bounding_boxes[i].min = bvhnode.min;
 		instance_bounding_boxes[i].max = bvhnode.max;
 		
 		AABB bb = instance_bounding_boxes[i];
 
-		transform_aabb(bb, world_data.instances[i].transform);
+		transform_aabb(bb, world_data.mesh_instances[i].transform);
 
 		instance_bounding_boxes[i] = bb;
 	}

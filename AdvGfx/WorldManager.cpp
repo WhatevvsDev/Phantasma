@@ -4,6 +4,7 @@
 struct
 {
 	WorldManagerDeviceData device_data;
+	std::vector<CameraInstance> cameras;
 } internal;
 
 int WorldManager::add_instance_of_mesh(u32 mesh_idx)
@@ -13,13 +14,13 @@ int WorldManager::add_instance_of_mesh(u32 mesh_idx)
 	new_mesh_instance.inverse_transform = glm::inverse(new_mesh_instance.transform);
 	new_mesh_instance.mesh_idx = mesh_idx;
 
-	u32 idx = internal.device_data.instance_count;
+	u32 idx = internal.device_data.mesh_instance_count;
 
-	internal.device_data.instances[idx] = new_mesh_instance;
+	internal.device_data.mesh_instances[idx] = new_mesh_instance;
 
-	internal.device_data.instance_count++;
+	internal.device_data.mesh_instance_count++;
 
-	return (internal.device_data.instance_count - 1);
+	return (internal.device_data.mesh_instance_count - 1);
 }
 
 WorldManagerDeviceData& WorldManager::get_world_device_data()

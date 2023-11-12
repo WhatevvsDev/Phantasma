@@ -38,12 +38,6 @@
 	// 2. Asset browser/manager
 	//		- A system that automatically detects, sorts and shows the state of various assets (whether its loaded to CPU/GPU or still on disk, etc.)
 
-	// 3. Some extra EXR controls
-	//		- Maybe adjusting brightness
-
-	// 4. For blur:
-			- Replace "Blur amount" with an actual real-world value or sm
-
 */
 
 namespace Raytracer
@@ -75,11 +69,35 @@ namespace Raytracer
 
 	std::vector<Material> materials = {default_material};
 
-	enum class CameraMovementType
+	void to_json(json& j, const CameraInstance& v)
 	{
-		Freecam,
-		Orbit
-	};
+		j["orbit_camera_position"] = v.orbit_camera_position;
+		j["orbit_camera_distance"] = v.orbit_camera_distance;
+		j["orbit_camera_angle"] = v.orbit_camera_angle;
+		j["orbit_camera_rotations_per_second"] = v.orbit_camera_rotations_per_second;
+		j["orbit_camera_t"] = v.orbit_camera_t;
+		j["position"] = v.position;
+		j["rotation"] = v.rotation;
+		j["camera_movement_type"] = v.camera_movement_type;
+		j["orbit_automatically"] = v.orbit_automatically;
+		j["focal_distance"] = v.focal_distance;
+		j["blur_radius"] = v.blur_radius;
+	}
+
+	void from_json(const json& j, CameraInstance& v)
+	{
+		j.at("orbit_camera_position").get_to(v.orbit_camera_position);
+		j.at("orbit_camera_distance").get_to(v.orbit_camera_distance);
+		j.at("orbit_camera_angle").get_to(v.orbit_camera_angle);
+		j.at("orbit_camera_rotations_per_second").get_to(v.orbit_camera_rotations_per_second);
+		j.at("orbit_camera_t").get_to(v.orbit_camera_t);
+		j.at("position").get_to(v.position);
+		j.at("rotation").get_to(v.rotation);
+		j.at("camera_movement_type").get_to(v.camera_movement_type);
+		j.at("orbit_automatically").get_to(v.orbit_automatically);
+		j.at("focal_distance").get_to(v.focal_distance);
+		j.at("blur_radius").get_to(v.blur_radius);
+	}
 
 	struct
 	{
@@ -87,26 +105,12 @@ namespace Raytracer
 		i32 fps_limit				{ 80 };
 
 		bool show_onscreen_log							{ true };
-		bool orbit_automatically						{ true };
 		bool accumulate_frames							{ true };
 		bool limit_accumulated_frames					{ false };
 		bool fps_limit_enabled							{ false };
-		 
-		// TODO: Replace this with an actual camera [1]
-		CameraMovementType camera_movement_type { CameraMovementType::Freecam };
-		glm::vec3 orbit_camera_position			{ 0.0f };
-		f32 orbit_camera_distance				{ 10.0f };
-		f32 orbit_camera_angle					{ 0.0f };
-		f32 orbit_camera_rotations_per_second	{ 0.1f };
-		f32 camera_speed_t						{ 0.5f };
-		glm::vec3 saved_camera_position			{ 0.0f };
-	} settings;
 
-	struct  
-	{
-		glm::vec3 position;
-		glm::vec3 rotation;
-	} host_camera;
+		f32 camera_speed_t						{ 0.5f };
+	} settings;
 
 	struct SceneData
 	{
@@ -119,8 +123,8 @@ namespace Raytracer
 		glm::mat4 camera_transform {glm::identity<glm::mat4>()};
 		f32 exr_angle { 0.0f };
 		u32 material_idx { 0 };
-		f32 focal_distance { 1.0f };
-		f32 blur_radius { 0.0f };
+		f32 focal_distance;
+		f32 blur_radius;
 		u32 max_luma_idx { 0 };
 		u32 selected_object_idx { UINT_MAX };
 		u32 pad[3];
@@ -156,7 +160,8 @@ namespace Raytracer
 		f32* loaded_exr_data { nullptr };
 		std::string current_exr { "None" };
 
-		f32 orbit_camera_t { 0.0f };
+		u32 active_camera_idx { 0 };
+		std::vector<CameraInstance> cameras;
 	} internal;
 
 	namespace Input
@@ -250,24 +255,27 @@ namespace Raytracer
 			TryFromJSONVal(save_data, settings, fps_limit);
 
 			TryFromJSONVal(save_data, settings, show_onscreen_log);
-			TryFromJSONVal(save_data, settings, orbit_automatically);
+			//TryFromJSONVal(save_data, settings, orbit_automatically);
 			TryFromJSONVal(save_data, settings, accumulate_frames);
 			TryFromJSONVal(save_data, settings, limit_accumulated_frames);
 			TryFromJSONVal(save_data, settings, fps_limit_enabled);
-
-			TryFromJSONVal(save_data, settings, camera_movement_type);
-			TryFromJSONVal(save_data, settings, orbit_camera_position);
-			TryFromJSONVal(save_data, settings, orbit_camera_distance);
-			TryFromJSONVal(save_data, settings, orbit_camera_angle);
-			TryFromJSONVal(save_data, settings, orbit_camera_rotations_per_second);
+			
+			//TryFromJSONVal(save_data, settings, camera_movement_type);
+			//TryFromJSONVal(save_data, settings, orbit_camera_position);
+			//TryFromJSONVal(save_data, settings, orbit_camera_distance);
+			//TryFromJSONVal(save_data, settings, orbit_camera_angle);
+			//TryFromJSONVal(save_data, settings, orbit_camera_rotations_per_second);
 			TryFromJSONVal(save_data, settings, camera_speed_t);
-			TryFromJSONVal(save_data, settings, saved_camera_position);
+			//TryFromJSONVal(save_data, settings, saved_camera_position);
 
-			TryFromJSONVal(save_data, host_camera, position);
-			TryFromJSONVal(save_data, host_camera, rotation);
+			//TryFromJSONVal(save_data, host_camera, position);
+			//TryFromJSONVal(save_data, host_camera, rotation);
 
-			TryFromJSONVal(save_data, internal, orbit_camera_t);
+			TryFromJSONVal(save_data, internal, cameras);
 		}
+
+		if(internal.cameras.empty())
+			internal.cameras.push_back(CameraInstance());
 	}
 
 	// TODO: This should probably not be in Raytracer.cpp
@@ -335,23 +343,24 @@ namespace Raytracer
 		ToJSONVal(save_data, settings, fps_limit);
 
 		ToJSONVal(save_data, settings, show_onscreen_log);
-		ToJSONVal(save_data, settings, orbit_automatically);
+		//ToJSONVal(save_data, settings, orbit_automatically);
 		ToJSONVal(save_data, settings, accumulate_frames);
 		ToJSONVal(save_data, settings, limit_accumulated_frames);
 		ToJSONVal(save_data, settings, fps_limit_enabled);
 
-		ToJSONVal(save_data, settings, camera_movement_type);
-		ToJSONVal(save_data, settings, orbit_camera_position);
-		ToJSONVal(save_data, settings, orbit_camera_distance);
-		ToJSONVal(save_data, settings, orbit_camera_angle);
-		ToJSONVal(save_data, settings, orbit_camera_rotations_per_second);
+		//ToJSONVal(save_data, settings, camera_movement_type);
+		//ToJSONVal(save_data, settings, orbit_camera_position);
+		//ToJSONVal(save_data, settings, orbit_camera_distance);
+		//ToJSONVal(save_data, settings, orbit_camera_angle);
+		//ToJSONVal(save_data, settings, orbit_camera_rotations_per_second);
 		ToJSONVal(save_data, settings, camera_speed_t);
-		ToJSONVal(save_data, settings, saved_camera_position);
+		//ToJSONVal(save_data, settings, saved_camera_position);
 
-		ToJSONVal(save_data, host_camera, position);
-		ToJSONVal(save_data, host_camera, rotation);
+		//ToJSONVal(save_data, host_camera, position);
+		//ToJSONVal(save_data, host_camera, rotation);
 
-		ToJSONVal(save_data, internal, orbit_camera_t);
+		//ToJSONVal(save_data, internal, orbit_camera_t);
+		ToJSONVal(save_data, internal, cameras);
 
 		std::ofstream o("phantasma.data.json");
 		o << save_data << std::endl;
@@ -362,27 +371,27 @@ namespace Raytracer
 		terminate_save_data();
 	}
 
-	void update_orbit_camera_behavior(f32 delta_time_ms)
+	void update_orbit_camera_behavior(f32 delta_time_ms, CameraInstance& camera)
 	{
-		if(settings.orbit_automatically)
+		if(camera.orbit_automatically)
 		{
-			internal.orbit_camera_t += (delta_time_ms / 1000.0f) * settings.orbit_camera_rotations_per_second;
-			internal.orbit_camera_t = wrap_number(internal.orbit_camera_t, 0.0f, 1.0f); 
+			camera.orbit_camera_t += (delta_time_ms / 1000.0f) * camera.orbit_camera_rotations_per_second;
+			camera.orbit_camera_t = wrap_number(camera.orbit_camera_t, 0.0f, 1.0f); 
 
-			bool camera_is_orbiting = (settings.orbit_camera_rotations_per_second != 0.0f);
+			bool camera_is_orbiting = (camera.orbit_camera_rotations_per_second != 0.0f);
 
 			internal.render_dirty |= camera_is_orbiting;
 		}
 
-		glm::vec3 position_offset = glm::vec3(0.0f, 0.0f, settings.orbit_camera_distance);
+		glm::vec3 position_offset = glm::vec3(0.0f, 0.0f, camera.orbit_camera_distance);
 
-		host_camera.rotation = glm::vec3(settings.orbit_camera_angle, internal.orbit_camera_t * 360.0f, 0.0f);
-		position_offset = position_offset * glm::mat3(glm::eulerAngleXY(glm::radians(-host_camera.rotation.x), glm::radians(-host_camera.rotation.y)));
+		camera.rotation = glm::vec3(camera.orbit_camera_angle, camera.orbit_camera_t * 360.0f, 0.0f);
+		position_offset = position_offset * glm::mat3(glm::eulerAngleXY(glm::radians(-camera.rotation.x), glm::radians(-camera.rotation.y)));
 
-		host_camera.position = settings.orbit_camera_position + position_offset;
+		camera.position = camera.orbit_camera_position + position_offset;
 	}
 
-	void update_free_float_camera_behavior(float delta_time_ms)
+	void update_free_float_camera_behavior(float delta_time_ms, CameraInstance& camera)
 	{
 		i32 move_hor =	(ImGui::IsKeyDown(ImGuiKey_D))		- (ImGui::IsKeyDown(ImGuiKey_A));
 		i32 move_ver =	(ImGui::IsKeyDown(ImGuiKey_Space))	- (ImGui::IsKeyDown(ImGuiKey_LeftCtrl));
@@ -390,7 +399,7 @@ namespace Raytracer
 				
 		glm::vec3 move_dir = glm::vec3(move_hor, move_ver, -move_ward);
 
-		move_dir = glm::normalize(move_dir * glm::mat3(glm::eulerAngleXY(glm::radians(-host_camera.rotation.x), glm::radians(-host_camera.rotation.y))));
+		move_dir = glm::normalize(move_dir * glm::mat3(glm::eulerAngleXY(glm::radians(-camera.rotation.x), glm::radians(-camera.rotation.y))));
 
 		bool camera_is_moving = (glm::dot(move_dir, move_dir) > 0.5f);
 
@@ -400,7 +409,7 @@ namespace Raytracer
 			
 			internal.render_dirty = true;
 				
-			host_camera.position += camera_move_delta;
+			camera.position += camera_move_delta;
 		}
 
 		ImVec2 mouse_delta = ImGui::GetIO().MouseDelta;
@@ -415,20 +424,20 @@ namespace Raytracer
 		{
 			glm::vec3 pan_vector = glm::vec3(camera_delta.y, -camera_delta.x, 0.0f) * 0.001f;
 
-			pan_vector = pan_vector * glm::mat3(glm::eulerAngleXY(glm::radians(-host_camera.rotation.x), glm::radians(-host_camera.rotation.y)));
+			pan_vector = pan_vector * glm::mat3(glm::eulerAngleXY(glm::radians(-camera.rotation.x), glm::radians(-camera.rotation.y)));
 		
-			host_camera.position += pan_vector;
+			camera.position += pan_vector;
 
 			internal.render_dirty = true;
 		}
 		else if(allow_camera_rotation && camera_updating)
 		{
-			host_camera.rotation += camera_delta * 0.1f;
+			camera.rotation += camera_delta * 0.1f;
 
-			bool pitch_exceeds_limit = (fabs(host_camera.rotation.x) > 89.9f);
+			bool pitch_exceeds_limit = (fabs(camera.rotation.x) > 89.9f);
 
 			if(pitch_exceeds_limit)
-				host_camera.rotation.x = 89.9f * sgn(host_camera.rotation.x);
+				camera.rotation.x = 89.9f * sgn(camera.rotation.x);
 
 			internal.render_dirty = true;
 		}
@@ -454,7 +463,7 @@ namespace Raytracer
 			{
 				if(valid_focus_hover)
 				{
-					scene_data.focal_distance = internal.distance_to_hovered;
+					internal.cameras[internal.active_camera_idx].focal_distance = internal.distance_to_hovered;
 					internal.focus_on_clicked = false;
 					internal.render_dirty = true;
 				}
@@ -527,11 +536,11 @@ namespace Raytracer
 			!ImGui::IsAnyItemFocused();
 
 		if(pressed_any_move_key)
-			settings.camera_movement_type = CameraMovementType::Freecam;
+			internal.cameras[internal.active_camera_idx].camera_movement_type = CameraMovementType::Freecam;
 
-		settings.camera_movement_type == CameraMovementType::Orbit
-			? update_orbit_camera_behavior(delta_time_ms)
-			: update_free_float_camera_behavior(delta_time_ms);
+		internal.cameras[internal.active_camera_idx].camera_movement_type == CameraMovementType::Orbit
+			? update_orbit_camera_behavior(delta_time_ms, internal.cameras[internal.active_camera_idx])
+			: update_free_float_camera_behavior(delta_time_ms, internal.cameras[internal.active_camera_idx]);
 
 		update_instance_selection_behavior();
 		update_instance_transform_hotkeys();
@@ -579,16 +588,20 @@ namespace Raytracer
 			internal.accumulated_frames = 0;
 		}
 
+		CameraInstance& active_camera = internal.cameras[internal.active_camera_idx];
+
 		scene_data.accumulated_frames = internal.accumulated_frames;
 		scene_data.selected_object_idx = internal.selected_instance_idx;
+		scene_data.focal_distance = active_camera.focal_distance;
+		scene_data.blur_radius = active_camera.blur_radius;
 
 		u32 render_area = internal.render_width_px * internal.render_height_px;
 		ComputeReadWriteBuffer screen_buffer({internal.buffer, (usize)(render_area)});
 
 		glm::mat4 new_transform = glm::identity<glm::mat4>();
 
-		new_transform *= glm::translate(host_camera.position);
-		new_transform *= glm::eulerAngleYX(glm::radians(host_camera.rotation.y), glm::radians(host_camera.rotation.x));
+		new_transform *= glm::translate(active_camera.position);
+		new_transform *= glm::eulerAngleYX(glm::radians(active_camera.rotation.y), glm::radians(active_camera.rotation.x));
 
 		scene_data.camera_transform = new_transform;
 
@@ -701,7 +714,7 @@ namespace Raytracer
 
 		ImGui::SeparatorText("Transform");
 
-		MeshInstanceHeader& instance = WorldManager::get_world_device_data().instances[internal.selected_instance_idx];
+		MeshInstanceHeader& instance = WorldManager::get_world_device_data().mesh_instances[internal.selected_instance_idx];
 		bool transformed = false;
 
 		glm::vec3 translation;
@@ -738,6 +751,8 @@ namespace Raytracer
 
 	void ui()
 	{
+		CameraInstance& active_camera = internal.cameras[internal.active_camera_idx];
+
 		if(!internal.show_debug_ui)
 			return;
 
@@ -760,41 +775,41 @@ namespace Raytracer
 			ImGui::SeparatorText("Camera");
 			ImGui::Indent();
 
-			if (ImGui::BeginCombo("Type", settings.camera_movement_type == CameraMovementType::Orbit ? "Orbit" : "Free"))
+			if (ImGui::BeginCombo("Type", active_camera.camera_movement_type == CameraMovementType::Orbit ? "Orbit" : "Free"))
 			{
-				if (ImGui::Selectable("Freecam", settings.camera_movement_type == CameraMovementType::Freecam))
-					settings.camera_movement_type = CameraMovementType::Freecam;
+				if (ImGui::Selectable("Freecam", active_camera.camera_movement_type == CameraMovementType::Freecam))
+					active_camera.camera_movement_type = CameraMovementType::Freecam;
 
-				if (ImGui::Selectable("Orbit", settings.camera_movement_type == CameraMovementType::Orbit))
+				if (ImGui::Selectable("Orbit", active_camera.camera_movement_type == CameraMovementType::Orbit))
 				{
-					settings.camera_movement_type = CameraMovementType::Orbit;
+					active_camera.camera_movement_type = CameraMovementType::Orbit;
 					internal.render_dirty = true;
 				}
 
 				ImGui::EndCombo();
 			}
 
-			if(settings.camera_movement_type == CameraMovementType::Orbit)
+			if(active_camera.camera_movement_type == CameraMovementType::Orbit)
 			{
-				internal.render_dirty |= ImGui::DragFloat3("Position", glm::value_ptr(settings.orbit_camera_position), 0.1f);
-				internal.render_dirty |= ImGui::DragFloat("Distance", &settings.orbit_camera_distance, 0.1f);
-				internal.render_dirty |= ImGui::DragFloat("Angle", &settings.orbit_camera_angle, 0.25f);
-				settings.orbit_camera_angle = glm::clamp(settings.orbit_camera_angle, -89.9f, 89.9f);
+				internal.render_dirty |= ImGui::DragFloat3("Position", glm::value_ptr(active_camera.orbit_camera_position), 0.1f);
+				internal.render_dirty |= ImGui::DragFloat("Distance", &active_camera.orbit_camera_distance, 0.1f);
+				internal.render_dirty |= ImGui::DragFloat("Angle", &active_camera.orbit_camera_angle, 0.25f);
+				active_camera.orbit_camera_angle = glm::clamp(active_camera.orbit_camera_angle, -89.9f, 89.9f);
 				
-				ImGui::Checkbox("Orbit automatically?", &settings.orbit_automatically);
-				if(settings.orbit_automatically)
-					ImGui::DragFloat("Rotations/s", &settings.orbit_camera_rotations_per_second, 0.001f, -1.0f, 1.0f);
+				ImGui::Checkbox("Orbit automatically?", &active_camera.orbit_automatically);
+				if(active_camera.orbit_automatically)
+					ImGui::DragFloat("Rotations/s", &active_camera.orbit_camera_rotations_per_second, 0.001f, -1.0f, 1.0f);
 				else
-					internal.render_dirty |= ImGui::DragFloat("Rotated T", &internal.orbit_camera_t, 0.001f);
+					internal.render_dirty |= ImGui::DragFloat("Rotated T", &active_camera.orbit_camera_t, 0.001f);
 				
-				internal.orbit_camera_t = wrap_number(internal.orbit_camera_t, 0.0f, 1.0f); 
+				active_camera.orbit_camera_t = wrap_number(active_camera.orbit_camera_t, 0.0f, 1.0f); 
 			}
 
 			static float blur_radius_proxy;
 			internal.render_dirty |= ImGui::DragFloat("Blur amount", &blur_radius_proxy, 0.01f, 0.0f, 1.0f);
-			scene_data.blur_radius = log(blur_radius_proxy * 0.2f + 1.0f);
+			active_camera.blur_radius = log(blur_radius_proxy * 0.2f + 1.0f);
 
-			internal.render_dirty |= ImGui::DragFloat("Focal distance", &scene_data.focal_distance, 0.001f, 0.001f, 1e34f);
+			internal.render_dirty |= ImGui::DragFloat("Focal distance", &active_camera.focal_distance, 0.001f, 0.001f, 1e34f);
 
 			if(!internal.focus_on_clicked)
 			{
@@ -932,15 +947,15 @@ namespace Raytracer
 		
 		ImGui::End();
 
-		glm::vec3 forward = glm::normalize(glm::vec3(0.0f, 0.0f, -1.0f) * glm::mat3(glm::eulerAngleXY(glm::radians(-host_camera.rotation.x), glm::radians(-host_camera.rotation.y))));;
+		glm::vec3 forward = glm::normalize(glm::vec3(0.0f, 0.0f, -1.0f) * glm::mat3(glm::eulerAngleXY(glm::radians(-active_camera.rotation.x), glm::radians(-active_camera.rotation.y))));
 
-		auto view = glm::lookAtRH(host_camera.position, host_camera.position + forward, glm::vec3(0.0f, 1.0f, 0.0f));
+		auto view = glm::lookAtRH(active_camera.position, active_camera.position + forward, glm::vec3(0.0f, 1.0f, 0.0f));
 
 		if(internal.selected_instance_idx != -1)
 		{
 			i32 transform_idx = internal.selected_instance_idx;
 
-			MeshInstanceHeader& instance = WorldManager::get_world_device_data().instances[transform_idx];
+			MeshInstanceHeader& instance = WorldManager::get_world_device_data().mesh_instances[transform_idx];
 			glm::mat4 transform = instance.transform;
 
 			glm::mat4 projection = glm::perspectiveRH(glm::radians(90.0f), (f32)internal.render_width_px / (f32)internal.render_height_px, 0.1f, 1000.0f);
