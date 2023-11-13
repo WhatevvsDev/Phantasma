@@ -553,6 +553,10 @@ float3 trace(TraceArgs* args)
 					float3 reflected_dir = reflected(current_ray.D, normal) * (1.0f + EPSILON);
 					
 					current_ray.D = normalize(reflected_dir + random_unit_vector(args->rand_seed, normal) * (1.0f - mat.specularity));
+					
+					e += t * material_color * 0.5f;
+					t *= material_color * 0.5f;
+
 					continue;
 				}
 				case Dielectric:
