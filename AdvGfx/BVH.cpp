@@ -342,7 +342,7 @@ TLASBuilder::TLASBuilder()
 	instance_bounding_boxes.resize(instance_count);
 	tri_idx.resize(instance_count);
 
-	for(int i = 0; i < instance_count; i++)
+	for(u32 i = 0; i < instance_count; i++)
 	{
 		tri_idx[i] = i;
 

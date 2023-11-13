@@ -32,11 +32,12 @@
 
 	// Main TODO
 
-	// 1. Camera system
-	//		- A proper system for managing camera, with various settings and options (FoV, etc.)
-
-	// 2. Asset browser/manager
+	// 1. Asset browser/manager
 	//		- A system that automatically detects, sorts and shows the state of various assets (whether its loaded to CPU/GPU or still on disk, etc.)
+
+	// 2. NEE for emissive objects
+
+	// 3. Texture support
 
 */
 
@@ -68,36 +69,6 @@ namespace Raytracer
 	Material default_material = {glm::vec4(1.0f, 0.5f, 0.7f, 0.0f), 1.5f, 0.1f, MaterialType::Diffuse, 0.0f, 0.0f, 0.0f};
 
 	std::vector<Material> materials = {default_material};
-
-	void to_json(json& j, const CameraInstance& v)
-	{
-		j["orbit_camera_position"] = v.orbit_camera_position;
-		j["orbit_camera_distance"] = v.orbit_camera_distance;
-		j["orbit_camera_angle"] = v.orbit_camera_angle;
-		j["orbit_camera_rotations_per_second"] = v.orbit_camera_rotations_per_second;
-		j["orbit_camera_t"] = v.orbit_camera_t;
-		j["position"] = v.position;
-		j["rotation"] = v.rotation;
-		j["camera_movement_type"] = v.camera_movement_type;
-		j["orbit_automatically"] = v.orbit_automatically;
-		j["focal_distance"] = v.focal_distance;
-		j["blur_radius"] = v.blur_radius;
-	}
-
-	void from_json(const json& j, CameraInstance& v)
-	{
-		j.at("orbit_camera_position").get_to(v.orbit_camera_position);
-		j.at("orbit_camera_distance").get_to(v.orbit_camera_distance);
-		j.at("orbit_camera_angle").get_to(v.orbit_camera_angle);
-		j.at("orbit_camera_rotations_per_second").get_to(v.orbit_camera_rotations_per_second);
-		j.at("orbit_camera_t").get_to(v.orbit_camera_t);
-		j.at("position").get_to(v.position);
-		j.at("rotation").get_to(v.rotation);
-		j.at("camera_movement_type").get_to(v.camera_movement_type);
-		j.at("orbit_automatically").get_to(v.orbit_automatically);
-		j.at("focal_distance").get_to(v.focal_distance);
-		j.at("blur_radius").get_to(v.blur_radius);
-	}
 
 	struct
 	{
@@ -255,21 +226,11 @@ namespace Raytracer
 			TryFromJSONVal(save_data, settings, fps_limit);
 
 			TryFromJSONVal(save_data, settings, show_onscreen_log);
-			//TryFromJSONVal(save_data, settings, orbit_automatically);
 			TryFromJSONVal(save_data, settings, accumulate_frames);
 			TryFromJSONVal(save_data, settings, limit_accumulated_frames);
 			TryFromJSONVal(save_data, settings, fps_limit_enabled);
 			
-			//TryFromJSONVal(save_data, settings, camera_movement_type);
-			//TryFromJSONVal(save_data, settings, orbit_camera_position);
-			//TryFromJSONVal(save_data, settings, orbit_camera_distance);
-			//TryFromJSONVal(save_data, settings, orbit_camera_angle);
-			//TryFromJSONVal(save_data, settings, orbit_camera_rotations_per_second);
 			TryFromJSONVal(save_data, settings, camera_speed_t);
-			//TryFromJSONVal(save_data, settings, saved_camera_position);
-
-			//TryFromJSONVal(save_data, host_camera, position);
-			//TryFromJSONVal(save_data, host_camera, rotation);
 
 			TryFromJSONVal(save_data, internal, cameras);
 		}
@@ -343,23 +304,12 @@ namespace Raytracer
 		ToJSONVal(save_data, settings, fps_limit);
 
 		ToJSONVal(save_data, settings, show_onscreen_log);
-		//ToJSONVal(save_data, settings, orbit_automatically);
 		ToJSONVal(save_data, settings, accumulate_frames);
 		ToJSONVal(save_data, settings, limit_accumulated_frames);
 		ToJSONVal(save_data, settings, fps_limit_enabled);
 
-		//ToJSONVal(save_data, settings, camera_movement_type);
-		//ToJSONVal(save_data, settings, orbit_camera_position);
-		//ToJSONVal(save_data, settings, orbit_camera_distance);
-		//ToJSONVal(save_data, settings, orbit_camera_angle);
-		//ToJSONVal(save_data, settings, orbit_camera_rotations_per_second);
 		ToJSONVal(save_data, settings, camera_speed_t);
-		//ToJSONVal(save_data, settings, saved_camera_position);
 
-		//ToJSONVal(save_data, host_camera, position);
-		//ToJSONVal(save_data, host_camera, rotation);
-
-		//ToJSONVal(save_data, internal, orbit_camera_t);
 		ToJSONVal(save_data, internal, cameras);
 
 		std::ofstream o("phantasma.data.json");
@@ -845,8 +795,53 @@ namespace Raytracer
 
 			ImGui::Unindent();
 			ImGui::Dummy({20, 20});
-			ImGui::SeparatorText("Shaders");
+			ImGui::SeparatorText("Camera Instances");
 			ImGui::Indent();
+			
+			if (ImGui::Button("Add Camera"))
+			{
+				// Copy over current camera as a new camera
+				internal.cameras.push_back(internal.cameras[internal.active_camera_idx]);
+			}
+
+			ImGui::Dummy({20, 20});
+
+			int remove_idx = -1;
+
+			for(int i = 0; i < internal.cameras.size(); i++)
+			{
+				std::string text = (i == internal.active_camera_idx)
+					? std::format("[Camera {}]", i)
+					: std::format("Camera {}", i);
+
+				if(ImGui::Button(text.c_str()))
+				{
+					internal.active_camera_idx = i;
+					internal.render_dirty = true;
+				}
+
+				ImGui::SameLine();
+
+
+				bool last_camera = internal.cameras.size() == 1;
+
+				if(!last_camera)
+				{
+					if(ImGui::Button(std::format("X ## {}", i).c_str()))
+					{
+						remove_idx = i;
+					}
+				}
+			}
+
+			if(remove_idx != -1)
+			{
+				internal.cameras.erase(internal.cameras.begin() + remove_idx);
+				if(internal.active_camera_idx >= internal.cameras.size())
+				{
+					internal.active_camera_idx--;
+				}
+			}
 
 			ImGui::EndTabItem();
 		}
@@ -944,7 +939,6 @@ namespace Raytracer
 		}
 
 		ImGui::EndTabBar();
-		
 		ImGui::End();
 
 		glm::vec3 forward = glm::normalize(glm::vec3(0.0f, 0.0f, -1.0f) * glm::mat3(glm::eulerAngleXY(glm::radians(-active_camera.rotation.x), glm::radians(-active_camera.rotation.y))));

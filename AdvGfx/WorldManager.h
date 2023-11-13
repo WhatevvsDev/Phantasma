@@ -3,10 +3,10 @@
 
 struct MeshInstanceHeader
 {
-	glm::mat4 transform;
-	glm::mat4 inverse_transform;
+	glm::mat4 transform {glm::identity<glm::mat4>()};
+	glm::mat4 inverse_transform {glm::identity<glm::mat4>()};
 		
-	u32 mesh_idx;
+	u32 mesh_idx { 0 };
 	u32 material_idx { 0 };
 };
 
