@@ -1,3 +1,4 @@
+#include "Math.h"
 // RNG - Marsaglia's xor32
 static uint seed = 0x12345678;
 uint WangHash( uint s )
@@ -38,7 +39,6 @@ namespace glm
 		j["x"] = v.x;
 		j["y"] = v.y;
 		j["z"] = v.z;
-
 	}
 
 	void from_json(const json& j, vec3& v)
@@ -46,5 +46,22 @@ namespace glm
 		j.at("x").get_to(v.x);
 		j.at("y").get_to(v.y);
 		j.at("z").get_to(v.z);
+	}
+
+	void glm::to_json(json& j, const mat4& v)
+	{
+		f32 matrix_values[16];
+		memcpy(matrix_values, glm::value_ptr(v), sizeof(f32) * 16);
+
+		j["mat4"] = matrix_values;
+	}
+
+	void from_json(const json& j, mat4& v)
+	{
+		f32 matrix_values[16];
+
+		j.at("mat4").get_to(matrix_values);
+
+		memcpy(glm::value_ptr(v), matrix_values, sizeof(f32) * 16);
 	}
 }

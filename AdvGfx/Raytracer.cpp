@@ -293,6 +293,8 @@ namespace Raytracer
 		AssetManager::init();
 		
 		load_exr();
+
+		WorldManager::deserialize_scene();
 	}
 
 	// Saves data such as settings, or world state to phantasma.data.json
@@ -318,6 +320,7 @@ namespace Raytracer
 
 	void terminate()
 	{
+		WorldManager::serialize_scene();
 		terminate_save_data();
 	}
 
@@ -549,7 +552,7 @@ namespace Raytracer
 		ComputeReadWriteBuffer screen_buffer({internal.buffer, (usize)(render_area)});
 
 		glm::mat4 new_transform = glm::identity<glm::mat4>();
-
+			
 		new_transform *= glm::translate(active_camera.position);
 		new_transform *= glm::eulerAngleYX(glm::radians(active_camera.rotation.y), glm::radians(active_camera.rotation.x));
 
@@ -666,7 +669,7 @@ namespace Raytracer
 
 		ImGui::SeparatorText("Transform");
 
-		MeshInstanceHeader& instance = WorldManager::get_world_device_data().mesh_instances[internal.selected_instance_idx];
+		MeshInstanceHeader& instance = WorldManager::get_mesh_device_data(internal.selected_instance_idx);
 		bool transformed = false;
 
 		glm::vec3 translation;
@@ -711,6 +714,24 @@ namespace Raytracer
 		ImGui::PushStyleColor(ImGuiCol_WindowBg, {0, 0, 0, 0});
 		ImGui::DockSpaceOverViewport(0, ImGuiDockNodeFlags_PassthruCentralNode | ImGuiDockNodeFlags_AutoHideTabBar | ImGuiDockNodeFlags_NoDockingInCentralNode);
 		ImGui::PopStyleColor();
+
+		if(ImGui::IsKeyPressed(ImGuiKey_Backspace))
+		{
+			bool any_instance_is_selected = internal.selected_instance_idx >= 0;
+
+			if(any_instance_is_selected)
+			{
+				WorldManager::remove_mesh_instance(internal.selected_instance_idx);
+				internal.world_dirty = true;
+			}
+
+			bool selected_index_out_of_range = WorldManager::get_world_device_data().mesh_instance_count <= internal.selected_instance_idx;
+
+			if(selected_index_out_of_range)
+			{
+				internal.selected_instance_idx = -1;
+			}
+		}
 
 		ImGui::Begin("Controls Window", 0, ImGuiWindowFlags_NoTitleBar);
 		ImGui::BeginTabBar("Controls Window Tab Bar");
@@ -951,7 +972,7 @@ namespace Raytracer
 		{
 			i32 transform_idx = internal.selected_instance_idx;
 
-			MeshInstanceHeader& instance = WorldManager::get_world_device_data().mesh_instances[transform_idx];
+			MeshInstanceHeader& instance = WorldManager::get_mesh_device_data(transform_idx);
 			glm::mat4 transform = instance.transform;
 
 			glm::mat4 projection = glm::perspectiveRH(glm::radians(90.0f), (f32)internal.render_width_px / (f32)internal.render_height_px, 0.1f, 1000.0f);

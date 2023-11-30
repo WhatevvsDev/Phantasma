@@ -33,4 +33,7 @@ namespace glm
 {
     void to_json(json& j, const vec3& v);
     void from_json(const json& j, vec3& v);
+
+    void to_json(json& j, const mat4& v);
+    void from_json(const json& j, mat4& v);
 }

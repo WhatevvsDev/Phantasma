@@ -8,6 +8,13 @@ struct MeshInstanceHeader
 		
 	u32 mesh_idx { 0 };
 	u32 material_idx { 0 };
+
+	// Needed to save/load vector of this
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE(MeshInstanceHeader, 
+		transform, 
+		inverse_transform, 
+		mesh_idx,
+		material_idx);
 };
 
 enum class CameraMovementType
@@ -59,13 +66,18 @@ struct WorldManagerDeviceData
 {
 	u32 mesh_instance_count;
 	u32 pad_0[3];
-	MeshInstanceHeader mesh_instances[4096];
+	MeshInstanceHeader mesh_instances[4096]; // Size of array pointed at should be 4096
 };
 
 namespace WorldManager
 {
 	// Returns index of object
 	int add_instance_of_mesh(u32 mesh_idx);
+	void remove_mesh_instance(i32 instance_idx);
+	MeshInstanceHeader& get_mesh_device_data(usize instance_idx);
 
 	WorldManagerDeviceData& get_world_device_data();
+
+	void serialize_scene();
+	void deserialize_scene();
 }
