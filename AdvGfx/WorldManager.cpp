@@ -9,6 +9,9 @@ struct
 	WorldManagerDeviceData device_data;
 	std::vector<CameraInstance> cameras;
 	std::vector<MeshInstanceHeader> mesh_instances {};
+
+	Material default_material = {glm::vec4(1.0f, 0.5f, 0.7f, 0.0f), 1.5f, 0.1f, MaterialType::Diffuse, 0.0f, 0.0f, 0.0f};
+	std::vector<Material> materials = {default_material};
 } internal;
 
 
@@ -34,6 +37,27 @@ MeshInstanceHeader& WorldManager::get_mesh_device_data(usize instance_idx)
 	return internal.mesh_instances[instance_idx];
 }
 
+Material& WorldManager::add_material()
+{
+	internal.materials.push_back(internal.default_material);
+	return internal.materials.at(internal.materials.size() - 1);
+}
+
+Material& WorldManager::get_material_ref(u32 material_idx)
+{
+	return internal.materials[material_idx];
+}
+
+u32 WorldManager::get_material_count()
+{
+	return internal.materials.size();
+}
+
+std::vector<Material>& WorldManager::get_material_vector()
+{
+	return internal.materials;
+}
+
 WorldManagerDeviceData& WorldManager::get_world_device_data()
 {
 	memset(internal.device_data.mesh_instances, 0, 4096 * sizeof(MeshInstanceHeader));
@@ -47,6 +71,7 @@ void WorldManager::serialize_scene()
 	json scene_data;
 
 	scene_data["MeshInstanceHeaders"] = internal.mesh_instances;
+	scene_data["Materials"] = internal.materials;
 
 	std::ofstream o("phantasma.scene.json");
 	o << scene_data << std::endl;
@@ -62,5 +87,8 @@ void WorldManager::deserialize_scene()
 	{
 		json scene_data = json::parse(f);
 		internal.mesh_instances = scene_data["MeshInstanceHeaders"];
+
+		if(scene_data.find("Materials") != scene_data.end())
+			internal.materials = scene_data["Materials"];
 	}
 }

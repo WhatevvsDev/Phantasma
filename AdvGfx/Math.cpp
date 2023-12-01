@@ -47,6 +47,22 @@ namespace glm
 		j.at("y").get_to(v.y);
 		j.at("z").get_to(v.z);
 	}
+	
+	void to_json(json& j, const vec4& v)
+	{
+		j["x"] = v.x;
+		j["y"] = v.y;
+		j["z"] = v.z;
+		j["w"] = v.w;
+	}
+
+	void from_json(const json& j, vec4& v)
+	{
+		j.at("x").get_to(v.x);
+		j.at("y").get_to(v.y);
+		j.at("z").get_to(v.z);
+		j.at("w").get_to(v.w);
+	}
 
 	void glm::to_json(json& j, const mat4& v)
 	{

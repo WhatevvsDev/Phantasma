@@ -66,10 +66,6 @@ namespace Raytracer
 
 	ImGuizmo::OPERATION all_axis_bits = (ImGuizmo::OPERATION)(axis_bits[0] | axis_bits[1] | axis_bits[2]);;
 
-	Material default_material = {glm::vec4(1.0f, 0.5f, 0.7f, 0.0f), 1.5f, 0.1f, MaterialType::Diffuse, 0.0f, 0.0f, 0.0f};
-
-	std::vector<Material> materials = {default_material};
-
 	struct
 	{
 		i32 accumulated_frame_limit { 32 };
@@ -587,7 +583,7 @@ namespace Raytracer
 			.write({&scene_data, 1})
 			.write(*exr_buffer)
 			.write({&WorldManager::get_world_device_data(), 1})
-			.write(materials)
+			.write(WorldManager::get_material_vector())
 			.write(tlas)
 			.read_write(*internal.gpu_detail_buffer)
 			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
@@ -696,12 +692,12 @@ namespace Raytracer
 
 		i32 mat_idx_proxy = (i32) instance.material_idx;
 		internal.render_dirty |= ImGui::InputInt("Material", &mat_idx_proxy, 1);
-		if(mat_idx_proxy > (i32)materials.size() - 1)
-			materials.push_back(default_material);
+		if(mat_idx_proxy > (i32)WorldManager::get_material_count() - 1)
+			WorldManager::add_material();
 		mat_idx_proxy = glm::max(mat_idx_proxy, 0);
 		instance.material_idx = (u32)mat_idx_proxy;
 
-		ui_material_editor(materials[instance.material_idx]);
+		ui_material_editor(WorldManager::get_material_ref(instance.material_idx));
 	}
 
 	void ui()
@@ -937,12 +933,14 @@ namespace Raytracer
 
 			if(ImGui::Button("Add new"))
 			{
-				materials.push_back(Material());
+				WorldManager::add_material();
 			}
 
 			u32 number_idx = 0;
-			for(auto& current_material : materials)
+			for(u32 idx = 0; idx < WorldManager::get_material_count(); idx++)
 			{
+				auto current_material = WorldManager::get_material_ref(idx);
+
 				if (ImGui::TreeNode(("## material list index" + std::to_string(number_idx)).c_str()))
 				{
 					ImGui::SameLine();

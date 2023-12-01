@@ -600,34 +600,6 @@ float3 trace(TraceArgs* args)
 					}
 					else // ray_is_specular
 					{
-						/*
-						float3 microfacet = get_ggx_microfacet(args->rand_seed, mat.roughness);
-						microfacet = tangent_to_base_vector(microfacet, normal);
-						float3 halfway = normalize(normalize(current_ray.D) + normalize(hemisphere_normal));
-
-						float d = 1.0f - clamp(normal_distribution_ggx(normal, halfway, mat.roughness), 0.0f ,1.0f);
-						float g = clamp(geometry_term(current_ray.D, normal, microfacet, mat.roughness), 0.0f, 1.0f);
-						float f = fresnel_schlick(mat.specularity, microfacet, halfway);
-						float ggx = d * g * f / (4 * saturate(dot(normal, microfacet)) * saturate(dot(normal, current_ray.D)));
-
-						float pdf = d * dot(normal, halfway) / (4.0f * dot(microfacet, halfway));
-
-						//pdf = saturate(pdf);
-
-						current_ray.D = reflected(current_ray.D, normal);
-
-						float3 specular = dot(normal, microfacet) * mat.albedo.xyz * ggx / pdf * mat.specularity;
-
-						specular.x = saturate(specular.x);
-						specular.y = saturate(specular.y);
-						specular.z = saturate(specular.z);
-
-						e += t * specular;
-						t *= specular;
-
-						continue;
-						*/
-
 						float rough = mat.roughness;
 
 						float3 V = current_ray.D;

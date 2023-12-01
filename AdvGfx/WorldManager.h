@@ -1,5 +1,6 @@
 #pragma once
 #include "Math.h"
+#include "Material.h"
 
 struct MeshInstanceHeader
 {
@@ -75,6 +76,11 @@ namespace WorldManager
 	int add_instance_of_mesh(u32 mesh_idx);
 	void remove_mesh_instance(i32 instance_idx);
 	MeshInstanceHeader& get_mesh_device_data(usize instance_idx);
+
+	Material& add_material();
+	Material& get_material_ref(u32 material_idx);
+	u32 get_material_count();
+	std::vector<Material>& get_material_vector();
 
 	WorldManagerDeviceData& get_world_device_data();
 

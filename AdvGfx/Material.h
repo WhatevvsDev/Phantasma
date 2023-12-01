@@ -1,4 +1,5 @@
 #pragma once
+#include "JSONUtility.h"
 
 enum class MaterialType : u32
 {
@@ -18,4 +19,13 @@ struct Material
 	float metallic { 0.0f };
 	float roughness { 0.0f };
 	float pad[2];
+
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE(Material, 
+		albedo, 
+		ior, 
+		absorbtion_coefficient,
+		type,
+		specularity,
+		metallic,
+		roughness);
 };
