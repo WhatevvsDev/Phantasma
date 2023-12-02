@@ -50,7 +50,7 @@ Material& WorldManager::get_material_ref(u32 material_idx)
 
 u32 WorldManager::get_material_count()
 {
-	return internal.materials.size();
+	return (u32)internal.materials.size();
 }
 
 std::vector<Material>& WorldManager::get_material_vector()
@@ -62,7 +62,7 @@ WorldManagerDeviceData& WorldManager::get_world_device_data()
 {
 	memset(internal.device_data.mesh_instances, 0, 4096 * sizeof(MeshInstanceHeader));
 	memcpy(internal.device_data.mesh_instances, internal.mesh_instances.data(), internal.mesh_instances.size() * sizeof(MeshInstanceHeader));
-	internal.device_data.mesh_instance_count = internal.mesh_instances.size();
+	internal.device_data.mesh_instance_count = (u32)internal.mesh_instances.size();
 
 	return internal.device_data;
 }

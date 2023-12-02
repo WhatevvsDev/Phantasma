@@ -721,7 +721,7 @@ namespace Raytracer
 				internal.world_dirty = true;
 			}
 
-			bool selected_index_out_of_range = WorldManager::get_world_device_data().mesh_instance_count <= internal.selected_instance_idx;
+			bool selected_index_out_of_range = (i32)WorldManager::get_world_device_data().mesh_instance_count <= internal.selected_instance_idx;
 
 			if(selected_index_out_of_range)
 			{
@@ -827,7 +827,7 @@ namespace Raytracer
 
 			int remove_idx = -1;
 
-			for(int i = 0; i < internal.cameras.size(); i++)
+			for(u32 i = 0; i < internal.cameras.size(); i++)
 			{
 				std::string text = (i == internal.active_camera_idx)
 					? std::format("[Camera {}]", i)
@@ -897,9 +897,9 @@ namespace Raytracer
 			static std::string selected_mesh_name = AssetManager::get_disk_files_by_extension("gltf").begin()->file_name;
 			static u32 selected_mesh_idx = 0;
 			
-			u32 idx = 0;
 			if(ImGui::BeginCombo("Mesh Instances", selected_mesh_name.c_str()))
 			{
+				u32 idx = 0;
 				for(auto& mesh : AssetManager::get_disk_files_by_extension("gltf"))
 				{
 					if (ImGui::Selectable(mesh.file_name.c_str(), mesh.file_name == selected_mesh_name))
