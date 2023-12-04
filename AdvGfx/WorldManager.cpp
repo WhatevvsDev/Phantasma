@@ -1,13 +1,14 @@
 #include "WorldManager.h"
 #include "AssetManager.h"
 #include "JSONUtility.h"
+#include "Camera.h"
 
 #include <fstream>
 
 struct
 {
 	WorldManagerDeviceData device_data;
-	std::vector<CameraInstance> cameras;
+	std::vector<Camera::Instance> cameras;
 	std::vector<MeshInstanceHeader> mesh_instances {};
 
 	Material default_material = {glm::vec4(1.0f, 0.5f, 0.7f, 0.0f), 1.5f, 0.1f, MaterialType::Diffuse, 0.0f, 0.0f, 0.0f};

@@ -182,6 +182,7 @@
     <ClCompile Include="App.cpp" />
     <ClCompile Include="AssetManager.cpp" />
     <ClCompile Include="BVH.cpp" />
+    <ClCompile Include="Camera.cpp" />
     <ClCompile Include="Compute.cpp" />
     <ClCompile Include="imgui.cpp" />
     <ClCompile Include="ImGuizmo.cpp" />
@@ -212,6 +213,7 @@
     <ClInclude Include="App.h" />
     <ClInclude Include="AssetManager.h" />
     <ClInclude Include="BVH.h" />
+    <ClInclude Include="Camera.h" />
     <ClInclude Include="Common.h" />
     <ClInclude Include="Compute.h" />
     <ClInclude Include="IOUtility.h" />

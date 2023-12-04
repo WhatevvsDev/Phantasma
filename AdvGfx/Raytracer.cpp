@@ -8,6 +8,7 @@
 #include "Math.h"
 #include "BVH.h"
 #include "Material.h"
+#include "Camera.h"
 
 #define TINYGLTF_IMPLEMENTATION
 #include "tiny_gltf.h"
@@ -70,54 +71,52 @@ namespace Raytracer
 
 	struct
 	{
-		i32 accumulated_frame_limit { 32 };
-		i32 fps_limit				{ 80 };
+		i32 accumulated_frame_limit		{ 32 };
+		i32 fps_limit					{ 80 };
 
-		bool show_onscreen_log							{ true };
-		bool accumulate_frames							{ true };
-		bool limit_accumulated_frames					{ false };
-		bool fps_limit_enabled							{ false };
-
-		f32 camera_speed_t						{ 0.5f };
+		bool show_onscreen_log			{ true };
+		bool accumulate_frames			{ true };
+		bool limit_accumulated_frames	{ false };
+		bool fps_limit_enabled			{ false };
 	} settings;
 
 	struct SceneData
 	{
-		u32 resolution[2] { 0, 0 };
-		u32 mouse_pos[2] { 0, 0 };
-		u32 accumulated_frames { 0 };
-		u32 exr_width { 0 };
-		u32 exr_height { 0 };
-		u32 reset_accumulator { false };
-		glm::mat4 camera_transform {glm::identity<glm::mat4>()};
-		f32 exr_angle { 0.0f };
-		u32 material_idx { 0 };
-		f32 focal_distance;
-		f32 blur_radius;
-		u32 max_luma_idx { 0 };
-		u32 selected_object_idx { UINT_MAX };
-		u32 pad[3];
+		u32 resolution[2]			{ 0, 0 };
+		u32 mouse_pos[2]			{ 0, 0 };
+		u32 accumulated_frames		{ 0 };
+		u32 exr_width				{ 0 };
+		u32 exr_height				{ 0 };
+		u32 reset_accumulator		{ false };
+		glm::mat4 camera_transform	{ glm::identity<glm::mat4>() };
+		f32 exr_angle				{ 0.0f };
+		u32 material_idx			{ 0 };
+		f32 focal_distance			{ 0.0f };
+		f32 blur_radius				{ 0.0f };
+		u32 max_luma_idx			{ 0 };
+		u32 selected_object_idx		{ UINT_MAX };
+		u32 pad[3]					{ };
 	} scene_data;
 
 	struct
 	{
-		i32 selected_instance_idx { -1 }; // Signed so we can easily tell if they are valid or not
-		i32 hovered_instance_idx { -1 };
+		i32 selected_instance_idx		{ -1 }; // Signed so we can easily tell if they are valid or not (kind of a waste)
+		i32 hovered_instance_idx		{ -1 };
 
-		u32* buffer { nullptr };
+		u32* buffer						{ nullptr };
 
-		bool show_debug_ui { false };
-		bool save_render_to_file { false };
-		bool render_dirty { true };
-		bool world_dirty { true };
-		bool focus_on_clicked { false };
+		bool show_debug_ui				{ false };
+		bool save_render_to_file		{ false };
+		bool render_dirty				{ true };
+		bool world_dirty				{ true };
+		bool focus_on_clicked			{ false };
 
-		f32 distance_to_hovered { 0.0f };
+		f32 distance_to_hovered			{ 0.0f };
 
-		u32 accumulated_frames { 0 };
-		u32 render_width_px { 0 };
-		u32 render_height_px { 0 };
-		const u32 render_channel_count { 4 };
+		u32 accumulated_frames			{ 0 };
+		u32 render_width_px				{ 0 };
+		u32 render_height_px			{ 0 };
+		const u32 render_channel_count	{ 4 };
 		
 		ImGuizmo::OPERATION current_gizmo_operation { ImGuizmo::TRANSLATE };
 		ImGuizmo::OPERATION axis_gizmo_bitmask { all_axis_bits };
@@ -130,7 +129,9 @@ namespace Raytracer
 		std::string current_exr { "None" };
 
 		u32 active_camera_idx { 0 };
-		std::vector<CameraInstance> cameras;
+		std::vector<Camera::Instance> cameras;
+
+		Camera::Instance& get_active_camera_ref() { return cameras[active_camera_idx]; }
 	} internal;
 
 	namespace Input
@@ -160,21 +161,6 @@ namespace Raytracer
 				break;
 			}
 		}	
-	}
-
-	float camera_speed_t_to_m_per_second()
-	{
-		f32 adjusted_t = settings.camera_speed_t * 2.0f - 1.0f;
-		f32 value = pow(adjusted_t * 9.95f, 2.0f) * sgn(adjusted_t);
-
-		if(settings.camera_speed_t > 0.5f)
-		{
-			return glm::clamp(value + 1.0f, 0.01f, 100.0f);
-		}
-		else
-		{
-			return glm::clamp(1.0f / fabsf(value - 1.0f), 0.01f, 100.0f);
-		}
 	}
 
 	// TODO: Temporary variables, will be consolidated into one system later
@@ -228,13 +214,11 @@ namespace Raytracer
 			TryFromJSONVal(save_data, settings, limit_accumulated_frames);
 			TryFromJSONVal(save_data, settings, fps_limit_enabled);
 			
-			TryFromJSONVal(save_data, settings, camera_speed_t);
-
 			TryFromJSONVal(save_data, internal, cameras);
 		}
 
 		if(internal.cameras.empty())
-			internal.cameras.push_back(CameraInstance());
+			internal.cameras.push_back(Camera::Instance());
 	}
 
 	// TODO: This should probably not be in Raytracer.cpp
@@ -308,8 +292,6 @@ namespace Raytracer
 		ToJSONVal(save_data, settings, limit_accumulated_frames);
 		ToJSONVal(save_data, settings, fps_limit_enabled);
 
-		ToJSONVal(save_data, settings, camera_speed_t);
-
 		ToJSONVal(save_data, internal, cameras);
 
 		std::ofstream o("phantasma.data.json");
@@ -320,78 +302,6 @@ namespace Raytracer
 	{
 		WorldManager::serialize_scene();
 		terminate_save_data();
-	}
-
-	void update_orbit_camera_behavior(f32 delta_time_ms, CameraInstance& camera)
-	{
-		if(camera.orbit_automatically)
-		{
-			camera.orbit_camera_t += (delta_time_ms / 1000.0f) * camera.orbit_camera_rotations_per_second;
-			camera.orbit_camera_t = wrap_number(camera.orbit_camera_t, 0.0f, 1.0f); 
-
-			bool camera_is_orbiting = (camera.orbit_camera_rotations_per_second != 0.0f);
-
-			internal.render_dirty |= camera_is_orbiting;
-		}
-
-		glm::vec3 position_offset = glm::vec3(0.0f, 0.0f, camera.orbit_camera_distance);
-
-		camera.rotation = glm::vec3(camera.orbit_camera_angle, camera.orbit_camera_t * 360.0f, 0.0f);
-		position_offset = position_offset * glm::mat3(glm::eulerAngleXY(glm::radians(-camera.rotation.x), glm::radians(-camera.rotation.y)));
-
-		camera.position = camera.orbit_camera_position + position_offset;
-	}
-
-	void update_free_float_camera_behavior(float delta_time_ms, CameraInstance& camera)
-	{
-		i32 move_hor =	(ImGui::IsKeyDown(ImGuiKey_D))		- (ImGui::IsKeyDown(ImGuiKey_A));
-		i32 move_ver =	(ImGui::IsKeyDown(ImGuiKey_Space))	- (ImGui::IsKeyDown(ImGuiKey_LeftCtrl));
-		i32 move_ward =	(ImGui::IsKeyDown(ImGuiKey_W))		- (ImGui::IsKeyDown(ImGuiKey_S));
-				
-		glm::vec3 move_dir = glm::vec3(move_hor, move_ver, -move_ward);
-
-		move_dir = glm::normalize(move_dir * glm::mat3(glm::eulerAngleXY(glm::radians(-camera.rotation.x), glm::radians(-camera.rotation.y))));
-
-		bool camera_is_moving = (glm::dot(move_dir, move_dir) > 0.5f);
-
-		if(camera_is_moving)
-		{
-			glm::vec3 camera_move_delta = glm::vec3(move_dir * delta_time_ms * 0.01f) * camera_speed_t_to_m_per_second();
-			
-			internal.render_dirty = true;
-				
-			camera.position += camera_move_delta;
-		}
-
-		ImVec2 mouse_delta = ImGui::GetIO().MouseDelta;
-		glm::vec3 camera_delta = glm::vec3(-mouse_delta.y, -mouse_delta.x, 0);
-
-		bool pan = ImGui::GetIO().MouseDown[2];
-
-		bool camera_updating = (glm::dot(camera_delta, camera_delta) != 0.0f);
-		bool allow_camera_rotation = !internal.show_debug_ui;
-
-		if(pan && camera_updating)
-		{
-			glm::vec3 pan_vector = glm::vec3(camera_delta.y, -camera_delta.x, 0.0f) * 0.001f;
-
-			pan_vector = pan_vector * glm::mat3(glm::eulerAngleXY(glm::radians(-camera.rotation.x), glm::radians(-camera.rotation.y)));
-		
-			camera.position += pan_vector;
-
-			internal.render_dirty = true;
-		}
-		else if(allow_camera_rotation && camera_updating)
-		{
-			camera.rotation += camera_delta * 0.1f;
-
-			bool pitch_exceeds_limit = (fabs(camera.rotation.x) > 89.9f);
-
-			if(pitch_exceeds_limit)
-				camera.rotation.x = 89.9f * sgn(camera.rotation.x);
-
-			internal.render_dirty = true;
-		}
 	}
 
 	void update_instance_selection_behavior()
@@ -414,7 +324,7 @@ namespace Raytracer
 			{
 				if(valid_focus_hover)
 				{
-					internal.cameras[internal.active_camera_idx].focal_distance = internal.distance_to_hovered;
+					internal.get_active_camera_ref().focal_distance = internal.distance_to_hovered;
 					internal.focus_on_clicked = false;
 					internal.render_dirty = true;
 				}
@@ -479,6 +389,8 @@ namespace Raytracer
 
 	void update(const f32 delta_time_ms)
 	{		
+		auto& active_camera = internal.get_active_camera_ref();
+
 		bool pressed_any_move_key =	
 			(ImGui::IsKeyDown(ImGuiKey_W) || 
 			ImGui::IsKeyDown(ImGuiKey_A) || 
@@ -486,12 +398,11 @@ namespace Raytracer
 			ImGui::IsKeyDown(ImGuiKey_D)) &&
 			!ImGui::IsAnyItemFocused();
 
-		if(pressed_any_move_key)
-			internal.cameras[internal.active_camera_idx].camera_movement_type = CameraMovementType::Freecam;
+		if(!internal.show_debug_ui && pressed_any_move_key)
+			internal.cameras[internal.active_camera_idx].movement_type = Camera::MovementType::Freecam;
 
-		internal.cameras[internal.active_camera_idx].camera_movement_type == CameraMovementType::Orbit
-			? update_orbit_camera_behavior(delta_time_ms, internal.cameras[internal.active_camera_idx])
-			: update_free_float_camera_behavior(delta_time_ms, internal.cameras[internal.active_camera_idx]);
+		if(!internal.show_debug_ui || active_camera.movement_type == Camera::MovementType::Orbit)
+			internal.render_dirty |= Camera::update_instance(delta_time_ms, active_camera);
 
 		update_instance_selection_behavior();
 		update_instance_transform_hotkeys();
@@ -499,8 +410,8 @@ namespace Raytracer
 		bool recompiled_any_shaders = Compute::recompile_kernels(ComputeKernelRecompilationCondition::SourceChanged);
 		internal.render_dirty |= recompiled_any_shaders;
 
-		settings.camera_speed_t += ImGui::GetIO().MouseWheel * 0.01f;
-		settings.camera_speed_t = glm::fclamp(settings.camera_speed_t, 0.0f, 1.0f);
+		active_camera.camera_speed_t += ImGui::GetIO().MouseWheel * 0.01f;
+		active_camera.camera_speed_t = glm::fclamp(active_camera.camera_speed_t, 0.0f, 1.0f);
 	}
 
 	// Averages out acquired samples, and renders them to the screen
@@ -539,7 +450,7 @@ namespace Raytracer
 			internal.accumulated_frames = 0;
 		}
 
-		CameraInstance& active_camera = internal.cameras[internal.active_camera_idx];
+		auto& active_camera = internal.get_active_camera_ref();
 
 		scene_data.accumulated_frames = internal.accumulated_frames;
 		scene_data.selected_object_idx = internal.selected_instance_idx;
@@ -704,7 +615,7 @@ namespace Raytracer
 
 	void ui()
 	{
-		CameraInstance& active_camera = internal.cameras[internal.active_camera_idx];
+		auto& active_camera = internal.get_active_camera_ref();
 
 		if(!internal.show_debug_ui)
 			return;
@@ -746,21 +657,21 @@ namespace Raytracer
 			ImGui::SeparatorText("Camera");
 			ImGui::Indent();
 
-			if (ImGui::BeginCombo("Type", active_camera.camera_movement_type == CameraMovementType::Orbit ? "Orbit" : "Free"))
+			if (ImGui::BeginCombo("Type", active_camera.movement_type == Camera::MovementType::Orbit ? "Orbit" : "Free"))
 			{
-				if (ImGui::Selectable("Freecam", active_camera.camera_movement_type == CameraMovementType::Freecam))
-					active_camera.camera_movement_type = CameraMovementType::Freecam;
+				if (ImGui::Selectable("Freecam", active_camera.movement_type == Camera::MovementType::Freecam))
+					active_camera.movement_type = Camera::MovementType::Freecam;
 
-				if (ImGui::Selectable("Orbit", active_camera.camera_movement_type == CameraMovementType::Orbit))
+				if (ImGui::Selectable("Orbit", active_camera.movement_type == Camera::MovementType::Orbit))
 				{
-					active_camera.camera_movement_type = CameraMovementType::Orbit;
+					active_camera.movement_type = Camera::MovementType::Orbit;
 					internal.render_dirty = true;
 				}
 
 				ImGui::EndCombo();
 			}
 
-			if(active_camera.camera_movement_type == CameraMovementType::Orbit)
+			if(active_camera.movement_type == Camera::MovementType::Orbit)
 			{
 				internal.render_dirty |= ImGui::DragFloat3("Position", glm::value_ptr(active_camera.orbit_camera_position), 0.1f);
 				internal.render_dirty |= ImGui::DragFloat("Distance", &active_camera.orbit_camera_distance, 0.1f);
@@ -822,7 +733,7 @@ namespace Raytracer
 			if (ImGui::Button("Add Camera"))
 			{
 				// Copy over current camera as a new camera
-				internal.cameras.push_back(internal.cameras[internal.active_camera_idx]);
+				internal.cameras.push_back(internal.get_active_camera_ref());
 			}
 
 			ImGui::Dummy({20, 20});
