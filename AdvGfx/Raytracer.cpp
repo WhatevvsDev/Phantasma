@@ -409,7 +409,7 @@ namespace Raytracer
 		u32 render_area = internal.render_width_px * internal.render_height_px;
 		ComputeReadWriteBuffer screen_buffer({internal.buffer, (usize)(render_area)});
 
-		bool stop_accumulating_frames = settings.limit_accumulated_frames && (internal.accumulated_frames > (u32)settings.accumulated_frame_limit);
+		bool accumulate_frames = !(settings.limit_accumulated_frames && (internal.accumulated_frames > (u32)settings.accumulated_frame_limit));
 
 		static std::vector<BVHNode> tlas { BVHNode() };
 
@@ -421,7 +421,7 @@ namespace Raytracer
 			internal.world_dirty = false;
 		}
 
-		if(!stop_accumulating_frames)
+		if(accumulate_frames)
 		{
 			raytrace_trace_rays(tlas);
 			raytrace_average_samples(screen_buffer);
