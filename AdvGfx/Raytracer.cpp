@@ -40,7 +40,7 @@
 
 	// 2. NEE for emissive objects
 
-	// 3. Texture support
+	// 3. A bunch of error checking, we work primarily with indices into arrays and such, and there is no checking when loading a scene for example
 
 */
 

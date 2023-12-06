@@ -17,7 +17,8 @@ struct MeshInstanceHeader
 		transform, 
 		inverse_transform, 
 		mesh_idx,
-		material_idx);
+		material_idx,
+		texture_idx);
 };
 
 struct WorldManagerDeviceData
