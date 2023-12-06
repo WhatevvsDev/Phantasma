@@ -4862,7 +4862,6 @@ static int LevelIndex(int lx, int ly, int tile_level_mode, int num_x_levels) {
   default:
     return -1;
   }
-  return 0;
 }
 
 static int LevelSize(int toplevel_size, int level, int tile_rounding_mode) {
@@ -8570,7 +8569,11 @@ int EXRNumLevels(const EXRImage* exr_image) {
   if(exr_image->images) return 1; // scanlines
   int levels = 1;
   const EXRImage* level_image = exr_image;
-  while((level_image = level_image->next_level)) ++levels;
+  while((level_image))
+  {
+      level_image = level_image->next_level;
+    ++levels;
+  }
   return levels;
 }
 

@@ -21,14 +21,14 @@ struct MeshInstanceHeader
 		texture_idx);
 };
 
-struct WorldManagerDeviceData
+struct WorldDeviceData
 {
 	u32 mesh_instance_count;
 	u32 pad_0[3];
 	MeshInstanceHeader mesh_instances[4096]; // TODO: we do this because you can't get the proper size of a struct if it has a std::vector in it. find a workaround?
 };
 
-namespace WorldManager
+namespace World
 {
 	// Returns index of object
 	int add_instance_of_mesh(u32 mesh_idx);
@@ -40,7 +40,7 @@ namespace WorldManager
 	u32 get_material_count();
 	std::vector<Material>& get_material_vector();
 
-	WorldManagerDeviceData& get_world_device_data();
+	WorldDeviceData& get_world_device_data();
 
 	void serialize_scene();
 	void deserialize_scene();

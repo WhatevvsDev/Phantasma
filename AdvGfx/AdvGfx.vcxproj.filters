@@ -78,13 +78,13 @@
     <ClCompile Include="implot_items.cpp">
       <Filter>External Source</Filter>
     </ClCompile>
-    <ClCompile Include="AssetManager.cpp">
+    <ClCompile Include="Assets.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="implot_demo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="WorldManager.cpp">
+    <ClCompile Include="World.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="stdafx.cpp">
@@ -119,9 +119,6 @@
     <ClInclude Include="IOUtility.h">
       <Filter>Utils</Filter>
     </ClInclude>
-    <ClInclude Include="Common.h">
-      <Filter>Utils</Filter>
-    </ClInclude>
     <ClInclude Include="BVH.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -134,10 +131,10 @@
     <ClInclude Include="Utilities.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="AssetManager.h">
+    <ClInclude Include="Assets.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="WorldManager.h">
+    <ClInclude Include="World.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="PrimitiveTypes.h">
@@ -159,6 +156,5 @@
     <CopyFileToFolders Include="assets\compute\example.cl" />
     <CopyFileToFolders Include="assets\compute\make_heatmap.cl" />
     <CopyFileToFolders Include="assets\compute\raytrace.cl" />
-    <CopyFileToFolders Include="assets\compute\reinhard_tonemapping.cl" />
   </ItemGroup>
 </Project>

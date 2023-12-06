@@ -82,7 +82,7 @@ typedef struct WorldManagerDeviceData
 	MeshInstanceHeader instances[256];
 } WorldManagerDeviceData;
 
-float3 get_exr_color(float3 direction, float* exr, uint exr_width, uint exr_height, float exr_angle, uint max_luma_idx, bool include_sun)
+float3 get_exr_color(float3 direction, float* exr, int2 exr_size, float exr_angle, bool include_sun)
 {	
 	float theta = acos(direction.y);
 	float phi = atan2(direction.z, direction.x) + PI;
@@ -92,13 +92,10 @@ float3 get_exr_color(float3 direction, float* exr, uint exr_width, uint exr_heig
 	
 	u = wrap_float(u + exr_angle / 360.0f, 0.0f, 1.0f);
 
-	uint i = floor(u * exr_width);
-	uint j = floor(v * exr_height);
+	uint i = floor(u * (exr_size.x - 1u));
+	uint j = floor(v * (exr_size.y - 1u));
 
-	i = clamp(i, 0u, exr_width - 1u);
-	j = clamp(j, 0u, exr_height - 1u);
-
-	uint idx = (i + j * exr_width);
+	uint idx = (i + j * exr_size.x);
 
 	float4 color = sample_exr(exr, idx * 4u);
 
@@ -310,15 +307,13 @@ typedef struct TraceArgs
 	TextureHeader* texture_headers;
 	uint mesh_idx;
 	float* exr;
-	uint exr_width;
-	uint exr_height;
+	int2 exr_size;
 	float exr_angle;
 	WorldManagerDeviceData* world_data;
 	Material* materials;
 	uint material_idx;
 	float focal_distance;
 	float blur_radius;
-	uint max_luma_idx;
 	BVHNode* tlas_nodes;
 	uint* tlas_idx;
 	PixelDetailInformation* detail_buffer;
@@ -496,7 +491,7 @@ float3 trace(TraceArgs* args)
 
 		if(!hit_anything)
 		{
-			float3 exr_color = get_exr_color(current_ray.D, args->exr, args->exr_width, args->exr_height, args->exr_angle, args->max_luma_idx, is_primary_ray);
+			float3 exr_color = get_exr_color(current_ray.D, args->exr, args->exr_size, args->exr_angle, is_primary_ray);
 
 			// Hacky way to get rid of fireflies
 			exr_color = clamp(exr_color, 0.0f , 32.0f);
@@ -551,6 +546,8 @@ float3 trace(TraceArgs* args)
 			float3 material_color = mat.albedo.xyz * (mat.albedo.a + 1.0f);
 			float3 texture_color = 0;
 
+			bool is_emissive = mat.albedo.a != 0.0f;
+
 			// <Texture Lookup>
 			if(instance->texture_idx != -1)
 			{
@@ -601,10 +598,13 @@ float3 trace(TraceArgs* args)
 					float3 diffuse = brdf * 2.0f * dot(normal, current_ray.D);
 					float3 specular = material_color * (1.0f - mat.specularity);
 
-					float3 final_color = lerp(diffuse, specular, mat.specularity) * (1.0f - mat.absorbtion_coefficient);
+					float3 final_color = lerp(diffuse, specular, mat.specularity);
 
 					e += t * final_color;
 					t *= lerp(final_color, 1.0f, mat.specularity);
+
+					if(is_emissive)
+						break;
 
 					continue;
 				}
@@ -738,9 +738,9 @@ void kernel raytrace(
 	global PixelDetailInformation* detail_buffer
 	)
 {     
-	int width = scene_data->resolution_x;
-	int height = scene_data->resolution_y;
-	float aspect_ratio = (float)(scene_data->resolution_x) / (float)(scene_data->resolution_y);
+	int width = scene_data->resolution.x;
+	int height = scene_data->resolution.y;
+	float aspect_ratio = (float)(width) / (float)(height);
 
 	int x = get_global_id(0);
 	int y = get_global_id(1);
@@ -798,13 +798,11 @@ void kernel raytrace(
 	trace_args.rand_seed = &rand_seed;
 	trace_args.mesh_headers = mesh_headers;
 	trace_args.exr = exr;
-	trace_args.exr_width = scene_data->exr_width;
-	trace_args.exr_height = scene_data->exr_height;
+	trace_args.exr_size = scene_data->exr_size;
 	trace_args.exr_angle = scene_data->exr_angle;
 	trace_args.world_data = world_manager_data;
 	trace_args.material_idx = scene_data->material_idx;
 	trace_args.materials = materials;
-	trace_args.max_luma_idx = scene_data->max_luma_idx;
 	trace_args.tlas_nodes = tlas_nodes;
 	trace_args.detail_buffer = &detail_buffer[pixel_dest];
 	trace_args.textures = textures;
@@ -812,7 +810,7 @@ void kernel raytrace(
 
 	float3 color = trace(&trace_args);
 
-	bool is_mouse_ray = (x == scene_data->mouse_x) && (y == scene_data->mouse_y);
+	bool is_mouse_ray = (x == scene_data->mouse_pos.x) && (y == scene_data->mouse_pos.y);
 	bool ray_hit_anything = ray.t < 1e30f;
 
 	if(is_mouse_ray)
@@ -840,4 +838,3 @@ void kernel raytrace(
 		accumulation_buffer[pixel_dest * 4 + 2] += color.z;
 	}
 }
-

@@ -1,4 +1,4 @@
-#include "AssetManager.h"
+#include "Assets.h"
 
 #include "BVH.h"
 
@@ -81,14 +81,14 @@ void find_disk_assets()
 			}
 			case hashstr("gltf"):
 			{
-				AssetManager::load_mesh(file_path);
+				Assets::load_mesh(file_path);
 				break;
 			}
 			case hashstr("png"):
 			case hashstr("jpg"):
 			case hashstr("jpeg"):
 			{
-				AssetManager::load_texture(file_path);
+				Assets::load_texture(file_path);
 				break;
 			}
 		}
@@ -97,12 +97,12 @@ void find_disk_assets()
 	}
 }
 
-void AssetManager::init()
+void Assets::init()
 {
 	find_disk_assets();
 }
 
-std::vector<DiskAsset>& AssetManager::get_disk_files_by_extension(const std::string& extension)
+std::vector<DiskAsset>& Assets::get_disk_files_by_extension(const std::string& extension)
 {
 	// TODO: Don't know if theres a better way to do this?
 	static std::vector<DiskAsset> empty_vector;
@@ -115,7 +115,7 @@ std::vector<DiskAsset>& AssetManager::get_disk_files_by_extension(const std::str
 	return assets_vector->second;
 }
 
-void AssetManager::load_mesh(const std::filesystem::path path)
+void Assets::load_mesh(const std::filesystem::path path)
 {
 	std::string file_name = path.filename().string();
 
@@ -175,7 +175,7 @@ void AssetManager::load_mesh(const std::filesystem::path path)
 	internal.tri_idx_compute_buffer	= new ComputeWriteBuffer({internal.consolidated_tri_idxs});
 }
 
-void AssetManager::load_texture(const std::filesystem::path path)
+void Assets::load_texture(const std::filesystem::path path)
 {
 	delete internal.texture_compute_buffer;
 	delete internal.texture_header_compute_buffer;
@@ -195,7 +195,7 @@ void AssetManager::load_texture(const std::filesystem::path path)
 	TextureHeader loaded_texture_header;
 	loaded_texture_header.width = (u32)width;
 	loaded_texture_header.height = (u32)height;
-	loaded_texture_header.start_offset = internal.consolidated_textures.size();
+	loaded_texture_header.start_offset = (u32)internal.consolidated_textures.size();
 
 	internal.consolidated_textures.reserve(width * height);
 	internal.consolidated_textures.insert(internal.consolidated_textures.end(), pixels.begin(), pixels.end());
@@ -208,68 +208,68 @@ void AssetManager::load_texture(const std::filesystem::path path)
 	delete data;
 }
 
-u32 AssetManager::get_texture_count()
+u32 Assets::get_texture_count()
 {
 	return (u32)internal.texture_headers.size();
 }
 
-void AssetManager::reconstruct_bvh(std::string mesh)
+void Assets::reconstruct_bvh(std::string mesh)
 {
 	internal.meshes.find(mesh)->second.reconstruct_bvh();
 }
 
 // TODO: This is disgusting, find a better way
-ComputeWriteBuffer& AssetManager::get_tris_compute_buffer()
+ComputeWriteBuffer& Assets::get_tris_compute_buffer()
 {
 	return *internal.tris_compute_buffer;
 }
 
-ComputeWriteBuffer& AssetManager::get_normals_compute_buffer()
+ComputeWriteBuffer& Assets::get_normals_compute_buffer()
 {
 	return *internal.normals_compute_buffer;
 }
 
-ComputeWriteBuffer& AssetManager::get_uvs_compute_buffer()
+ComputeWriteBuffer& Assets::get_uvs_compute_buffer()
 {
 	return *internal.uvs_compute_buffer;
 }
 
-ComputeWriteBuffer& AssetManager::get_bvh_compute_buffer()
+ComputeWriteBuffer& Assets::get_bvh_compute_buffer()
 {
 	return *internal.bvh_compute_buffer;
 }
 
-ComputeWriteBuffer& AssetManager::get_tri_idx_compute_buffer()
+ComputeWriteBuffer& Assets::get_tri_idx_compute_buffer()
 {
 	return *internal.tri_idx_compute_buffer;
 }
 
-ComputeWriteBuffer& AssetManager::get_mesh_header_buffer()
+ComputeWriteBuffer& Assets::get_mesh_header_buffer()
 {
 	return *internal.mesh_header_compute_buffer;
 }
 
-ComputeWriteBuffer& AssetManager::get_texture_compute_buffer()
+ComputeWriteBuffer& Assets::get_texture_compute_buffer()
 {
 	return *internal.texture_compute_buffer;
 }
 
-ComputeWriteBuffer& AssetManager::get_texture_header_buffer()
+ComputeWriteBuffer& Assets::get_texture_header_buffer()
 {
 	return *internal.texture_header_compute_buffer;
 }
 
-std::vector<MeshHeader>& AssetManager::get_mesh_headers()
+std::vector<MeshHeader>& Assets::get_mesh_headers()
 {
 	return internal.mesh_headers;
 }
 
-std::unordered_map<std::string, Mesh>& AssetManager::get_meshes()
+std::unordered_map<std::string, Mesh>& Assets::get_meshes()
 {
 	return internal.meshes;
 }
 
-BVHNode AssetManager::get_root_bvh_node_of_mesh(u32 idx)
+BVHNode Assets::get_root_bvh_node_of_mesh(u32 idx)
 {
 	auto mesh_header = internal.mesh_headers[idx];
 

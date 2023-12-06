@@ -1,6 +1,6 @@
 #include "BVH.h"
-#include "WorldManager.h"
-#include "AssetManager.h"
+#include "World.h"
+#include "Assets.h"
 
 float aabb_area(const glm::vec3& extent)
 {
@@ -328,7 +328,7 @@ void TLASBuilder::subdivide( uint nodeIdx)
 
 TLASBuilder::TLASBuilder()
 {
-	auto& world_data = WorldManager::get_world_device_data();
+	auto& world_data = World::get_world_device_data();
 	u32 instance_count = world_data.mesh_instance_count;
 
 	if(instance_count == 0)
@@ -346,7 +346,7 @@ TLASBuilder::TLASBuilder()
 	{
 		tri_idx[i] = i;
 
-		auto bvhnode = AssetManager::get_root_bvh_node_of_mesh(world_data.mesh_instances[i].mesh_idx);
+		auto bvhnode = Assets::get_root_bvh_node_of_mesh(world_data.mesh_instances[i].mesh_idx);
 
 		instance_bounding_boxes[i].min = bvhnode.min;
 		instance_bounding_boxes[i].max = bvhnode.max;

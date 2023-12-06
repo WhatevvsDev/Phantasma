@@ -75,7 +75,7 @@ Mesh::Mesh(const std::string& path)
 		// Indices into the vertex buffer for each vertex of a triangle
 
 		if(indices_exist)
-			for(int j = 0; j < 3; j++)
+			for(i32 j = 0; j < 3; j++)
 				tri_indices[j] = indices[i + j];
 
 
@@ -106,7 +106,6 @@ Mesh::Mesh(const std::string& path)
 	build_timer.reset();
 	bvh = new BVH(tris);
 	LOGDEBUG(std::format("Built BVH for {} in {} ms", get_file_name_from_path_string(path), (u32)build_timer.to_now()));
-
 }
 
 void Mesh::reconstruct_bvh()

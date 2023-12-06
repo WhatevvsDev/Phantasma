@@ -51,4 +51,6 @@ namespace Camera
 
 	// Returns whether camera transform or state has changed
 	bool update_instance(f32 delta_time_ms, Camera::Instance& instance);
+
+	glm::mat4 get_instance_matrix(Camera::Instance& instance);
 }

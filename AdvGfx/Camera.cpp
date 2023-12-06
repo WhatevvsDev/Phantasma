@@ -97,6 +97,9 @@ bool freecam_camera_behavior(f32 delta_time_ms, Camera::Instance& camera)
 
 bool Camera::update_instance(f32 delta_time_ms, Camera::Instance& instance)
 {
+	instance.camera_speed_t += ImGui::GetIO().MouseWheel * 0.01f;
+	instance.camera_speed_t = glm::fclamp(instance.camera_speed_t, 0.0f, 1.0f);
+
 	switch (instance.movement_type)
 	{
 	case MovementType::Orbit:
@@ -106,4 +109,14 @@ bool Camera::update_instance(f32 delta_time_ms, Camera::Instance& instance)
 	}
 
 	return false;
+}
+
+glm::mat4 Camera::get_instance_matrix(Camera::Instance& instance)
+{
+	glm::mat4 new_transform = glm::identity<glm::mat4>();
+			
+	new_transform *= glm::translate(instance.position);
+	new_transform *= glm::eulerAngleYX(glm::radians(instance.rotation.y), glm::radians(instance.rotation.x));
+
+	return new_transform;
 }

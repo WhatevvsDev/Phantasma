@@ -9,10 +9,10 @@ void kernel average_accumulated(
 	int x = get_global_id(0);
 	int y = get_global_id(1);
 
-	uint pixel_idx = (x + y * scene_data->resolution_x);
+	uint pixel_idx = (x + y * scene_data->resolution.x);
 	
-	int width = scene_data->resolution_x;
-	int height = scene_data->resolution_y;
+	int width = scene_data->resolution.x;
+	int height = scene_data->resolution.y;
 
 	uint neighbors_idx[8] = 
 	{

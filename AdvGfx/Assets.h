@@ -36,7 +36,7 @@ struct DiskAsset
 	std::string file_name;
 };
 
-namespace AssetManager
+namespace Assets
 {
 	void init();
 

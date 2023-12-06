@@ -259,22 +259,17 @@ float saturate(float value)
 
 typedef struct SceneData
 {
-	uint resolution_x;
-	uint resolution_y;
-	uint mouse_x;
-	uint mouse_y;
+	uint2 resolution;
+	uint2 mouse_pos;
+	int2 exr_size;
 	int accumulated_frames;
-	uint exr_width;
-	uint exr_height;
 	bool reset_accumulator;
 	float camera_transform[16];
 	float exr_angle;
 	uint material_idx;
 	float focal_distance;
 	float blur_radius;
-	uint max_luma_idx;
 	uint selected_object_idx;
-	uint pad[3];
 } SceneData;
 
 #endif

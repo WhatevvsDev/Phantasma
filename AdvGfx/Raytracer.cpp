@@ -3,8 +3,8 @@
 #include <GLFW/glfw3.h>
 
 #include "Compute.h"
-#include "AssetManager.h"
-#include "WorldManager.h"
+#include "Assets.h"
+#include "World.h"
 #include "Math.h"
 #include "BVH.h"
 #include "Material.h"
@@ -61,11 +61,12 @@ namespace Raytracer
 		Z
 	};
 
-	const ImGuizmo::OPERATION axis_bits[3] = {
-			(ImGuizmo::OPERATION)(ImGuizmo::TRANSLATE_X | ImGuizmo::ROTATE_X | ImGuizmo::SCALE_X),
-			(ImGuizmo::OPERATION)(ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Y | ImGuizmo::SCALE_Y),
-			(ImGuizmo::OPERATION)(ImGuizmo::TRANSLATE_Z | ImGuizmo::ROTATE_Z | ImGuizmo::SCALE_Z)
-		};
+	const ImGuizmo::OPERATION axis_bits[3] = 
+	{
+		(ImGuizmo::OPERATION)(ImGuizmo::TRANSLATE_X | ImGuizmo::ROTATE_X | ImGuizmo::SCALE_X),
+		(ImGuizmo::OPERATION)(ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Y | ImGuizmo::SCALE_Y),
+		(ImGuizmo::OPERATION)(ImGuizmo::TRANSLATE_Z | ImGuizmo::ROTATE_Z | ImGuizmo::SCALE_Z)
+	};
 
 	ImGuizmo::OPERATION all_axis_bits = (ImGuizmo::OPERATION)(axis_bits[0] | axis_bits[1] | axis_bits[2]);;
 
@@ -84,18 +85,15 @@ namespace Raytracer
 	{
 		u32 resolution[2]			{ 0, 0 };
 		u32 mouse_pos[2]			{ 0, 0 };
+		i32 exr_size[2]				{ 0, 0 };
 		u32 accumulated_frames		{ 0 };
-		u32 exr_width				{ 0 };
-		u32 exr_height				{ 0 };
 		u32 reset_accumulator		{ false };
 		glm::mat4 camera_transform	{ glm::identity<glm::mat4>() };
 		f32 exr_angle				{ 0.0f };
 		u32 material_idx			{ 0 };
 		f32 focal_distance			{ 0.0f };
 		f32 blur_radius				{ 0.0f };
-		u32 max_luma_idx			{ 0 };
 		u32 selected_object_idx		{ UINT_MAX };
-		u32 pad[3]					{ };
 	} scene_data;
 
 	struct
@@ -208,12 +206,10 @@ namespace Raytracer
 
 			TryFromJSONVal(save_data, settings, accumulated_frame_limit);
 			TryFromJSONVal(save_data, settings, fps_limit);
-
 			TryFromJSONVal(save_data, settings, show_onscreen_log);
 			TryFromJSONVal(save_data, settings, accumulate_frames);
 			TryFromJSONVal(save_data, settings, limit_accumulated_frames);
 			TryFromJSONVal(save_data, settings, fps_limit_enabled);
-			
 			TryFromJSONVal(save_data, internal, cameras);
 		}
 
@@ -224,39 +220,20 @@ namespace Raytracer
 	// TODO: This should probably not be in Raytracer.cpp
 	void load_exr(u32 index = 0)
 	{
-		std::string exr_path = AssetManager::get_disk_files_by_extension("exr")[index].path.string();
+		std::string exr_path = Assets::get_disk_files_by_extension("exr")[index].path.string();
 		std::string file_name_with_extension = exr_path.substr(exr_path.find_last_of("/\\") + 1);
 
 		internal.current_exr = file_name_with_extension;
 
-		i32 width;
-		i32 height;
 		const char* err = nullptr;
 
 		delete[] internal.loaded_exr_data;
-		LoadEXR(&internal.loaded_exr_data, &width, &height, exr_path.c_str(), &err);
+		LoadEXR(&internal.loaded_exr_data, &scene_data.exr_size[0], &scene_data.exr_size[1], exr_path.c_str(), &err);
 
 		if(err)
-		{
 			LOGERROR(err);
-		}
 		
-		scene_data.exr_width = (u32)width;
-		scene_data.exr_height = (u32)height;
-
-		// Finding the brightest spot on the exr, assumed to be the sun for NEE
-		f32 max_luma = -1e34f;
-		for(u32 idx = 0; idx < (u32)width * (u32)height; idx++)
-		{
-			glm::vec4 value = *(((glm::vec4*)internal.loaded_exr_data) + idx);
-			f32 luma = (value.x * 0.2126f + value.y * 0.7152f + value.z * 0.0722f) * value.w;
-			max_luma = glm::max(luma, max_luma);
-
-			if(luma == max_luma)
-				scene_data.max_luma_idx = idx;
-		}
-
-		exr_buffer = new ComputeWriteBuffer({internal.loaded_exr_data, (usize)(width * height * 4)});
+		exr_buffer = new ComputeWriteBuffer({internal.loaded_exr_data, (usize)(scene_data.exr_size[0] * scene_data.exr_size[1] * 4)});
 		internal.render_dirty = true;
 	}
 
@@ -272,11 +249,11 @@ namespace Raytracer
 		internal.gpu_accumulation_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * internal.render_channel_count * sizeof(float)));
 		internal.gpu_detail_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * sizeof(PixelDetailInformation)));
 
-		AssetManager::init();
+		Assets::init();
 		
 		load_exr();
 
-		WorldManager::deserialize_scene();
+		World::deserialize_scene();
 	}
 
 	// Saves data such as settings, or world state to phantasma.data.json
@@ -286,12 +263,10 @@ namespace Raytracer
 
 		ToJSONVal(save_data, settings, accumulated_frame_limit);
 		ToJSONVal(save_data, settings, fps_limit);
-
 		ToJSONVal(save_data, settings, show_onscreen_log);
 		ToJSONVal(save_data, settings, accumulate_frames);
 		ToJSONVal(save_data, settings, limit_accumulated_frames);
 		ToJSONVal(save_data, settings, fps_limit_enabled);
-
 		ToJSONVal(save_data, internal, cameras);
 
 		std::ofstream o("phantasma.data.json");
@@ -300,7 +275,7 @@ namespace Raytracer
 
 	void terminate()
 	{
-		WorldManager::serialize_scene();
+		World::serialize_scene();
 		terminate_save_data();
 	}
 
@@ -336,36 +311,8 @@ namespace Raytracer
 		}
 	}
 
-	void axis_lock_change(LockAxis axis)
-	{
-		if(internal.axis_gizmo_bitmask == all_axis_bits)
-		{
-			internal.axis_gizmo_bitmask = axis_bits[(int)axis];
-			return;
-		}
-
-		if(internal.axis_gizmo_bitmask & axis_bits[(int)axis])
-		{
-			internal.axis_gizmo_bitmask = (ImGuizmo::OPERATION)(internal.axis_gizmo_bitmask ^ axis_bits[(int)axis]);
-		}
-		else
-		{
-			internal.axis_gizmo_bitmask = (ImGuizmo::OPERATION)(internal.axis_gizmo_bitmask | axis_bits[(int)axis]);
-		}
-
-		if((int)internal.axis_gizmo_bitmask == 0)
-		{
-			internal.axis_gizmo_bitmask = all_axis_bits;
-		}
-
-	}
-
 	void update_instance_transform_hotkeys()
 	{
-		bool x_axis = ImGui::IsKeyPressed(ImGuiKey_X);
-		bool y_axis = ImGui::IsKeyPressed(ImGuiKey_Y);
-		bool z_axis = ImGui::IsKeyPressed(ImGuiKey_Z);
-		
 		bool translate = ImGui::IsKeyPressed(ImGuiKey_G);
 		bool rotate = ImGui::IsKeyPressed(ImGuiKey_R);
 		bool scale = ImGui::IsKeyPressed(ImGuiKey_E);
@@ -381,10 +328,6 @@ namespace Raytracer
 
 		if(translate || rotate || scale)
 			internal.axis_gizmo_bitmask = all_axis_bits;
-
-		if(x_axis) axis_lock_change(LockAxis::X);
-		if(y_axis) axis_lock_change(LockAxis::Y);
-		if(z_axis) axis_lock_change(LockAxis::Z);
 	}
 
 	void update(const f32 delta_time_ms)
@@ -398,10 +341,12 @@ namespace Raytracer
 			ImGui::IsKeyDown(ImGuiKey_D)) &&
 			!ImGui::IsAnyItemFocused();
 
-		if(!internal.show_debug_ui && pressed_any_move_key)
-			internal.cameras[internal.active_camera_idx].movement_type = Camera::MovementType::Freecam;
+		bool ui_closed = !internal.show_debug_ui;
 
-		if(!internal.show_debug_ui || active_camera.movement_type == Camera::MovementType::Orbit)
+		if(ui_closed && pressed_any_move_key)
+			active_camera.movement_type = Camera::MovementType::Freecam;
+
+		if(ui_closed || active_camera.movement_type == Camera::MovementType::Orbit)
 			internal.render_dirty |= Camera::update_instance(delta_time_ms, active_camera);
 
 		update_instance_selection_behavior();
@@ -409,12 +354,35 @@ namespace Raytracer
 
 		bool recompiled_any_shaders = Compute::recompile_kernels(ComputeKernelRecompilationCondition::SourceChanged);
 		internal.render_dirty |= recompiled_any_shaders;
-
-		active_camera.camera_speed_t += ImGui::GetIO().MouseWheel * 0.01f;
-		active_camera.camera_speed_t = glm::fclamp(active_camera.camera_speed_t, 0.0f, 1.0f);
 	}
 
 	// Averages out acquired samples, and renders them to the screen
+	void raytrace_trace_rays(std::vector<BVHNode>& tlas)
+	{
+		ComputeOperation("raytrace.cl")
+			.read_write(*internal.gpu_accumulation_buffer)	
+			.read(ComputeReadBuffer({&internal.hovered_instance_idx, 1}))
+			.read(ComputeReadBuffer({&internal.distance_to_hovered, 1}))
+			.write(Assets::get_normals_compute_buffer())
+			.write(Assets::get_uvs_compute_buffer())
+			.write(Assets::get_tris_compute_buffer())
+			.write(Assets::get_bvh_compute_buffer())
+			.write(Assets::get_tri_idx_compute_buffer())
+			.write(Assets::get_mesh_header_buffer())
+			.write(Assets::get_texture_compute_buffer())
+			.write(Assets::get_texture_header_buffer())
+			.write({&scene_data, 1})
+			.write(*exr_buffer)
+			.write({&World::get_world_device_data(), 1})
+			.write(World::get_material_vector())
+			.write(tlas)
+			.read_write(*internal.gpu_detail_buffer)	
+			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
+			.execute();
+
+			internal.accumulated_frames++;
+	}
+
 	void raytrace_average_samples(const ComputeReadWriteBuffer& screen_buffer)
 	{
 		f32 samples_reciprocal = 1.0f / (f32)internal.accumulated_frames;
@@ -456,16 +424,10 @@ namespace Raytracer
 		scene_data.selected_object_idx = internal.selected_instance_idx;
 		scene_data.focal_distance = active_camera.focal_distance;
 		scene_data.blur_radius = active_camera.blur_radius;
+		scene_data.camera_transform = Camera::get_instance_matrix(active_camera);
 
 		u32 render_area = internal.render_width_px * internal.render_height_px;
 		ComputeReadWriteBuffer screen_buffer({internal.buffer, (usize)(render_area)});
-
-		glm::mat4 new_transform = glm::identity<glm::mat4>();
-			
-		new_transform *= glm::translate(active_camera.position);
-		new_transform *= glm::eulerAngleYX(glm::radians(active_camera.rotation.y), glm::radians(active_camera.rotation.x));
-
-		scene_data.camera_transform = new_transform;
 
 		bool stop_accumulating_frames = settings.limit_accumulated_frames && (internal.accumulated_frames > (u32)settings.accumulated_frame_limit);
 
@@ -479,37 +441,13 @@ namespace Raytracer
 			internal.world_dirty = false;
 		}
 
-		if(stop_accumulating_frames)
-			goto skip_rendering_goto;
+		if(!stop_accumulating_frames)
+		{
+			raytrace_trace_rays(tlas);
+			raytrace_average_samples(screen_buffer);
 
-		internal.accumulated_frames++;
-
-		ComputeOperation("raytrace.cl")
-			.read_write(*internal.gpu_accumulation_buffer)	
-			.read(ComputeReadBuffer({&internal.hovered_instance_idx, 1}))
-			.read(ComputeReadBuffer({&internal.distance_to_hovered, 1}))
-			.write(AssetManager::get_normals_compute_buffer())
-			.write(AssetManager::get_uvs_compute_buffer())
-			.write(AssetManager::get_tris_compute_buffer())
-			.write(AssetManager::get_bvh_compute_buffer())
-			.write(AssetManager::get_tri_idx_compute_buffer())
-			.write(AssetManager::get_mesh_header_buffer())
-			.write(AssetManager::get_texture_compute_buffer())
-			.write(AssetManager::get_texture_header_buffer())
-			.write({&scene_data, 1})
-			.write(*exr_buffer)
-			.write({&WorldManager::get_world_device_data(), 1})
-			.write(WorldManager::get_material_vector())
-			.write(tlas)
-			.read_write(*internal.gpu_detail_buffer)	
-			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
-			.execute();
-
-		raytrace_average_samples(screen_buffer);
-
-		scene_data.reset_accumulator = false;
-
-		skip_rendering_goto:;
+			scene_data.reset_accumulator = false;
+		}
 
 		raytrace_save_render_to_file();
 	}
@@ -580,7 +518,7 @@ namespace Raytracer
 
 		ImGui::SeparatorText("Transform");
 
-		MeshInstanceHeader& instance = WorldManager::get_mesh_device_data(internal.selected_instance_idx);
+		MeshInstanceHeader& instance = World::get_mesh_device_data(internal.selected_instance_idx);
 		bool transformed = false;
 
 		glm::vec3 translation;
@@ -606,16 +544,16 @@ namespace Raytracer
 		ImGui::SeparatorText("Material");
 
 		internal.render_dirty |= ImGui::InputInt("Texture index", &instance.texture_idx, 1, 1);
-		instance.texture_idx = glm::clamp(instance.texture_idx, -1, (i32)AssetManager::get_texture_count() - 1);
+		instance.texture_idx = glm::clamp(instance.texture_idx, -1, (i32)Assets::get_texture_count() - 1);
 
 		i32 mat_idx_proxy = (i32) instance.material_idx;
 		internal.render_dirty |= ImGui::InputInt("Material", &mat_idx_proxy, 1);
-		if(mat_idx_proxy > (i32)WorldManager::get_material_count() - 1)
-			WorldManager::add_material();
+		if(mat_idx_proxy > (i32)World::get_material_count() - 1)
+			World::add_material();
 		mat_idx_proxy = glm::max(mat_idx_proxy, 0);
 		instance.material_idx = (u32)mat_idx_proxy;
 
-		ui_material_editor(WorldManager::get_material_ref(instance.material_idx));
+		ui_material_editor(World::get_material_ref(instance.material_idx));
 	}
 
 	void ui()
@@ -635,11 +573,11 @@ namespace Raytracer
 
 			if(any_instance_is_selected)
 			{
-				WorldManager::remove_mesh_instance(internal.selected_instance_idx);
+				World::remove_mesh_instance(internal.selected_instance_idx);
 				internal.world_dirty = true;
 			}
 
-			bool selected_index_out_of_range = (i32)WorldManager::get_world_device_data().mesh_instance_count <= internal.selected_instance_idx;
+			bool selected_index_out_of_range = (i32)World::get_world_device_data().mesh_instance_count <= internal.selected_instance_idx;
 
 			if(selected_index_out_of_range)
 			{
@@ -792,7 +730,7 @@ namespace Raytracer
 			if(ImGui::BeginCombo("EXRs", internal.current_exr.c_str()))
 			{
 				u32 idx = 0;
-				for(auto exr : AssetManager::get_disk_files_by_extension("exr"))
+				for(auto exr : Assets::get_disk_files_by_extension("exr"))
 				{
 					if (ImGui::Selectable((exr.file_name + ".exr").c_str(), exr.file_name == internal.current_exr))
 					{
@@ -812,13 +750,13 @@ namespace Raytracer
 			
 			scene_data.exr_angle = wrap_number(scene_data.exr_angle, 0.0f, 360.0f);
 
-			static std::string selected_mesh_name = AssetManager::get_disk_files_by_extension("gltf").begin()->file_name;
+			static std::string selected_mesh_name = Assets::get_disk_files_by_extension("gltf").begin()->file_name;
 			static u32 selected_mesh_idx = 0;
 			
 			if(ImGui::BeginCombo("Mesh Instances", selected_mesh_name.c_str()))
 			{
 				u32 idx = 0;
-				for(auto& mesh : AssetManager::get_disk_files_by_extension("gltf"))
+				for(auto& mesh : Assets::get_disk_files_by_extension("gltf"))
 				{
 					if (ImGui::Selectable(mesh.file_name.c_str(), mesh.file_name == selected_mesh_name))
 					{
@@ -833,7 +771,7 @@ namespace Raytracer
 
 			if(ImGui::Button("Add Instance"))
 			{
-				internal.selected_instance_idx = WorldManager::add_instance_of_mesh(selected_mesh_idx);
+				internal.selected_instance_idx = World::add_instance_of_mesh(selected_mesh_idx);
 				internal.world_dirty = true;
 			}
 
@@ -851,13 +789,13 @@ namespace Raytracer
 
 			if(ImGui::Button("Add new"))
 			{
-				WorldManager::add_material();
+				World::add_material();
 			}
 
 			u32 number_idx = 0;
-			for(u32 idx = 0; idx < WorldManager::get_material_count(); idx++)
+			for(u32 idx = 0; idx < World::get_material_count(); idx++)
 			{
-				auto current_material = WorldManager::get_material_ref(idx);
+				auto current_material = World::get_material_ref(idx);
 
 				if (ImGui::TreeNode(("## material list index" + std::to_string(number_idx)).c_str()))
 				{
@@ -888,7 +826,7 @@ namespace Raytracer
 		{
 			i32 transform_idx = internal.selected_instance_idx;
 
-			MeshInstanceHeader& instance = WorldManager::get_mesh_device_data(transform_idx);
+			MeshInstanceHeader& instance = World::get_mesh_device_data(transform_idx);
 			glm::mat4 transform = instance.transform;
 
 			glm::mat4 projection = glm::perspectiveRH(glm::radians(90.0f), (f32)internal.render_width_px / (f32)internal.render_height_px, 0.1f, 1000.0f);
