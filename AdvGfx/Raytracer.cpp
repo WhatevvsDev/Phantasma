@@ -54,22 +54,6 @@ namespace Raytracer
 		u32 pad;
 	};
 
-	enum class LockAxis
-	{
-		X,
-		Y,
-		Z
-	};
-
-	const ImGuizmo::OPERATION axis_bits[3] = 
-	{
-		(ImGuizmo::OPERATION)(ImGuizmo::TRANSLATE_X | ImGuizmo::ROTATE_X | ImGuizmo::SCALE_X),
-		(ImGuizmo::OPERATION)(ImGuizmo::TRANSLATE_Y | ImGuizmo::ROTATE_Y | ImGuizmo::SCALE_Y),
-		(ImGuizmo::OPERATION)(ImGuizmo::TRANSLATE_Z | ImGuizmo::ROTATE_Z | ImGuizmo::SCALE_Z)
-	};
-
-	ImGuizmo::OPERATION all_axis_bits = (ImGuizmo::OPERATION)(axis_bits[0] | axis_bits[1] | axis_bits[2]);;
-
 	struct
 	{
 		i32 accumulated_frame_limit		{ 32 };
@@ -117,7 +101,6 @@ namespace Raytracer
 		const u32 render_channel_count	{ 4 };
 		
 		ImGuizmo::OPERATION current_gizmo_operation { ImGuizmo::TRANSLATE };
-		ImGuizmo::OPERATION axis_gizmo_bitmask { all_axis_bits };
 
 		ComputeGPUOnlyBuffer* gpu_accumulation_buffer { nullptr };
 		ComputeGPUOnlyBuffer* gpu_detail_buffer { nullptr };
@@ -325,9 +308,6 @@ namespace Raytracer
 
 		if(scale)
 			internal.current_gizmo_operation = ImGuizmo::SCALE;
-
-		if(translate || rotate || scale)
-			internal.axis_gizmo_bitmask = all_axis_bits;
 	}
 
 	void update(const f32 delta_time_ms)
@@ -831,7 +811,7 @@ namespace Raytracer
 
 			glm::mat4 projection = glm::perspectiveRH(glm::radians(90.0f), (f32)internal.render_width_px / (f32)internal.render_height_px, 0.1f, 1000.0f);
 
-			if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection), (ImGuizmo::OPERATION)(internal.current_gizmo_operation & internal.axis_gizmo_bitmask), ImGuizmo::LOCAL, glm::value_ptr(transform)))
+			if (ImGuizmo::Manipulate(glm::value_ptr(view), glm::value_ptr(projection), (ImGuizmo::OPERATION)(internal.current_gizmo_operation), ImGuizmo::LOCAL, glm::value_ptr(transform)))
 			{
 				instance.transform = transform;
 				instance.inverse_transform = glm::inverse(transform);
