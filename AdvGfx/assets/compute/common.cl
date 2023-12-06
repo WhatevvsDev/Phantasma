@@ -29,7 +29,7 @@ float RandomFloat( uint* s )
 
 float4 sample_exr(float* exr, uint idx)
 {
-	return (float4)(exr[idx + 0], exr[idx + 1], exr[idx + 2], exr[idx + 3]);
+	return (float4)(exr[idx + 0], exr[idx + 1], exr[idx + 2], exr[idx + 3]) * 1.0f;
 };
 
 float wrap_float(float val, float min, float max) 

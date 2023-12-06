@@ -45,12 +45,24 @@ typedef struct MeshHeader
 	uint normals_offset;
 	uint normals_count; // Is in theory always 3x tris_count;
 
+	uint uvs_offset;
+
 	uint root_bvh_node_idx;
 	uint bvh_node_count; // Technically could be unnecessary
 
 	uint tri_idx_offset;
 	uint tri_idx_count;
+
+	uint pad;
 } MeshHeader;
+
+typedef struct TextureHeader
+{
+	uint start_offset;
+	uint width;
+	uint height;
+	uint pad;
+} TextureHeader;
 
 typedef struct MeshInstanceHeader
 {
@@ -59,6 +71,8 @@ typedef struct MeshInstanceHeader
 		
 	uint mesh_idx;
 	uint material_idx;
+	uint texture_idx;
+	uint pad;
 } MeshInstanceHeader;
 
 typedef struct WorldManagerDeviceData
@@ -244,11 +258,24 @@ float3 interpolate_tri_normal(float4* normals, struct Ray* ray)
 	float v = ray->intersection.v;
 	float w = 1.0f - u - v;
 
-	float3 v0normal = normals[ray->intersection.tri_hit * 3 + 0].xyz;
-	float3 v1normal = normals[ray->intersection.tri_hit * 3 + 1].xyz;
-	float3 v2normal = normals[ray->intersection.tri_hit * 3 + 2].xyz;
+	float3 v0_normal = normals[ray->intersection.tri_hit * 3 + 0].xyz;
+	float3 v1_normal = normals[ray->intersection.tri_hit * 3 + 1].xyz;
+	float3 v2_normal = normals[ray->intersection.tri_hit * 3 + 2].xyz;
 
-	return normalize(v0normal * w + v1normal * u + v2normal * v);
+	return normalize(v0_normal * w + v1_normal * u + v2_normal * v);
+}
+
+float2 interpolate_tri_uvs(float2* uvs, struct Ray* ray)
+{
+	float u = ray->intersection.u;
+	float v = ray->intersection.v;
+	float w = 1.0f - u - v;
+
+	float2 v0_uv = uvs[ray->intersection.tri_hit * 3 + 0].xy;
+	float2 v1_uv = uvs[ray->intersection.tri_hit * 3 + 1].xy;
+	float2 v2_uv = uvs[ray->intersection.tri_hit * 3 + 2].xy;
+
+	return (v0_uv * w + v1_uv * u + v2_uv * v);
 }
 
 typedef enum MaterialType
@@ -275,10 +302,12 @@ typedef struct TraceArgs
 	Ray* primary_ray;
 	BVHNode* blas_nodes;
 	float4* normals;
+	float2* uvs;
 	Tri* tris;
 	uint* trisIdx;
 	uint* rand_seed;
 	MeshHeader* mesh_headers;
+	TextureHeader* texture_headers;
 	uint mesh_idx;
 	float* exr;
 	uint exr_width;
@@ -293,6 +322,7 @@ typedef struct TraceArgs
 	BVHNode* tlas_nodes;
 	uint* tlas_idx;
 	PixelDetailInformation* detail_buffer;
+	unsigned char* textures;
 } TraceArgs;
 
 float4 malleys_method(uint* rand_seed)
@@ -471,8 +501,7 @@ float3 trace(TraceArgs* args)
 			// Hacky way to get rid of fireflies
 			exr_color = clamp(exr_color, 0.0f , 32.0f);
 
-			e += t * exr_color;
-			break;
+			return t * exr_color;
 		}
 		else
 		{
@@ -483,6 +512,7 @@ float3 trace(TraceArgs* args)
 			float3 hit_pos = current_ray.O + (current_ray.D * current_ray.t);
 			float3 normal = interpolate_tri_normal(&args->normals[mesh->normals_offset], &current_ray);
 			float3 geo_normal = current_ray.intersection.geo_normal;
+			float2 uvs = interpolate_tri_uvs(&args->uvs[mesh->uvs_offset], &current_ray);
 
 			// We have to apply transform so normals are world-space
 
@@ -492,8 +522,10 @@ float3 trace(TraceArgs* args)
 
 			normal = transform((float4)(normal, 0.0f), &local_inverse_transform_ver).xyz;
 			geo_normal = transform((float4)(geo_normal, 0.0f), &local_inverse_transform_ver).xyz;
+			
 			normal = normalize(normal);
 			geo_normal = normalize(geo_normal);
+
 
 			bool inner_normal = dot(geo_normal, current_ray.D) > 0.0f;
 
@@ -502,11 +534,11 @@ float3 trace(TraceArgs* args)
 #else
 			float3 hemisphere_normal = uniform_hemisphere_tangent(args->rand_seed).xyz;
 #endif
+			if(inner_normal)
+				normal = -normal;
 
 			hemisphere_normal = tangent_to_base_vector(hemisphere_normal, normal);
 
-			if(inner_normal)
-				normal = -normal;
 
 			float old_ray_distance = current_ray.t;
 			current_ray.O = hit_pos + hemisphere_normal * EPSILON;
@@ -517,15 +549,43 @@ float3 trace(TraceArgs* args)
 			float random = RandomFloat(args->rand_seed);
 
 			float3 material_color = mat.albedo.xyz * (mat.albedo.a + 1.0f);
+			float3 texture_color = 0;
+
+			// <Texture Lookup>
+			if(instance->texture_idx != -1)
+			{
+				TextureHeader header = args->texture_headers[instance->texture_idx];
+
+				// TODO: this is hacky, but will be replaced with actual UVs, surely
+				float u = uvs.x;
+				float v = uvs.y;
+
+				uint channels = 4;
+				uint texel_x = u * header.width;
+				uint texel_y = v * header.height;
+
+				uint texel_idx = (texel_x + texel_y * header.width) * channels;
+
+				uchar* texel = &args->textures[texel_idx + header.start_offset];
+				
+				texture_color = (float3)(texel[0], texel[1], texel[2]) / 255.0f;
+
+				material_color = texture_color * (mat.albedo.a + 1.0f);
+			}
+			// </Texture Lookup>
+
+
 
 			// <Russian roulette>
-			float die_chance = max(max((float)material_color.x, (float)material_color.y), (float)material_color.z);
-			die_chance = clamp(die_chance, 0.0f, 1.0f);
+			{
+				float die_chance = max(max((float)material_color.x, (float)material_color.y), (float)material_color.z);
+				die_chance = clamp(die_chance, 0.0f, 1.0f);
 
-			if(RandomFloat(args->rand_seed) > die_chance)
-				break;
-				
-			material_color /= die_chance;
+				if(RandomFloat(args->rand_seed) > die_chance)
+					break;
+					
+				material_color /= die_chance;
+			}
 			// </Russian roulette>
 
 			switch(mat.type)
@@ -650,7 +710,7 @@ float3 trace(TraceArgs* args)
 			}
 		}
 	}
-	return e;
+	return 0;
 }
 
 float3 to_float3(float* array)
@@ -661,12 +721,15 @@ float3 to_float3(float* array)
 void kernel raytrace(
 	global float* accumulation_buffer, 
 	global int* mouse, 
-	global float* distance, 
-	global float4* normals, 
+	global float* distance,
+	global float4* normals,
+	global float2* uvs, 
 	global struct Tri* tris, 
 	global struct BVHNode* blas_nodes, 
 	global uint* trisIdx, 
 	global struct MeshHeader* mesh_headers, 
+	global unsigned char* textures,
+	global struct MeshHeader* texture_headers, 
 	global struct SceneData* scene_data, 
 	global float* exr, 
 	global struct WorldManagerDeviceData* world_manager_data, 
@@ -729,6 +792,7 @@ void kernel raytrace(
 	trace_args.primary_ray = &ray;
 	trace_args.blas_nodes = blas_nodes;
 	trace_args.normals = normals;
+	trace_args.uvs = uvs;
 	trace_args.tris = tris;
 	trace_args.trisIdx = trisIdx;
 	trace_args.rand_seed = &rand_seed;
@@ -743,6 +807,8 @@ void kernel raytrace(
 	trace_args.max_luma_idx = scene_data->max_luma_idx;
 	trace_args.tlas_nodes = tlas_nodes;
 	trace_args.detail_buffer = &detail_buffer[pixel_dest];
+	trace_args.textures = textures;
+	trace_args.texture_headers = texture_headers;
 
 	float3 color = trace(&trace_args);
 

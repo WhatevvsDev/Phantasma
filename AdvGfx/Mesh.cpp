@@ -34,6 +34,12 @@ Mesh::Mesh(const std::string& path)
 	auto& vertex_normal_accessor = model.accessors[primitive.attributes["NORMAL"]];
 	auto& vertex_normal_buffer = model.bufferViews[vertex_normal_accessor.bufferView];
 
+	// Vertex UVs
+	has_uvs = primitive.attributes.find("TEXCOORD_0") != primitive.attributes.end();
+
+	auto& vertex_uv_accessor = model.accessors[primitive.attributes["TEXCOORD_0"]];
+	auto& vertex_uv_buffer = model.bufferViews[vertex_uv_accessor.bufferView];
+
 	// Indices
 	auto& index_accessor = model.accessors[primitive.indices];
 	auto& index_buffer_view = model.bufferViews[index_accessor.bufferView];
@@ -49,6 +55,9 @@ Mesh::Mesh(const std::string& path)
 	tris.resize(index_count / 3);
 	normals.resize(index_count);
 
+	if(has_uvs)
+		uvs.resize(index_count);
+
 	std::vector<int> indices;
 	
 	if(indices_exist)
@@ -56,6 +65,9 @@ Mesh::Mesh(const std::string& path)
 
 	auto vert_pos_buf = model.buffers[vertex_position_buffer.buffer].data.data();
 	auto vert_nor_buf = model.buffers[vertex_normal_buffer.buffer].data.data();
+	auto vert_uv_buf = model.buffers[vertex_uv_buffer.buffer].data.data();
+
+	// TODO: This entire model loading part is so ugly and convoluted, fix this
 
 	for(int i = 0, t = 0; i < index_count; i += 3, t++)
 	{
@@ -69,6 +81,7 @@ Mesh::Mesh(const std::string& path)
 
 		auto pos_buf = (glm::vec3*) &vert_pos_buf[vertex_position_buffer.byteOffset];
 		auto normal_buf = (glm::vec3*) &vert_nor_buf[vertex_normal_buffer.byteOffset];
+		auto uv_buf = (glm::vec2*) &vert_uv_buf[vertex_uv_buffer.byteOffset];
 
 		tris[t].vertex0 = pos_buf[tri_indices[0]];
 		tris[t].vertex1 = pos_buf[tri_indices[1]];
@@ -77,6 +90,13 @@ Mesh::Mesh(const std::string& path)
 		normals[i + 0] = glm::vec4(normal_buf[tri_indices[0]], 0);
 		normals[i + 1] = glm::vec4(normal_buf[tri_indices[1]], 0);
 		normals[i + 2] = glm::vec4(normal_buf[tri_indices[2]], 0);
+
+		if(has_uvs)
+		{
+			uvs[i + 0] = uv_buf[tri_indices[0]];
+			uvs[i + 1] = uv_buf[tri_indices[1]];
+			uvs[i + 2] = uv_buf[tri_indices[2]];
+		}
 	}
 
 	std::string file_name_with_extension = path.substr(path.find_last_of("/\\") + 1);

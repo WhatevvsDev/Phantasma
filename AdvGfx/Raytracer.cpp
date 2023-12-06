@@ -489,16 +489,19 @@ namespace Raytracer
 			.read(ComputeReadBuffer({&internal.hovered_instance_idx, 1}))
 			.read(ComputeReadBuffer({&internal.distance_to_hovered, 1}))
 			.write(AssetManager::get_normals_compute_buffer())
+			.write(AssetManager::get_uvs_compute_buffer())
 			.write(AssetManager::get_tris_compute_buffer())
 			.write(AssetManager::get_bvh_compute_buffer())
 			.write(AssetManager::get_tri_idx_compute_buffer())
 			.write(AssetManager::get_mesh_header_buffer())
+			.write(AssetManager::get_texture_compute_buffer())
+			.write(AssetManager::get_texture_header_buffer())
 			.write({&scene_data, 1})
 			.write(*exr_buffer)
 			.write({&WorldManager::get_world_device_data(), 1})
 			.write(WorldManager::get_material_vector())
 			.write(tlas)
-			.read_write(*internal.gpu_detail_buffer)
+			.read_write(*internal.gpu_detail_buffer)	
 			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
 			.execute();
 
@@ -516,7 +519,7 @@ namespace Raytracer
 		"Diffuse",
 		"Metal",
 		"Dielectric",
-		"Cook-Torrance - NOT IMPLEMENTED"
+		"Cook-Torrance - NOT IMPLEMENTED",
 	};
 
 	void ui_material_editor(Material& material)
@@ -525,7 +528,6 @@ namespace Raytracer
 		bool is_metal = material.type == MaterialType::Metal;
 		bool is_dielectric = material.type == MaterialType::Dielectric;
 		bool is_cook_torrance = material.type == MaterialType::CookTorranceBRDF;
-
 		
 		internal.render_dirty |= ImGui::ColorPicker3("Albedo", glm::value_ptr(material.albedo), ImGuiColorEditFlags_NoInputs);
 		internal.render_dirty |= ImGui::DragFloat("Emissiveness", &material.albedo.a, 0.01f, 0.0f, 100.0f);
@@ -603,6 +605,9 @@ namespace Raytracer
 		ImGui::Dummy({0, 20});
 		ImGui::SeparatorText("Material");
 
+		internal.render_dirty |= ImGui::InputInt("Texture index", &instance.texture_idx, 1, 1);
+		instance.texture_idx = glm::clamp(instance.texture_idx, -1, (i32)AssetManager::get_texture_count() - 1);
+
 		i32 mat_idx_proxy = (i32) instance.material_idx;
 		internal.render_dirty |= ImGui::InputInt("Material", &mat_idx_proxy, 1);
 		if(mat_idx_proxy > (i32)WorldManager::get_material_count() - 1)
@@ -624,7 +629,7 @@ namespace Raytracer
 		ImGui::DockSpaceOverViewport(0, ImGuiDockNodeFlags_PassthruCentralNode | ImGuiDockNodeFlags_AutoHideTabBar | ImGuiDockNodeFlags_NoDockingInCentralNode);
 		ImGui::PopStyleColor();
 
-		if(ImGui::IsKeyPressed(ImGuiKey_Backspace))
+		if(ImGui::IsKeyPressed(ImGuiKey_Backspace) && !ImGui::IsAnyItemActive())
 		{
 			bool any_instance_is_selected = internal.selected_instance_idx >= 0;
 

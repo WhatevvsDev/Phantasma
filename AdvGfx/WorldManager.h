@@ -9,6 +9,8 @@ struct MeshInstanceHeader
 		
 	u32 mesh_idx { 0 };
 	u32 material_idx { 0 };
+	i32 texture_idx { -1 }; // TODO: We should support more textures
+	u32 pad { 0 };
 
 	// Needed to save/load vector of this
 	NLOHMANN_DEFINE_TYPE_INTRUSIVE(MeshInstanceHeader, 
@@ -22,7 +24,7 @@ struct WorldManagerDeviceData
 {
 	u32 mesh_instance_count;
 	u32 pad_0[3];
-	MeshInstanceHeader mesh_instances[4096];
+	MeshInstanceHeader mesh_instances[4096]; // TODO: we do this because you can't get the proper size of a struct if it has a std::vector in it. find a workaround?
 };
 
 namespace WorldManager
