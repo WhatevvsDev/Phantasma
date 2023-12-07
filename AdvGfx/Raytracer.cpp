@@ -46,6 +46,16 @@
 
 namespace Raytracer
 {	
+	enum class ViewType : u32
+	{
+		Render,
+		Albedo,
+		Normal,
+		BLAS,
+		TLAS,
+		AS
+	};
+
 	struct PixelDetailInformation
 	{
 		u32 hit_object;
@@ -78,6 +88,7 @@ namespace Raytracer
 		f32 focal_distance			{ 0.0f };
 		f32 blur_radius				{ 0.0f };
 		u32 selected_object_idx		{ UINT_MAX };
+		ViewType view_type { ViewType::Render };
 	} scene_data;
 
 	struct
@@ -574,6 +585,45 @@ namespace Raytracer
 			ImGui::Indent();
 			
 			ImGui::Checkbox("Show onscreen log?", &settings.show_onscreen_log);
+
+			static std::string view_types_as_strings[] =
+			{
+				"Render",
+				"Albedo",
+				"Normal",
+				"BLAS",
+				"TLAS",
+				"AS"
+			};
+
+			ViewType old_type = scene_data.view_type;
+
+			if (ImGui::BeginCombo("View Type", view_types_as_strings[(u32)scene_data.view_type].c_str()))
+			{
+				if (ImGui::Selectable("Render", scene_data.view_type == ViewType::Render))
+					scene_data.view_type = ViewType::Render;
+
+				if (ImGui::Selectable("Albedo", scene_data.view_type == ViewType::Albedo))
+					scene_data.view_type = ViewType::Albedo;
+
+				if (ImGui::Selectable("Normal", scene_data.view_type == ViewType::Normal))
+					scene_data.view_type = ViewType::Normal;
+
+				if (ImGui::Selectable("BLAS", scene_data.view_type == ViewType::BLAS))
+					scene_data.view_type = ViewType::BLAS;
+
+				if (ImGui::Selectable("TLAS", scene_data.view_type == ViewType::TLAS))
+					scene_data.view_type = ViewType::TLAS;
+
+				if (ImGui::Selectable("AS", scene_data.view_type == ViewType::AS))
+					scene_data.view_type = ViewType::AS;
+
+				ImGui::EndCombo();
+			}
+
+			bool view_type_has_changed = old_type != scene_data.view_type;
+
+			internal.render_dirty |= view_type_has_changed;
 
 			ImGui::Unindent();
 			ImGui::Dummy({20, 20});

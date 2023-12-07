@@ -253,6 +253,22 @@ float saturate(float value)
 
 // Structs
 
+#ifndef VIEW_TYPE
+
+#define VIEW_TYPE
+
+typedef enum ViewType
+{
+	Render = 0,
+	Albedo = 1,
+	Normal = 2,
+	BLAS   = 3,
+	TLAS   = 4,
+	AS     = 5
+} ViewType;
+
+#endif
+
 #ifndef SCENE_DATA
 
 #define SCENE_DATA
@@ -270,6 +286,7 @@ typedef struct SceneData
 	float focal_distance;
 	float blur_radius;
 	uint selected_object_idx;
+	ViewType view_type;
 } SceneData;
 
 #endif

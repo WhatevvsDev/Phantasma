@@ -26,14 +26,49 @@ void kernel average_accumulated(
 		clamp(x + 2, 0, width - 1) + clamp(y + 2, 0, height - 1) * width
 	};
 
-	float3 color = (float3)(
-		accumulation_buffer[pixel_idx * 4 + 0], 
-		accumulation_buffer[pixel_idx * 4 + 1], 
-		accumulation_buffer[pixel_idx * 4 + 2]);
+	float3 color = 0;
+	
+	switch(scene_data->view_type)
+	{
+		case Render:
+		{
+			color = (float3)
+			(	
+				accumulation_buffer[pixel_idx * 4 + 0], 
+				accumulation_buffer[pixel_idx * 4 + 1], 
+				accumulation_buffer[pixel_idx * 4 + 2]
+			);
 
-	color *= *sample_count_reciprocal;
-
-	color = sqrt(color);
+			color *= *sample_count_reciprocal;
+			color = sqrt(color);
+			break;
+		}
+		case Albedo:
+		{
+			// Not implemented
+			break;
+		}
+		case Normal:
+		{
+			// Not implemented
+			break;
+		}
+		case BLAS:
+		{
+			color = detail_buffer[pixel_idx].blas_hits / 16.0f;
+			break;
+		}
+		case TLAS:
+		{
+			color = detail_buffer[pixel_idx].tlas_hits / 16.0f;
+			break;
+		}
+		case AS:
+		{
+			color = (detail_buffer[pixel_idx].tlas_hits + detail_buffer[pixel_idx].blas_hits) / 32.0f;
+			break;
+		}
+	}
 
 	int r = clamp((int)(color.x * 255.0f), 0, 255);
 	int g = clamp((int)(color.y * 255.0f), 0, 255);
