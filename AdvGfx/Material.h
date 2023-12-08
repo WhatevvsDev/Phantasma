@@ -6,7 +6,8 @@ enum class MaterialType : u32
 	Diffuse,
 	Metal,
 	Dielectric,
-	CookTorranceBRDF
+	CookTorranceBRDF,
+	MaterialTypeRange
 };
 
 struct Material

@@ -53,7 +53,8 @@ namespace Raytracer
 		Normal,
 		BLAS,
 		TLAS,
-		AS
+		AS,
+		ViewTypeRange
 	};
 
 	struct PixelDetailInformation
@@ -443,13 +444,31 @@ namespace Raytracer
 		raytrace_save_render_to_file();
 	}
 
-	std::string material_types_as_strings[] =
+	constexpr std::string material_type_to_string(const MaterialType& type)
 	{
-		"Diffuse",
-		"Metal",
-		"Dielectric",
-		"Cook-Torrance - NOT IMPLEMENTED",
-	};
+		switch(type)
+		{
+			case MaterialType::Diffuse: return "Diffuse";
+			case MaterialType::Metal: return "Metal";
+			case MaterialType::Dielectric: return "Dielectric";
+			case MaterialType::CookTorranceBRDF: return "Cook-Torrance";
+		}
+		return "";
+	}
+
+	constexpr std::string view_type_to_string(const ViewType& type)
+	{
+		switch(type)
+		{
+			case ViewType::Render: return "Render";
+			case ViewType::Albedo: return "Albedo";
+			case ViewType::Normal: return "Normal";
+			case ViewType::BLAS: return "BLAS";
+			case ViewType::TLAS: return "TLAS";
+			case ViewType::AS: return "AS";
+		}
+		return "";
+	}
 
 	void ui_material_editor(Material& material)
 	{
@@ -477,21 +496,17 @@ namespace Raytracer
 		internal.render_dirty |= ImGui::DragFloat("Metallic", &material.metallic, 0.01f, 0.0f, 1.0f);
 
 		MaterialType old_type = material.type;
-		std::string material_name = material_types_as_strings[(u32)material.type];
 
-		if(ImGui::BeginCombo("Material Type", material_name.c_str()))
+		if(ImGui::BeginCombo("Material Type", material_type_to_string(material.type).c_str()))
 		{
-			if(ImGui::Selectable("Diffuse", is_diffuse))
-				material.type = MaterialType::Diffuse;
+			for(i32 i = 0; i < (i32)MaterialType::MaterialTypeRange; i++)
+			{
+				MaterialType type = (MaterialType)i;
+				bool is_type = type == material.type;
 
-			if(ImGui::Selectable("Metal", is_metal))
-				material.type = MaterialType::Metal;
-
-			if(ImGui::Selectable("Dielectric", is_dielectric))
-				material.type = MaterialType::Dielectric;
-
-			if(ImGui::Selectable("Cook-Torrance - NOT IMPLEMENTED", is_dielectric))
-				material.type = MaterialType::CookTorranceBRDF;
+				if(ImGui::Selectable(material_type_to_string(type).c_str(), is_type))
+					material.type = type;
+			}
 
 			ImGui::EndCombo();
 		}
@@ -586,37 +601,18 @@ namespace Raytracer
 			
 			ImGui::Checkbox("Show onscreen log?", &settings.show_onscreen_log);
 
-			static std::string view_types_as_strings[] =
-			{
-				"Render",
-				"Albedo",
-				"Normal",
-				"BLAS",
-				"TLAS",
-				"AS"
-			};
-
 			ViewType old_type = scene_data.view_type;
 
-			if (ImGui::BeginCombo("View Type", view_types_as_strings[(u32)scene_data.view_type].c_str()))
+			if (ImGui::BeginCombo("View Type", view_type_to_string(scene_data.view_type).c_str()))
 			{
-				if (ImGui::Selectable("Render", scene_data.view_type == ViewType::Render))
-					scene_data.view_type = ViewType::Render;
+				for(i32 i = 0; i < (i32)ViewType::ViewTypeRange; i++)
+				{
+					auto type = (ViewType)i;
+					bool is_type = scene_data.view_type == type;
 
-				if (ImGui::Selectable("Albedo", scene_data.view_type == ViewType::Albedo))
-					scene_data.view_type = ViewType::Albedo;
-
-				if (ImGui::Selectable("Normal", scene_data.view_type == ViewType::Normal))
-					scene_data.view_type = ViewType::Normal;
-
-				if (ImGui::Selectable("BLAS", scene_data.view_type == ViewType::BLAS))
-					scene_data.view_type = ViewType::BLAS;
-
-				if (ImGui::Selectable("TLAS", scene_data.view_type == ViewType::TLAS))
-					scene_data.view_type = ViewType::TLAS;
-
-				if (ImGui::Selectable("AS", scene_data.view_type == ViewType::AS))
-					scene_data.view_type = ViewType::AS;
+					if (ImGui::Selectable(view_type_to_string(type).c_str(), is_type))
+						scene_data.view_type = type;
+				}
 
 				ImGui::EndCombo();
 			}
@@ -830,7 +826,7 @@ namespace Raytracer
 				if (ImGui::TreeNode(("## material list index" + std::to_string(number_idx)).c_str()))
 				{
 					ImGui::SameLine();
-					ImGui::Text((material_types_as_strings[(u32)current_material.type].c_str()));
+					ImGui::Text((material_type_to_string(current_material.type).c_str()));
 
 					ui_material_editor(current_material);
 
@@ -839,7 +835,7 @@ namespace Raytracer
 				else
 				{
 					ImGui::SameLine();
-					ImGui::Text((material_types_as_strings[(u32)current_material.type].c_str()));
+					ImGui::Text((material_type_to_string(current_material.type).c_str()));
 				}
 				number_idx++;
 			}
