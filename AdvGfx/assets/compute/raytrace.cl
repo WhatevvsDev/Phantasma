@@ -20,13 +20,12 @@ typedef struct RayIntersection
 	float3 geo_normal;
 } RayIntersection;
 
-typedef struct Ray
+typedef struct __attribute__ ((packed)) Ray
 { 
     float3 O;
-    float3 D; 
     float t;
-	int depth;
-	RayIntersection intersection;
+    float3 D;
+	RayIntersection* intersection;
 } Ray;
 
 typedef struct BVHNode
@@ -121,10 +120,10 @@ void intersect_tri(Ray* ray, Tri* tris, uint triIdx, MeshHeader* header)
 	if(ray->t > t)
 	{
 		ray->t = t;
-		ray->intersection.tri_hit = triIdx;
-		ray->intersection.u = u;
-		ray->intersection.v = v;
-		ray->intersection.geo_normal = cross(edge1, edge2);
+		ray->intersection->tri_hit = triIdx;
+		ray->intersection->u = u;
+		ray->intersection->v = v;
+		ray->intersection->geo_normal = cross(edge1, edge2);
 	}
 }
 
@@ -251,26 +250,26 @@ float beers_law(float thickness, float absorbtion_coefficient)
 
 float3 interpolate_tri_normal(float4* normals, struct Ray* ray)
 {
-	float u = ray->intersection.u;
-	float v = ray->intersection.v;
+	float u = ray->intersection->u;
+	float v = ray->intersection->v;
 	float w = 1.0f - u - v;
 
-	float3 v0_normal = normals[ray->intersection.tri_hit * 3 + 0].xyz;
-	float3 v1_normal = normals[ray->intersection.tri_hit * 3 + 1].xyz;
-	float3 v2_normal = normals[ray->intersection.tri_hit * 3 + 2].xyz;
+	float3 v0_normal = normals[ray->intersection->tri_hit * 3 + 0].xyz;
+	float3 v1_normal = normals[ray->intersection->tri_hit * 3 + 1].xyz;
+	float3 v2_normal = normals[ray->intersection->tri_hit * 3 + 2].xyz;
 
 	return normalize(v0_normal * w + v1_normal * u + v2_normal * v);
 }
 
 float2 interpolate_tri_uvs(float2* uvs, struct Ray* ray)
 {
-	float u = ray->intersection.u;
-	float v = ray->intersection.v;
+	float u = ray->intersection->u;
+	float v = ray->intersection->v;
 	float w = 1.0f - u - v;
 
-	float2 v0_uv = uvs[ray->intersection.tri_hit * 3 + 0].xy;
-	float2 v1_uv = uvs[ray->intersection.tri_hit * 3 + 1].xy;
-	float2 v2_uv = uvs[ray->intersection.tri_hit * 3 + 2].xy;
+	float2 v0_uv = uvs[ray->intersection->tri_hit * 3 + 0].xy;
+	float2 v1_uv = uvs[ray->intersection->tri_hit * 3 + 1].xy;
+	float2 v2_uv = uvs[ray->intersection->tri_hit * 3 + 2].xy;
 
 	return (v0_uv * w + v1_uv * u + v2_uv * v);
 }
@@ -442,7 +441,8 @@ float3 trace(TraceArgs* args)
 {
 	// Keeping track of current ray in the stack
 	Ray current_ray = *args->primary_ray;
-
+	
+	uint depth = DEPTH;
 	float3 color = (float3)(0.0f);
 
 	BVHArgs bvh_args;
@@ -459,7 +459,7 @@ float3 trace(TraceArgs* args)
 	float3 e = 0;
 	float3 t = 1;
 
-	while(current_ray.depth > 0)
+	while(depth > 0)
 	{
 		// Go through ray stack, return if empty
 		bool out_of_scope = (dot(t, t) < EPSILON);
@@ -477,7 +477,7 @@ float3 trace(TraceArgs* args)
 			hit_header_idx = intersect_tlas(&bvh_args);
 		}
 
-		bool is_primary_ray = (current_ray.depth == DEPTH);
+		bool is_primary_ray = (depth == DEPTH);
 
 		if(is_primary_ray)
 		{
@@ -506,7 +506,7 @@ float3 trace(TraceArgs* args)
 
 			float3 hit_pos = current_ray.O + (current_ray.D * current_ray.t);
 			float3 normal = interpolate_tri_normal(&args->normals[mesh->normals_offset], &current_ray);
-			float3 geo_normal = current_ray.intersection.geo_normal;
+			float3 geo_normal = current_ray.intersection->geo_normal;
 			float2 uvs = interpolate_tri_uvs(&args->uvs[mesh->uvs_offset], &current_ray);
 
 			// We have to apply transform so normals are world-space
@@ -538,7 +538,7 @@ float3 trace(TraceArgs* args)
 			float old_ray_distance = current_ray.t;
 			current_ray.O = hit_pos + hemisphere_normal * EPSILON;
 			current_ray.t = 1e30f;
-			current_ray.depth--;
+			depth--;
 
 			float3 reflected_dir = reflected(current_ray.D, normal);
 			float random = RandomFloat(args->rand_seed);
@@ -735,7 +735,8 @@ void kernel raytrace(
 	global struct WorldManagerDeviceData* world_manager_data, 
 	global struct Material* materials, 
 	global BVHNode* tlas_nodes,
-	global PixelDetailInformation* detail_buffer
+	global PixelDetailInformation* detail_buffer,
+	global Ray* primary_rays
 	)
 {     
 	int width = scene_data->resolution.x;
@@ -745,48 +746,15 @@ void kernel raytrace(
 	int x = get_global_id(0);
 	int y = get_global_id(1);
 
-	uint pixel_dest = (x + y * width);
+	uint pixel_index = (x + y * width);
 
-	uint rand_seed = WangHash(pixel_dest + scene_data->accumulated_frames * width * height);
-
-	uint strata_idx = scene_data->accumulated_frames % (16);
-	uint strata_x_idx = strata_idx % 4;
-	uint strata_y_idx = strata_idx / 4;
-
-	float strata_u = (RandomFloat(&rand_seed) * 0.25f) + (0.25f * (float)strata_x_idx);
-	float strata_v = (RandomFloat(&rand_seed) * 0.25f) + (0.25f * (float)strata_y_idx);
-
-#if(STRATIFIED_4x4 == 0)
-	float x_t = ((((float)x + RandomFloat(&rand_seed)) / (float)width) - 0.5f) * 2.0f;
-	float y_t = ((((float)y + RandomFloat(&rand_seed)) / (float)height)- 0.5f) * 2.0f;
-#else
-	float x_t = ((((float)x + strata_u) / (float)width) - 0.5f) * 2.0f;
-	float y_t = ((((float)y + strata_v) / (float)height) - 0.5f) * 2.0f;
-#endif
-
-
-	float3 pixel_dir_tangent = 
-	(float3)(0.0f, 0.0f, -1.0f) + 
-	(float3)(1.0f, 0.0f, 0.0f) * x_t * aspect_ratio -
-	(float3)(0.0f, 1.0f, 0.0f) * y_t;
-
-	float3 disk_pos_tangent = (float3)(sample_uniform_disk(&rand_seed) * scene_data->blur_radius, 0.0f);
-
-	pixel_dir_tangent -= disk_pos_tangent / scene_data->focal_distance;
-	float3 pixel_dir_world = transform((float4)(pixel_dir_tangent, 0.0f), scene_data->camera_transform).xyz;;
-	float3 disk_pos_world = transform((float4)(disk_pos_tangent, 0.0f), scene_data->camera_transform).xyz;
-	
-	// TODO: this is kinda dumb innit?
-	float3 cam_pos = transform((float4)(0.0f, 0.0f, 0.0f, 1.0f), scene_data->camera_transform).xyz;
-
-	float3 ray_dir = (pixel_dir_world);
+	uint rand_seed = WangHash(pixel_index + scene_data->accumulated_frames * width * height);
 
 	// Actual raytracing
-	struct Ray ray;
-	ray.O = cam_pos + disk_pos_world;
-    ray.D = normalize(ray_dir);
-    ray.t = 1e30f;
-	ray.depth = DEPTH;
+	RayIntersection intersection;
+
+	struct Ray ray = primary_rays[pixel_index];
+	ray.intersection = &intersection;
 
 	struct TraceArgs trace_args;
 	trace_args.primary_ray = &ray;
@@ -804,7 +772,7 @@ void kernel raytrace(
 	trace_args.material_idx = scene_data->material_idx;
 	trace_args.materials = materials;
 	trace_args.tlas_nodes = tlas_nodes;
-	trace_args.detail_buffer = &detail_buffer[pixel_dest];
+	trace_args.detail_buffer = &detail_buffer[pixel_index];
 	trace_args.textures = textures;
 	trace_args.texture_headers = texture_headers;
 
@@ -827,14 +795,14 @@ void kernel raytrace(
 
 	if(scene_data->reset_accumulator)
 	{
-		accumulation_buffer[pixel_dest * 4 + 0] = color.x;
-		accumulation_buffer[pixel_dest * 4 + 1] = color.y;
-		accumulation_buffer[pixel_dest * 4 + 2] = color.z;
+		accumulation_buffer[pixel_index * 4 + 0] = color.x;
+		accumulation_buffer[pixel_index * 4 + 1] = color.y;
+		accumulation_buffer[pixel_index * 4 + 2] = color.z;
 	}
 	else
 	{
-		accumulation_buffer[pixel_dest * 4 + 0] += color.x;
-		accumulation_buffer[pixel_dest * 4 + 1] += color.y;
-		accumulation_buffer[pixel_dest * 4 + 2] += color.z;
+		accumulation_buffer[pixel_index * 4 + 0] += color.x;
+		accumulation_buffer[pixel_index * 4 + 1] += color.y;
+		accumulation_buffer[pixel_index * 4 + 2] += color.z;
 	}
 }

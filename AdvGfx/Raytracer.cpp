@@ -117,6 +117,8 @@ namespace Raytracer
 		ComputeGPUOnlyBuffer* gpu_accumulation_buffer { nullptr };
 		ComputeGPUOnlyBuffer* gpu_detail_buffer { nullptr };
 
+		ComputeGPUOnlyBuffer* gpu_primary_ray_buffer { nullptr };
+
 		//std::vector<DiskAsset> exr_assets_on_disk;
 		f32* loaded_exr_data { nullptr };
 		std::string current_exr { "None" };
@@ -243,6 +245,7 @@ namespace Raytracer
 
 		internal.gpu_accumulation_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * internal.render_channel_count * sizeof(float)));
 		internal.gpu_detail_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * sizeof(PixelDetailInformation)));
+		internal.gpu_primary_ray_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * 44)); // TODO: This is hardcoded, it should not be!
 
 		Assets::init();
 		
@@ -368,7 +371,8 @@ namespace Raytracer
 			.write({&World::get_world_device_data(), 1})
 			.write(World::get_material_vector())
 			.write(tlas)
-			.read_write(*internal.gpu_detail_buffer)	
+			.read_write(*internal.gpu_detail_buffer)
+			.read_write((*internal.gpu_primary_ray_buffer))
 			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
 			.execute();
 
@@ -398,6 +402,25 @@ namespace Raytracer
 		stbi_write_jpg("render.jpg", internal.render_width_px, internal.render_height_px, internal.render_channel_count, internal.buffer, 100);
 		LOGDEBUG("Saved screenshot.");
 		internal.save_render_to_file = false;
+	}
+
+	void raytrace_generate_primary_rays()
+	{
+		struct GeneratePrimaryRaysDesc
+		{
+			u32 width;
+			u32 height;
+		} desc;
+
+		desc.width = internal.render_width_px;
+		desc.height = internal.render_height_px;
+
+		ComputeOperation("generate_primary_rays.cl")
+			.write({&desc, 1})
+			.write({&scene_data, 1})
+			.read_write((*internal.gpu_primary_ray_buffer))
+			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
+			.execute();
 	}
 
 	void raytrace()
@@ -435,6 +458,7 @@ namespace Raytracer
 
 		if(accumulate_frames)
 		{
+			raytrace_generate_primary_rays();
 			raytrace_trace_rays(tlas);
 			raytrace_average_samples(screen_buffer);
 
