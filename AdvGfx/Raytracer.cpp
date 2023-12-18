@@ -78,18 +78,19 @@ namespace Raytracer
 
 	struct SceneData
 	{
-		u32 resolution[2]			{ 0, 0 };
-		u32 mouse_pos[2]			{ 0, 0 };
-		i32 exr_size[2]				{ 0, 0 };
-		u32 accumulated_frames		{ 0 };
-		u32 reset_accumulator		{ false };
-		glm::mat4 camera_transform	{ glm::identity<glm::mat4>() };
-		f32 exr_angle				{ 0.0f };
-		u32 material_idx			{ 0 };
-		f32 focal_distance			{ 0.0f };
-		f32 blur_radius				{ 0.0f };
-		u32 selected_object_idx		{ UINT_MAX };
-		ViewType view_type { ViewType::Render };
+		u32 resolution[2]				{ 0, 0 };
+		u32 mouse_pos[2]				{ 0, 0 };
+		i32 exr_size[2]					{ 0, 0 };
+		u32 accumulated_frames			{ 0 };
+		u32 reset_accumulator			{ false };
+		glm::mat4 camera_transform		{ glm::identity<glm::mat4>() };
+		glm::mat4 old_camera_transform	{ glm::identity<glm::mat4>() };
+		f32 exr_angle					{ 0.0f };
+		u32 material_idx				{ 0 };
+		f32 focal_distance				{ 0.0f };
+		f32 blur_radius					{ 0.0f };
+		u32 selected_object_idx			{ UINT_MAX };
+		ViewType view_type				{ ViewType::Render };
 	} scene_data;
 
 	struct
@@ -439,6 +440,7 @@ namespace Raytracer
 		scene_data.selected_object_idx = internal.selected_instance_idx;
 		scene_data.focal_distance = active_camera.focal_distance;
 		scene_data.blur_radius = active_camera.blur_radius;
+		scene_data.old_camera_transform = scene_data.camera_transform;
 		scene_data.camera_transform = Camera::get_instance_matrix(active_camera);
 
 		u32 render_area = internal.render_width_px * internal.render_height_px;
@@ -640,10 +642,6 @@ namespace Raytracer
 
 				ImGui::EndCombo();
 			}
-
-			bool view_type_has_changed = old_type != scene_data.view_type;
-
-			internal.render_dirty |= view_type_has_changed;
 
 			ImGui::Unindent();
 			ImGui::Dummy({20, 20});
