@@ -68,8 +68,12 @@ void kernel average_accumulated(
 			color = (detail_buffer[pixel_idx].tlas_hits + detail_buffer[pixel_idx].blas_hits) / 32.0f;
 			break;
 		}
+		default:
+		{
+			color = (float3)(1.0f, 0.0f, 1.0f);
+		}
 	}
-
+	
 	int r = clamp((int)(color.x * 255.0f), 0, 255);
 	int g = clamp((int)(color.y * 255.0f), 0, 255);
 	int b = clamp((int)(color.z * 255.0f), 0, 255);
@@ -91,5 +95,6 @@ void kernel average_accumulated(
 			b = 0x29;
 		}
 	}
+
 	render_buffer[pixel_idx] = 0x00010000 * b + 0x00000100 * g + 0x00000001 * r;
 }
