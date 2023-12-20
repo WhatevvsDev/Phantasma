@@ -12,6 +12,7 @@ struct BVHNode
 
 struct BVH
 {
+	BVH();
 	BVH(const std::vector<Tri>& tris);
 
 	std::vector<uint>       triIdx;
@@ -28,21 +29,32 @@ struct AABB
 	glm::vec3 max;
 };
 
-struct TLASBuilder
+struct BVHConstructionAABBList
 {
-	TLASBuilder();
+	std::vector<AABB> primitive_aabbs;
+	std::vector<glm::vec3> centroids;
 
-	void update_node_bounds(BVHNode& node);
-	float evaluate_sah(BVHNode& node, int axis, float pos);
-	float find_best_split_plane(BVHNode& node, int& axis, float& splitPos);
-	void subdivide( uint nodeIdx);
-
-	std::vector<BVHNode> nodes;
-	std::vector<AABB> instance_bounding_boxes;
-	std::vector<u32> tri_idx;
-	u32 next_node_idx { 0 };
+	BVHConstructionAABBList(const std::vector<Tri>& tris);
+	BVHConstructionAABBList(const std::vector<AABB>& aabbs);
 };
 
 
-void update_node_bounds( uint nodeIdx, BVH& bvh, const std::vector<Tri>& tris);
-void subdivide( uint nodeIdx, BVH& bvh, const std::vector<Tri>& tris);
+// Does not actually hold the BVH, just creates it wherever it was called from
+struct BVHConstructor
+{
+	BVH& bvh;
+	BVHConstructionAABBList aabb_list;
+
+	BVHConstructor(BVH& bvh, const std::vector<Tri>& triangles);
+	BVHConstructor(BVH& bvh, const std::vector<AABB>& aabbs);
+
+	void update_node_bounds(uint nodeIdx);
+	float evaluate_sah(BVHNode& node, int axis, float pos);
+	float find_best_split_plane(BVHNode& node, int& axis, float& splitPos);
+	void subdivide(uint nodeIdx);
+};
+
+struct TLASConstructor
+{
+	TLASConstructor(BVH& bvh);
+};

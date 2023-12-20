@@ -42,6 +42,7 @@
 
 	// 3. A bunch of error checking, we work primarily with indices into arrays and such, and there is no checking when loading a scene for example
 
+	// 4. Some sort of scene management? current work is sloppy
 */
 
 namespace Raytracer
@@ -452,9 +453,10 @@ namespace Raytracer
 
 		if(internal.world_dirty)
 		{
-			auto built_tlas = TLASBuilder();
+			BVH built_tlas = BVH();
+			auto new_tlas = TLASConstructor(built_tlas);
 
-			tlas = built_tlas.nodes;
+			tlas = built_tlas.bvhNodes;
 			internal.world_dirty = false;
 		}
 
