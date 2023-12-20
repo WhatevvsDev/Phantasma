@@ -281,6 +281,7 @@ typedef struct SceneData
 	int accumulated_frames;
 	bool reset_accumulator;
 	float camera_transform[16];
+	float inverse_camera_transform[16];
 	float old_camera_transform[16];
 	float exr_angle;
 	uint material_idx;
@@ -302,6 +303,7 @@ typedef struct PixelDetailInformation
 	uint blas_hits;
 	uint tlas_hits;
 	uint pad;
+	float4 hit_position;
 } PixelDetailInformation;
 
 #endif

@@ -485,6 +485,7 @@ float3 trace(TraceArgs* args)
 			args->detail_buffer->tlas_hits = bvh_args.tlas_hits;
 			args->detail_buffer->blas_hits = bvh_args.blas_hits;
 			args->detail_buffer->hit_object = hit_header_idx;
+			args->detail_buffer->hit_position = (float4)(current_ray.O + current_ray.D * current_ray.t, 0.0f);
 		}
 		
 		bool hit_anything = current_ray.t < 1e30;
@@ -792,6 +793,17 @@ void kernel raytrace(
 			*distance = -1.0f;
 		}
 	}
+
+	// <Reprojection>
+	{
+		// Known information
+		float2 uv = (float2)((float)x / (float)width, (float)y / (float)height);
+		float3 cam_pos = (float3)(scene_data->camera_transform[12], scene_data->camera_transform[13], scene_data->camera_transform[14]);
+		float4 pixel_ws_pos = (float4)(detail_buffer[pixel_index].hit_position.xyz, 1.0f);
+
+		// TODO: Finish this
+	}
+	// </Reprojection>
 
 	if(scene_data->reset_accumulator)
 	{

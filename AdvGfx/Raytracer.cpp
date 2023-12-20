@@ -64,6 +64,7 @@ namespace Raytracer
 		u32 blas_hits;
 		u32 tlas_hits;
 		u32 pad;
+		glm::vec4 hit_position;
 	};
 
 	struct
@@ -85,6 +86,7 @@ namespace Raytracer
 		u32 accumulated_frames			{ 0 };
 		u32 reset_accumulator			{ false };
 		glm::mat4 camera_transform		{ glm::identity<glm::mat4>() };
+		glm::mat4 inverse_camera_transform	{ glm::identity<glm::mat4>() };
 		glm::mat4 old_camera_transform	{ glm::identity<glm::mat4>() };
 		f32 exr_angle					{ 0.0f };
 		u32 material_idx				{ 0 };
@@ -443,6 +445,7 @@ namespace Raytracer
 		scene_data.blur_radius = active_camera.blur_radius;
 		scene_data.old_camera_transform = scene_data.camera_transform;
 		scene_data.camera_transform = Camera::get_instance_matrix(active_camera);
+		scene_data.inverse_camera_transform = glm::inverse(scene_data.camera_transform);
 
 		u32 render_area = internal.render_width_px * internal.render_height_px;
 		ComputeReadWriteBuffer screen_buffer({internal.buffer, (usize)(render_area)});
@@ -681,7 +684,7 @@ namespace Raytracer
 			}
 
 			static float blur_radius_proxy;
-			internal.render_dirty |= ImGui::DragFloat("Blur amount", &blur_radius_proxy, 0.01f, 0.0f, 1.0f);
+			internal.render_dirty |= ImGui::DragFloat("Blur amount", &blur_radius_proxy, 1.0f, 0.0f, 1000.0f);
 			active_camera.blur_radius = log(blur_radius_proxy * 0.2f + 1.0f);
 
 			internal.render_dirty |= ImGui::DragFloat("Focal distance", &active_camera.focal_distance, 0.001f, 0.001f, 1e34f);
