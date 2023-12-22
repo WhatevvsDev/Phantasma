@@ -41,7 +41,7 @@ void kernel generate_primary_rays(
 	float3 disk_pos_world = transform((float4)(disk_pos_tangent, 0.0f), scene_data->camera_transform).xyz;
 	
 	// Get position from matrix
-	float3 cam_pos = (float3)(scene_data->camera_transform[12], scene_data->camera_transform[13], scene_data->camera_transform[14]);
+	float3 cam_pos = (float3)(scene_data->inverse_camera_transform[12], scene_data->inverse_camera_transform[13], scene_data->inverse_camera_transform[14]);
 	
 	// Actual raytracing
 	struct Ray ray;

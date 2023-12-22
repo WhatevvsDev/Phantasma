@@ -17,11 +17,11 @@ struct Tri
 struct Mesh
 {
 	Mesh(const std::string& path);
-	std::vector<Tri> tris;
-	std::vector<glm::vec4> normals;
-	std::vector<glm::vec2> uvs;
-	BVH* bvh;
-	std::string name;
+	std::vector<Tri> tris{ };
+	std::vector<glm::vec4> normals{ };
+	std::vector<glm::vec2> uvs{ };
+	BVH* bvh { nullptr } ;
+	std::string name { };
 
 	bool has_uvs;
 

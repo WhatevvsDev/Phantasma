@@ -632,8 +632,6 @@ namespace Raytracer
 			
 			ImGui::Checkbox("Show onscreen log?", &settings.show_onscreen_log);
 
-			ViewType old_type = scene_data.view_type;
-
 			if (ImGui::BeginCombo("View Type", view_type_to_string(scene_data.view_type).c_str()))
 			{
 				for(i32 i = 0; i < (i32)ViewType::ViewTypeRange; i++)

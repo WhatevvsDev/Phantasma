@@ -798,9 +798,8 @@ void kernel raytrace(
 	{
 		// Known information
 		float2 uv = (float2)((float)x / (float)width, (float)y / (float)height);
-		float3 cam_pos = (float3)(scene_data->camera_transform[12], scene_data->camera_transform[13], scene_data->camera_transform[14]);
+		float4 cam_pos = (float4)(scene_data->camera_transform[12], scene_data->camera_transform[13], scene_data->camera_transform[14], 0.0f);
 		float4 pixel_ws_pos = (float4)(detail_buffer[pixel_index].hit_position.xyz, 1.0f);
-
 		// TODO: Finish this
 	}
 	// </Reprojection>

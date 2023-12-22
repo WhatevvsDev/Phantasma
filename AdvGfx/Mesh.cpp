@@ -104,12 +104,14 @@ Mesh::Mesh(const std::string& path)
 
 	build_timer.start();
 	build_timer.reset();
-	bvh = new BVH(tris);
+	reconstruct_bvh();
 	LOGDEBUG(std::format("Built BVH for {} in {} ms", get_file_name_from_path_string(path), (u32)build_timer.to_now()));
 }
 
 void Mesh::reconstruct_bvh()
 {
 	delete bvh;
-	bvh = new BVH(tris);
+	bvh = new BVH();
+
+	BLASConstructor(*bvh, tris);
 }

@@ -13,7 +13,6 @@ struct BVHNode
 struct BVH
 {
 	BVH();
-	BVH(const std::vector<Tri>& tris);
 
 	std::vector<uint>       triIdx;
 	std::vector<BVHNode>    bvhNodes;
@@ -45,8 +44,7 @@ struct BVHConstructor
 	BVH& bvh;
 	BVHConstructionAABBList aabb_list;
 
-	BVHConstructor(BVH& bvh, const std::vector<Tri>& triangles);
-	BVHConstructor(BVH& bvh, const std::vector<AABB>& aabbs);
+	BVHConstructor(BVH& bvh, const BVHConstructionAABBList& aabb_list);
 
 	void update_node_bounds(uint nodeIdx);
 	float evaluate_sah(BVHNode& node, int axis, float pos);
@@ -57,4 +55,9 @@ struct BVHConstructor
 struct TLASConstructor
 {
 	TLASConstructor(BVH& bvh);
+};
+
+struct BLASConstructor
+{
+	BLASConstructor(BVH& bvh, const BVHConstructionAABBList& aabb_list);
 };

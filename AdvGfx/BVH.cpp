@@ -20,24 +20,9 @@ glm::vec3 aabb_centroid(AABB& aabb)
 	return (aabb.min + aabb.max) * 0.5f;
 }
 
-//BVHConstructor(BVH& bvh, const std::vector<AABB>& aabbs);
-
-BVHConstructor::BVHConstructor(BVH& bvh, const std::vector<Tri>& triangles)
+BVHConstructor::BVHConstructor(BVH& bvh, const BVHConstructionAABBList& aabb_list)
 	: bvh(bvh)
-	, aabb_list(BVHConstructionAABBList(triangles))
-{
-	// assign all triangles to root node
-	BVHNode& root = bvh.bvhNodes[0];
-	root.left_first = 0, root.tri_count = (unsigned int)aabb_list.primitive_aabbs.size();
-
-	update_node_bounds(0);
-	// subdivide recursively
-	subdivide(0);
-}
-
-BVHConstructor::BVHConstructor(BVH& bvh, const std::vector<AABB>& aabbs)
-	: bvh(bvh)
-	, aabb_list(BVHConstructionAABBList(aabbs))
+	, aabb_list(aabb_list)
 {
 	// assign all triangles to root node
 	BVHNode& root = bvh.bvhNodes[0];
@@ -198,25 +183,6 @@ BVH::BVH()
 {
 }
 
-BVH::BVH(const std::vector<Tri>& tris)
-{
-	size_t primitive_count = tris.size();
-
-	triIdx.resize(primitive_count);
-	bvhNodes.resize(primitive_count * 2);
-	centroids.resize(tris.size());
-
-	// populate triangle index array
-	for (int i = 0; i < primitive_count; i++) 
-		triIdx[i] = i;
-
-	// calculate triangle centroids for partitioning
-	for (int i = 0; i < primitive_count; i++)
-		centroids[i] = (tris[i].vertex0 + tris[i].vertex1 + tris[i].vertex2) * 0.3333f;
-	
-	BVHConstructor(*this, tris);
-}
-
 AABB get_triangle_aabb(const Tri& triangle)
 {
 	AABB aabb;
@@ -279,6 +245,20 @@ TLASConstructor::TLASConstructor(BVH& bvh)
 	}
 
 
-
 	BVHConstructor(bvh, transformed_aabbs);
+}
+
+BLASConstructor::BLASConstructor(BVH& bvh, const BVHConstructionAABBList& aabb_list)
+{
+	size_t primitive_count = aabb_list.primitive_aabbs.size();
+
+	bvh.triIdx.resize(primitive_count);
+	bvh.bvhNodes.resize(primitive_count * 2);
+	bvh.centroids.resize(primitive_count);
+
+	// populate triangle index array
+	for (int i = 0; i < primitive_count; i++)
+		bvh.triIdx[i] = i;
+
+	BVHConstructor(bvh, aabb_list.primitive_aabbs);
 }
