@@ -104,7 +104,6 @@ namespace Raytracer
 		u32* buffer						{ nullptr };
 
 		bool show_debug_ui				{ false };
-		bool save_render_to_file		{ false };
 		bool render_dirty				{ true };
 		bool world_dirty				{ true };
 		bool focus_on_clicked			{ false };
@@ -132,35 +131,6 @@ namespace Raytracer
 
 		Camera::Instance& get_active_camera_ref() { return cameras[active_camera_idx]; }
 	} internal;
-
-	namespace Input
-	{
-		void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
-		{
-			// Unused parameters
-			(void)window; (void)scancode; (void)action; (void)mods;
-
-			bool key_is_pressed = (action == GLFW_PRESS);
-
-			if(!key_is_pressed)
-				return;
-
-			switch(key)
-			{
-				case GLFW_KEY_P:
-					internal.save_render_to_file = true;
-				break;
-				case GLFW_KEY_ESCAPE:
-					Raytracer::terminate();
-					exit(0);
-				break;
-				case GLFW_KEY_F1:
-					internal.show_debug_ui = !internal.show_debug_ui;
-					glfwSetInputMode(window, GLFW_CURSOR, internal.show_debug_ui ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
-				break;
-			}
-		}	
-	}
 
 	// TODO: Temporary variables, will be consolidated into one system later
 	ComputeReadBuffer* screen_compute_buffer	{ nullptr };
@@ -329,8 +299,24 @@ namespace Raytracer
 			internal.current_gizmo_operation = ImGuizmo::SCALE;
 	}
 
+	void update_input()
+	{
+		if (ImGui::IsKeyPressed(ImGuiKey_Escape))
+		{
+			Raytracer::terminate();
+			exit(0);
+		}
+
+		if (ImGui::IsKeyPressed(ImGuiKey_F1))
+		{
+			internal.show_debug_ui = !internal.show_debug_ui;
+		}			
+	}
+
 	void update(const f32 delta_time_ms)
 	{		
+		update_input();
+
 		auto& active_camera = internal.get_active_camera_ref();
 
 		bool pressed_any_move_key =	
@@ -400,12 +386,11 @@ namespace Raytracer
 
 	void raytrace_save_render_to_file() 
 	{
-		if(!internal.save_render_to_file)
+		if(!ImGui::IsKeyReleased(ImGuiKey_P))
 			return;
 
 		stbi_write_jpg("render.jpg", internal.render_width_px, internal.render_height_px, internal.render_channel_count, internal.buffer, 100);
 		LOGDEBUG("Saved screenshot.");
-		internal.save_render_to_file = false;
 	}
 
 	void raytrace_generate_primary_rays()
@@ -901,10 +886,8 @@ namespace Raytracer
 		}
 	}
 
-	u32 Raytracer::get_target_fps()
+	bool Raytracer::ui_is_visible()
 	{
-		return settings.fps_limit_enabled ? 
-			settings.fps_limit :
-			1000;
+		return internal.show_debug_ui;
 	}
 }

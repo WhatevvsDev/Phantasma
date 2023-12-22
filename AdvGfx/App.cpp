@@ -55,9 +55,6 @@ namespace App
 		
 		glfwMakeContextCurrent(window);
 		
-		glfwSetKeyCallback(window, Raytracer::Input::key_callback);
-		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
 		ImPlot::CreateContext();
@@ -114,13 +111,12 @@ namespace App
 		last_render_time = fmax(last_render_time, 1.0f);
 		last_update_time = fmax(last_update_time, 1.0f);
 
-		std::string title = std::format("{} Window {}x{} | {} ms ({} {}) | {}ms update", 
+		std::string title = std::format("{} Window {}x{} | {} ms ({} FPS) | {}ms update", 
 			app_desc.title, 
 			app_desc.width, 
 			app_desc.height, 
 			(int)last_render_time, 
 			(int)ceil(1000.0f / last_render_time),  
-			(Raytracer::get_target_fps() == 1000) ? "FPS" : "Limited FPS",
 			(int)last_update_time);
 
 		glfwSetWindowTitle(window, title.c_str());
@@ -133,15 +129,13 @@ namespace App
 
 		// We need total delta time
 		Raytracer::update(last_update_time + last_render_time);
+		glfwSetInputMode(window, GLFW_CURSOR, Raytracer::ui_is_visible() ? GLFW_CURSOR_NORMAL : GLFW_CURSOR_DISABLED);
+
 		// Only get the render time
 		last_update_time =  fps_timer.lap_delta();
 		Raytracer::raytrace();
-
-		float actual_time = fps_timer.peek_delta();
-		float sleep_time = (1000.0f / Raytracer::get_target_fps() - actual_time);
-		if(sleep_time < 0) sleep_time = 0;
-		Sleep((DWORD)sleep_time);
 		last_render_time = fps_timer.lap_delta();
+
 		Raytracer::ui();
 
 		// Flipping the buffer so its proper
@@ -155,7 +149,6 @@ namespace App
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 		
 		glfwSwapBuffers(window);
-
 
 		glfwPollEvents();
 	}

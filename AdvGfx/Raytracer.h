@@ -30,5 +30,5 @@ namespace Raytracer
 	void update(const f32 delta_time_ms);
 	void ui();
 
-	u32 get_target_fps();
+	bool ui_is_visible();
 };
