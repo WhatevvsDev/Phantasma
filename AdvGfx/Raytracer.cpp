@@ -21,12 +21,6 @@
 #include <IconsFontAwesome6.h>
 #include <ImPlot.h>
 
-#define TINYEXR_IMPLEMENTATION
-#define TINYEXR_USE_MINIZ 0
-#define TINYEXR_USE_STB_ZLIB 1
-#define TINYEXR_USE_THREAD 1
-#include "tinyexr.h"
-
 
 // Implicit casting as error
 #pragma warning(error:4244)
@@ -188,23 +182,14 @@ namespace Raytracer
 			internal.cameras.push_back(Camera::Instance());
 	}
 
-	// TODO: This should probably not be in Raytracer.cpp
-	void load_exr(u32 index = 0)
+	void switch_skybox(u32 index)
 	{
-		std::string exr_path = Assets::get_disk_files_by_extension("exr")[index].path.string();
-		std::string file_name_with_extension = exr_path.substr(exr_path.find_last_of("/\\") + 1);
+		auto& exr = Assets::get_exr_by_index(index);
+		delete exr_buffer;
+		exr_buffer = new ComputeWriteBuffer({ exr.data, (usize)(exr.width * exr.height * 4) });
+		scene_data.exr_size[0] = exr.width;
+		scene_data.exr_size[1] = exr.height;
 
-		internal.current_exr = file_name_with_extension;
-
-		const char* err = nullptr;
-
-		delete[] internal.loaded_exr_data;
-		LoadEXR(&internal.loaded_exr_data, &scene_data.exr_size[0], &scene_data.exr_size[1], exr_path.c_str(), &err);
-
-		if(err)
-			LOGERROR(err);
-		
-		exr_buffer = new ComputeWriteBuffer({internal.loaded_exr_data, (usize)(scene_data.exr_size[0] * scene_data.exr_size[1] * 4)});
 		internal.render_dirty = true;
 	}
 
@@ -222,8 +207,8 @@ namespace Raytracer
 		internal.gpu_primary_ray_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * 44)); // TODO: This is hardcoded, it should not be!
 
 		Assets::init();
-		
-		load_exr();
+
+		switch_skybox(0);
 
 		World::deserialize_scene();
 	}
@@ -771,7 +756,9 @@ namespace Raytracer
 					if (ImGui::Selectable((exr.file_name + ".exr").c_str(), exr.file_name == internal.current_exr))
 					{
 						internal.current_exr = exr.file_name;
-						load_exr(idx);
+						
+						// Load actual exr
+						switch_skybox(idx);
 					}
 
 					idx++;

@@ -30,6 +30,14 @@ struct TextureHeader
 	u32 pad;
 };
 
+struct EXR_CPU
+{
+	std::string name { "" };
+	i32 width { 0 };
+	i32 height { 0 };
+	f32* data { nullptr };
+};
+
 struct DiskAsset
 {
 	std::filesystem::path path;
@@ -40,8 +48,12 @@ namespace Assets
 {
 	void init();
 
-	void load_mesh(const std::filesystem::path path);
-	void load_texture(const std::filesystem::path path);
+	void import_mesh(const std::filesystem::path path);
+	void import_texture(const std::filesystem::path path);
+	void import_exr(const std::filesystem::path path);
+
+	const EXR_CPU& get_exr_by_name(const std::string& name_with_extension);
+	const EXR_CPU& get_exr_by_index(u32 index);
 
 	u32 get_texture_count();
 

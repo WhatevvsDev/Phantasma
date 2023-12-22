@@ -4,12 +4,22 @@
 
 #include <stb_image.h>
 
+#define TINYEXR_IMPLEMENTATION
+#define TINYEXR_USE_MINIZ 0
+#define TINYEXR_USE_STB_ZLIB 1
+#define TINYEXR_USE_THREAD 1
+#include "tinyexr.h"
+
 struct
 {
-	std::unordered_map<std::string, Mesh> meshes;
 
+	// GPU Data Headers
 	std::vector<MeshHeader> mesh_headers {};
 	std::vector<TextureHeader> texture_headers {};
+
+	// CPU Data
+	std::unordered_map<std::string, EXR_CPU> exrs_cpu {};
+	std::unordered_map<std::string, Mesh> meshes_cpu;
 
 	std::vector<Tri> consolidated_tris {};
 	std::vector<glm::vec4> consolidated_normals {};
@@ -34,7 +44,7 @@ struct
 
 } internal;
 
-// Search for, and automatically compile compute shaders
+// Search for, and automatically import assets from disk 
 void find_disk_assets()
 {
 	std::string assets_directory = get_current_directory_path() + "\\..\\..\\AdvGfx\\assets\\";
@@ -76,19 +86,19 @@ void find_disk_assets()
 			}
 			case hashstr("exr"):
 			{
-				// Do nothing, it will get entered after the switch
+				Assets::import_exr(file_path);
 				break;
 			}
 			case hashstr("gltf"):
 			{
-				Assets::load_mesh(file_path);
+				Assets::import_mesh(file_path);
 				break;
 			}
 			case hashstr("png"):
 			case hashstr("jpg"):
 			case hashstr("jpeg"):
 			{
-				Assets::load_texture(file_path);
+				Assets::import_texture(file_path);
 				break;
 			}
 		}
@@ -115,11 +125,11 @@ std::vector<DiskAsset>& Assets::get_disk_files_by_extension(const std::string& e
 	return assets_vector->second;
 }
 
-void Assets::load_mesh(const std::filesystem::path path)
+void Assets::import_mesh(const std::filesystem::path path)
 {
 	std::string file_name = path.filename().string();
 
-	internal.meshes.insert({
+	internal.meshes_cpu.insert({
 		file_name, Mesh(path.string())
 	});
 
@@ -129,7 +139,7 @@ void Assets::load_mesh(const std::filesystem::path path)
 	delete internal.bvh_compute_buffer;
 	delete internal.tri_idx_compute_buffer;
 
-	Mesh& loaded_mesh = internal.meshes.find(file_name)->second;
+	Mesh& loaded_mesh = internal.meshes_cpu.find(file_name)->second;
 
 	// Create Mesh header for compute
 	MeshHeader loaded_mesh_header;
@@ -175,7 +185,7 @@ void Assets::load_mesh(const std::filesystem::path path)
 	internal.tri_idx_compute_buffer	= new ComputeWriteBuffer({internal.consolidated_tri_idxs});
 }
 
-void Assets::load_texture(const std::filesystem::path path)
+void Assets::import_texture(const std::filesystem::path path)
 {
 	delete internal.texture_compute_buffer;
 	delete internal.texture_header_compute_buffer;
@@ -208,6 +218,33 @@ void Assets::load_texture(const std::filesystem::path path)
 	delete data;
 }
 
+void Assets::import_exr(const std::filesystem::path path)
+{
+	std::string file_name_with_extension = path.string().substr(path.string().find_last_of("/\\") + 1);
+
+	auto& exr_entry = internal.exrs_cpu.insert({ file_name_with_extension, EXR_CPU() }).first->second;	
+
+	const char* err = nullptr;
+
+	delete[] exr_entry.data;
+	LoadEXR(&exr_entry.data, &exr_entry.width, &exr_entry.height, path.string().c_str(), &err);
+
+	LOGDEBUG(std::format("Loaded an exr with a size of {} x {}", exr_entry.width, exr_entry.height));
+
+	if (err)
+		LOGERROR(err);
+}
+
+const EXR_CPU& Assets::get_exr_by_name(const std::string& name_with_extension)
+{
+	return internal.exrs_cpu.find(name_with_extension)->second;
+}
+
+const EXR_CPU& Assets::get_exr_by_index(u32 index)
+{
+	return std::next(internal.exrs_cpu.begin(), index)->second;
+}
+
 u32 Assets::get_texture_count()
 {
 	return (u32)internal.texture_headers.size();
@@ -215,7 +252,7 @@ u32 Assets::get_texture_count()
 
 void Assets::reconstruct_bvh(std::string mesh)
 {
-	internal.meshes.find(mesh)->second.reconstruct_bvh();
+	internal.meshes_cpu.find(mesh)->second.reconstruct_bvh();
 }
 
 // TODO: This is disgusting, find a better way
@@ -266,7 +303,7 @@ std::vector<MeshHeader>& Assets::get_mesh_headers()
 
 std::unordered_map<std::string, Mesh>& Assets::get_meshes()
 {
-	return internal.meshes;
+	return internal.meshes_cpu;
 }
 
 BVHNode Assets::get_root_bvh_node_of_mesh(u32 idx)
