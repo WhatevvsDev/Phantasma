@@ -102,6 +102,7 @@ struct BVHNode
 
 struct BVH
 {
+	inline BVH() {};
 	BVH(const std::vector<Tri>& tris);
 
 	std::vector<uint>       triIdx;
@@ -121,9 +122,9 @@ struct TLASBuilder
 	float find_best_split_plane(BVHNode& node, int& axis, float& splitPos);
 	void subdivide(uint nodeIdx);
 
+	std::vector<u32> tri_idx;
 	std::vector<BVHNode> nodes;
 	std::vector<AABB> instance_bounding_boxes;
-	std::vector<u32> tri_idx;
 	u32 next_node_idx{ 0 };
 };
 
