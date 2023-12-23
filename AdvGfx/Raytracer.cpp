@@ -327,7 +327,7 @@ namespace Raytracer
 	}
 
 	// Averages out acquired samples, and renders them to the screen
-	void raytrace_trace_rays(std::vector<BVHNode>& tlas)
+	void raytrace_trace_rays(std::vector<BVHNode>& tlas, std::vector<u32> tlas_idxs)
 	{
 		ComputeOperation("raytrace.cl")
 			.read_write(*internal.gpu_accumulation_buffer)	
@@ -346,6 +346,7 @@ namespace Raytracer
 			.write({&World::get_world_device_data(), 1})
 			.write(World::get_material_vector())
 			.write(tlas)
+			.write(tlas_idxs)
 			.read_write(*internal.gpu_detail_buffer)
 			.read_write((*internal.gpu_primary_ray_buffer))
 			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
@@ -422,21 +423,25 @@ namespace Raytracer
 
 		bool accumulate_frames = !(settings.limit_accumulated_frames && (internal.accumulated_frames > (u32)settings.accumulated_frame_limit));
 
-		static std::vector<BVHNode> tlas { };
+		static std::vector<BVHNode> tlas{ };
+		static std::vector<u32> tlas_idxs{ };
 
 		if(internal.world_dirty)
 		{
 			//BVH built_tlas = BVH();
 			//auto new_tlas = TLASConstructor(built_tlas);
 
-			tlas = TLASBuilder().nodes;
+			auto bruh = TLASBuilder();
+
+			tlas = bruh.nodes;
+			tlas_idxs = bruh.tri_idx;
 			internal.world_dirty = false;
 		}
 
 		if(accumulate_frames)
 		{
 			raytrace_generate_primary_rays();
-			raytrace_trace_rays(tlas);
+			raytrace_trace_rays(tlas, tlas_idxs);
 			raytrace_average_samples(screen_buffer);
 
 			scene_data.reset_accumulator = false;

@@ -252,17 +252,16 @@ BVHBuilder::BVHBuilder(BVH& bvh, const BVHConstructionAABBList& primitives, bool
 	: bvh(bvh)
 	, primitive_aabb_list(primitives)
 {
-
 	is_tlas = tlas;
 	// assign all triangles to root node
 	BVHNode& root = bvh.nodes[0];
 	root.left_first = 0, root.tri_count = (unsigned int)primitives.primitive_aabbs.size();
 
-	bvh.centroids = primitive_aabb_list.centroids;
+	primitive_aabb_list.centroids;
 
 	for (u32 i = 0; i < root.tri_count; i++)
 	{
-		bvh.triIdx[i] = i;
+		bvh.tri_idx[i] = i;
 	}
 
 	update_node_bounds(0);
@@ -276,13 +275,18 @@ void BVHBuilder::update_node_bounds(uint nodeIdx)
 
 	node.min = glm::vec3(1e30f);
 	node.max = glm::vec3(-1e30f);
-	for (uint first = node.left_first, i = 0; i < node.tri_count; i++)
+	for (u32 i = 0; i < node.tri_count; i++)
 	{
-		uint leafTriIdx = bvh.triIdx[first + i];
+		uint leafTriIdx = bvh.tri_idx[node.left_first + i];
 		const AABB& leafTri = primitive_aabb_list.primitive_aabbs[leafTriIdx];
 		node.min = glm::min(node.min, leafTri.min);
 		node.max = glm::max(node.max, leafTri.max);
 	}
+}
+
+glm::vec3 aabb_centroid(const AABB& aabb)
+{
+	return (aabb.min + aabb.max) * 0.5f;
 }
 
 float BVHBuilder::evaluate_sah(BVHNode& node, int axis, float pos)
@@ -296,9 +300,10 @@ float BVHBuilder::evaluate_sah(BVHNode& node, int axis, float pos)
 	int leftCount = 0, rightCount = 0;
 	for (uint i = 0; i < node.tri_count; i++)
 	{
-		const AABB& aabb = primitive_aabb_list.primitive_aabbs[bvh.triIdx[node.left_first + i]];
+		const AABB& aabb = primitive_aabb_list.primitive_aabbs[bvh.tri_idx[node.left_first + i]];
+		const glm::vec3& centroid = primitive_aabb_list.centroids[bvh.tri_idx[node.left_first + i]];
 
-		if (primitive_aabb_list.centroids[bvh.triIdx[node.left_first + i]][axis] < pos)
+		if (centroid[axis] < pos)
 		{
 			leftCount++;
 			left_min = glm::min(left_min, aabb.min);
@@ -316,10 +321,7 @@ float BVHBuilder::evaluate_sah(BVHNode& node, int axis, float pos)
 	float left_area = aabb_area(left_extent);
 	float right_area = aabb_area(right_extent);
 
-	float left_cost = (leftCount > 0) ? leftCount * left_area : 0;
-	float right_cost = (rightCount > 0) ? rightCount * right_area : 0;
-
-	float cost = left_cost + right_cost;
+	float cost = leftCount * left_area + rightCount * right_area;
 	return cost > 0 ? cost : 1e30f;
 }
 
@@ -365,22 +367,16 @@ void BVHBuilder::subdivide(uint nodeIdx)
 	float parentCost = get_node_cost(node);
 	float splitCost = find_best_split_plane(node, axis, splitPos);
 
-	if (is_tlas)
-	{
-		LOGERROR(std::format("BVH parent/split cost: {} / {}", parentCost, splitCost));
-	}
-
 	if (splitCost >= parentCost) return;
 	// in-place partition
 	int i = node.left_first;
 	int j = i + node.tri_count - 1;
 	while (i <= j)
 	{
-		
-		if (primitive_aabb_list.centroids[bvh.triIdx[i]][axis] < splitPos)
+		if (primitive_aabb_list.centroids[bvh.tri_idx[i]][axis] < splitPos)
 			i++;
 		else
-			std::swap(bvh.triIdx[i], bvh.triIdx[j--]);
+			std::swap(bvh.tri_idx[i], bvh.tri_idx[j--]);
 	}
 	// abort split if one of the sides is empty
 	int leftCount = i - node.left_first;
@@ -431,21 +427,13 @@ void TLASBuilder::update_node_bounds(BVHNode& node)
 {
 	node.min = glm::vec3(1e30f);
 	node.max = glm::vec3(-1e30f);
-
-	u32 first_child_instance = node.left_first;
-
 	for (u32 i = 0; i < node.tri_count; i++)
 	{
-		AABB instance_bounding_box = instance_bounding_boxes[first_child_instance + i];
-
-		node.min = glm::min(node.min, instance_bounding_box.min);
-		node.max = glm::max(node.max, instance_bounding_box.max);
+		uint leafTriIdx = tri_idx[node.left_first + i];
+		const AABB& leafTri = primitive_aabb_list.primitive_aabbs[leafTriIdx];
+		node.min = glm::min(node.min, leafTri.min);
+		node.max = glm::max(node.max, leafTri.max);
 	}
-}
-
-glm::vec3 aabb_centroid(AABB& aabb)
-{
-	return (aabb.min + aabb.max) * 0.5f;
 }
 
 float TLASBuilder::evaluate_sah(BVHNode& node, int axis, float pos)
@@ -459,8 +447,10 @@ float TLASBuilder::evaluate_sah(BVHNode& node, int axis, float pos)
 	int leftCount = 0, rightCount = 0;
 	for (uint i = 0; i < node.tri_count; i++)
 	{
-		const AABB& aabb = instance_bounding_boxes[tri_idx[node.left_first + i]];
-		if (aabb_centroid(instance_bounding_boxes[tri_idx[node.left_first + i]])[axis] < pos)
+		const AABB& aabb = primitive_aabb_list.primitive_aabbs[tri_idx[node.left_first + i]];
+		const glm::vec3& centroid = primitive_aabb_list.centroids[tri_idx[node.left_first + i]];
+
+		if (centroid[axis] < pos)
 		{
 			leftCount++;
 			left_min = glm::min(left_min, aabb.min);
@@ -524,15 +514,13 @@ void TLASBuilder::subdivide(uint nodeIdx)
 	float parentCost = get_node_cost(node);
 	float splitCost = find_best_split_plane(node, axis, splitPos);
 
-	LOGERROR(std::format("TLAS parent/split cost: {} / {}", parentCost, splitCost));
-
 	if (splitCost >= parentCost) return;
 	// in-place partition
 	int i = node.left_first;
 	int j = i + node.tri_count - 1;
 	while (i <= j)
 	{
-		if (aabb_centroid(instance_bounding_boxes[tri_idx[i]])[axis] < splitPos)
+		if (primitive_aabb_list.centroids[tri_idx[i]][axis] < splitPos)
 			i++;
 		else
 			std::swap(tri_idx[i], tri_idx[j--]);
@@ -570,9 +558,10 @@ TLASBuilder::TLASBuilder()
 	}
 
 	nodes.resize(instance_count * 2);
-	instance_bounding_boxes.resize(instance_count);
 	tri_idx.resize(instance_count);
 
+	std::vector<AABB> instance_bounding_boxes;
+	instance_bounding_boxes.resize(instance_count);
 	for (u32 i = 0; i < instance_count; i++)
 	{
 		tri_idx[i] = i;
@@ -589,7 +578,7 @@ TLASBuilder::TLASBuilder()
 		instance_bounding_boxes[i] = bb;
 	}
 
-	BVHConstructionAABBList instance_aabbs(instance_bounding_boxes);
+	primitive_aabb_list = BVHConstructionAABBList(instance_bounding_boxes);
 
 	nodes[0].tri_count = instance_count;
 
@@ -606,10 +595,9 @@ TLASBuilder::TLASBuilder()
 	BVH test_bvh;
 
 	test_bvh.nodes.resize(instance_count * 2);
-	test_bvh.centroids.resize(instance_count);
-	test_bvh.triIdx.resize(instance_count);
+	test_bvh.tri_idx.resize(instance_count);
 
-	BVHBuilder(test_bvh, instance_aabbs, true);
+	BVHBuilder(test_bvh, primitive_aabb_list, true);
 
 	LOGERROR("PRINTING NORMAL TLAS");
 	for (int i = 0; i < (int)instance_count; i++)
@@ -620,8 +608,7 @@ TLASBuilder::TLASBuilder()
 		LOGERROR(std::format("I AM A NORMAL BVH NODE {}", test_bvh.nodes[i].left_first));
 
 
-	tri_idx = test_bvh.triIdx;
-	instance_aabbs.centroids = test_bvh.centroids;
+	tri_idx = test_bvh.tri_idx;
 	//nodes = test_bvh.nodes;
 
 }
@@ -631,17 +618,8 @@ BVH::BVH(const std::vector<Tri>& tris)
 
 	size_t primitive_count = tris.size();
 
-	triIdx.resize(primitive_count);
+	tri_idx.resize(primitive_count);
 	nodes.resize(primitive_count * 2);
-	centroids.resize(tris.size());
-
-	// populate triangle index array
-	for (int i = 0; i < primitive_count; i++)
-		triIdx[i] = i;
-
-	// calculate triangle centroids for partitioning
-	for (int i = 0; i < primitive_count; i++)
-		centroids[i] = (tris[i].vertex0 + tris[i].vertex1 + tris[i].vertex2) * 0.3333f;
 
 	BVHBuilder(*this, tris);
 }

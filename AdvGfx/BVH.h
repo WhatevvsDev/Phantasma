@@ -65,7 +65,8 @@ struct BVHConstructionAABBList
 {
 	std::vector<AABB> primitive_aabbs;
 	std::vector<glm::vec3> centroids;
-
+	
+	inline BVHConstructionAABBList() {};
 	BVHConstructionAABBList(const std::vector<Tri>& triangles);
 	BVHConstructionAABBList(const std::vector<AABB>& aabbs);
 };
@@ -105,9 +106,8 @@ struct BVH
 	inline BVH() {};
 	BVH(const std::vector<Tri>& tris);
 
-	std::vector<uint>       triIdx;
+	std::vector<u32>       tri_idx;
 	std::vector<BVHNode>    nodes;
-	std::vector<glm::vec3>  centroids;
 	uint nodes_used = 1;
 
 	float build_time = 0.0f;
@@ -124,7 +124,9 @@ struct TLASBuilder
 
 	std::vector<u32> tri_idx;
 	std::vector<BVHNode> nodes;
-	std::vector<AABB> instance_bounding_boxes;
+
+	BVHConstructionAABBList primitive_aabb_list;
+
 	u32 next_node_idx{ 0 };
 };
 
