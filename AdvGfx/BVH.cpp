@@ -102,7 +102,7 @@ float BVHConstructor::find_best_split_plane(BVHNode& node, int& axis, float& spl
 
 		int split_planes = 8;
 
-		float scale = (boundsMax - boundsMin) / split_planes;
+		float scale = (boundsMax - boundsMin) / (split_planes + 1);
 		for (uint i = 1; i < (uint)split_planes; i++)
 		{
 			float candidatePos = boundsMin + i * scale;
