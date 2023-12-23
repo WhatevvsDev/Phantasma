@@ -383,16 +383,16 @@ int intersect_tlas(BVHArgs* args)
 		{
 			for (uint i = 0; i < node->tri_count; i++ )
 			{
-				MeshInstanceHeader* instance = &args->world_data->instances[node->left_first + i];
+				MeshInstanceHeader* instance = &args->world_data->instances[args->tlas_idx[node->left_first + i]];
 
 				args->mesh_header = &args->mesh_headers[instance->mesh_idx];
 				args->inverse_transform = instance->inverse_transform;
-
+				
 				intersect_bvh(args);
 
 				if(args->ray->t < dist)
 				{
-					hit = node->left_first + i;
+					hit = args->tlas_idx[node->left_first + i];
 					dist = args->ray->t;
 				}
 			}
@@ -404,6 +404,7 @@ int intersect_tlas(BVHArgs* args)
 		}
 		else
 		{
+			
 			BVHNode* left_child = &args->tlas_nodes[node->left_first];
 			BVHNode* right_child = &args->tlas_nodes[node->left_first + 1];
 			float left_dist = intersect_aabb(args->ray, left_child);
@@ -736,6 +737,7 @@ void kernel raytrace(
 	global struct WorldManagerDeviceData* world_manager_data, 
 	global struct Material* materials, 
 	global BVHNode* tlas_nodes,
+	global uint* tlas_idx,
 	global PixelDetailInformation* detail_buffer,
 	global Ray* primary_rays
 	)
@@ -773,6 +775,7 @@ void kernel raytrace(
 	trace_args.material_idx = scene_data->material_idx;
 	trace_args.materials = materials;
 	trace_args.tlas_nodes = tlas_nodes;
+	trace_args.tlas_idx = tlas_idx;
 	trace_args.detail_buffer = &detail_buffer[pixel_index];
 	trace_args.textures = textures;
 	trace_args.texture_headers = texture_headers;

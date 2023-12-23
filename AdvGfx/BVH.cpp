@@ -28,6 +28,11 @@ BVHConstructor::BVHConstructor(BVH& bvh, const BVHConstructionAABBList& aabb_lis
 	BVHNode& root = bvh.bvhNodes[0];
 	root.left_first = 0, root.tri_count = (unsigned int)aabb_list.primitive_aabbs.size();
 
+	for (u32 i = 0; i < aabb_list.centroids.size(); i++)
+	{
+		bvh.triIdx[i] = i;
+	}
+
 	update_node_bounds(0);
 	// subdivide recursively
 	subdivide(0);
@@ -39,12 +44,12 @@ void BVHConstructor::update_node_bounds(uint nodeIdx)
 
 	node.min = glm::vec3(1e30f);
 	node.max = glm::vec3(-1e30f);
-	for (uint first = node.left_first, i = 0; i < node.tri_count; i++)
+	for (u32 i = 0; i < node.tri_count; i++)
 	{
-		uint leaf_primitive_index = bvh.triIdx[first + i];
-		const AABB& aabb = aabb_list.primitive_aabbs[leaf_primitive_index];
-		node.min = glm::min(node.min, aabb.min);
-		node.max = glm::max(node.max, aabb.max);
+		uint leafTriIdx = bvh.triIdx[node.left_first + i];
+		const AABB& leafTri = aabb_list.primitive_aabbs[leafTriIdx];
+		node.min = glm::min(node.min, leafTri.min);
+		node.max = glm::max(node.max, leafTri.max);
 	}
 }
 
@@ -59,18 +64,20 @@ float BVHConstructor::evaluate_sah(BVHNode& node, int axis, float pos)
 	int leftCount = 0, rightCount = 0;
 	for (uint i = 0; i < node.tri_count; i++)
 	{
-		const AABB& leaf_primitive_aabb = aabb_list.primitive_aabbs[bvh.triIdx[node.left_first + i]];
-		if (bvh.centroids[bvh.triIdx[node.left_first + i]][axis] < pos)
+		const AABB& aabb = aabb_list.primitive_aabbs[bvh.triIdx[node.left_first + i]];
+		const glm::vec3& centroid = aabb_list.centroids[bvh.triIdx[node.left_first + i]];
+
+		if (centroid[axis] < pos)
 		{
 			leftCount++;
-			left_min = glm::min(left_min, leaf_primitive_aabb.min);
-			left_max = glm::max(left_max, leaf_primitive_aabb.max);
+			left_min = glm::min(left_min, aabb.min);
+			left_max = glm::max(left_max, aabb.max);
 		}
 		else
 		{
 			rightCount++;
-			right_min = glm::min(right_min, leaf_primitive_aabb.min);
-			right_max = glm::max(right_max, leaf_primitive_aabb.max);
+			right_min = glm::min(right_min, aabb.min);
+			right_max = glm::max(right_max, aabb.max);
 		}
 	}
 	glm::vec3 left_extent = left_max - left_min;
@@ -109,6 +116,7 @@ float BVHConstructor::find_best_split_plane(BVHNode& node, int& axis, float& spl
 			}
 		}
 	}
+
 	return bestCost;
 }
 
@@ -129,7 +137,7 @@ void BVHConstructor::subdivide(uint nodeIdx)
 	int j = i + node.tri_count - 1;
 	while (i <= j)
 	{
-		if (bvh.centroids[bvh.triIdx[i]][axis] < splitPos)
+		if (aabb_list.centroids[bvh.triIdx[i]][axis] < splitPos)
 			i++;
 		else
 			std::swap(bvh.triIdx[i], bvh.triIdx[j--]);
@@ -243,7 +251,6 @@ TLASConstructor::TLASConstructor(BVH& bvh)
 
 		transformed_aabbs.push_back(aabb);
 	}
-
 
 	BVHConstructor(bvh, transformed_aabbs);
 }
