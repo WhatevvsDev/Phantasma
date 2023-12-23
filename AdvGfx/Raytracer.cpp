@@ -422,14 +422,14 @@ namespace Raytracer
 
 		bool accumulate_frames = !(settings.limit_accumulated_frames && (internal.accumulated_frames > (u32)settings.accumulated_frame_limit));
 
-		static std::vector<BVHNode> tlas { BVHNode() };
+		static std::vector<BVHNode> tlas { };
 
 		if(internal.world_dirty)
 		{
-			BVH built_tlas = BVH();
-			auto new_tlas = TLASConstructor(built_tlas);
+			//BVH built_tlas = BVH();
+			//auto new_tlas = TLASConstructor(built_tlas);
 
-			tlas = built_tlas.bvhNodes;
+			tlas = TLASBuilder().nodes;
 			internal.world_dirty = false;
 		}
 

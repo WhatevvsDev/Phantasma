@@ -387,7 +387,7 @@ int intersect_tlas(BVHArgs* args)
 
 				args->mesh_header = &args->mesh_headers[instance->mesh_idx];
 				args->inverse_transform = instance->inverse_transform;
-
+				
 				intersect_bvh(args);
 
 				if(args->ray->t < dist)
@@ -404,6 +404,7 @@ int intersect_tlas(BVHArgs* args)
 		}
 		else
 		{
+			
 			BVHNode* left_child = &args->tlas_nodes[node->left_first];
 			BVHNode* right_child = &args->tlas_nodes[node->left_first + 1];
 			float left_dist = intersect_aabb(args->ray, left_child);

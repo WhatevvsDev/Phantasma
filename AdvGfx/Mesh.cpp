@@ -111,7 +111,8 @@ Mesh::Mesh(const std::string& path)
 void Mesh::reconstruct_bvh()
 {
 	delete bvh;
-	bvh = new BVH();
+	bvh = new BVH(tris);
 
-	BLASConstructor(*bvh, tris);
+
+	//BLASConstructor(*bvh, tris);
 }
