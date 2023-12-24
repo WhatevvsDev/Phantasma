@@ -113,5 +113,5 @@ void Mesh::reconstruct_bvh()
 	delete bvh;
 	bvh = new BVH();
 
-	BLASConstructor(*bvh, tris);
+	BuildBLAS(*bvh, tris);
 }

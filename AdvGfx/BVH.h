@@ -34,12 +34,7 @@ struct BVHConstructionPrimitiveAABBData
 	BVHConstructionPrimitiveAABBData(const std::vector<AABB>& aabbs);
 };
 
-struct TLASConstructor
-{
-	TLASConstructor(BVH& bvh);
-};
 
-struct BLASConstructor
-{
-	BLASConstructor(BVH& bvh, const BVHConstructionPrimitiveAABBData& aabb_list);
-};
+void BuildTLAS(BVH& bvh);
+
+void BuildBLAS(BVH& bvh, const BVHConstructionPrimitiveAABBData& aabb_list);

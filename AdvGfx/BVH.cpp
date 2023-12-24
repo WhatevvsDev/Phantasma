@@ -248,7 +248,7 @@ BVHConstructionPrimitiveAABBData::BVHConstructionPrimitiveAABBData(const std::ve
 	}
 }
 
-TLASConstructor::TLASConstructor(BVH& bvh)
+void BuildTLAS(BVH& bvh)
 {
 	auto& world_data = World::get_world_device_data();
 	u32 instance_count = world_data.mesh_instance_count;
@@ -276,7 +276,7 @@ TLASConstructor::TLASConstructor(BVH& bvh)
 	BVHConstructor(bvh, transformed_aabbs);
 }
 
-BLASConstructor::BLASConstructor(BVH& bvh, const BVHConstructionPrimitiveAABBData& aabb_list)
+void BuildBLAS(BVH& bvh, const BVHConstructionPrimitiveAABBData& aabb_list)
 {
 	usize primitive_count = aabb_list.primitive_count;
 

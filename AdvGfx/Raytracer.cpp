@@ -430,7 +430,7 @@ namespace Raytracer
 		if(internal.world_dirty)
 		{
 			BVH built_tlas = BVH();
-			auto new_tlas = TLASConstructor(built_tlas);
+			BuildTLAS(built_tlas);
 
 			tlas_idx = built_tlas.primitive_idx;
 			tlas = built_tlas.nodes;
