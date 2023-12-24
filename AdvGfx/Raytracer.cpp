@@ -84,8 +84,6 @@ namespace Raytracer
 		glm::mat4 old_camera_transform	{ glm::identity<glm::mat4>() };
 		f32 exr_angle					{ 0.0f };
 		u32 material_idx				{ 0 };
-		f32 focal_distance				{ 0.0f };
-		f32 blur_radius					{ 0.0f };
 		u32 selected_object_idx			{ UINT_MAX };
 		ViewType view_type				{ ViewType::Render };
 	} scene_data;
@@ -331,7 +329,7 @@ namespace Raytracer
 	std::vector<u32> tlas_idx{ };
 
 	// Averages out acquired samples, and renders them to the screen
-	void raytrace_trace_rays(std::vector<BVHNode>& tlas)
+	void raytrace_trace_rays()
 	{
 		ComputeOperation("raytrace.cl")
 			.read_write(*internal.gpu_accumulation_buffer)	
@@ -385,18 +383,30 @@ namespace Raytracer
 
 	void raytrace_generate_primary_rays()
 	{
-		struct GeneratePrimaryRaysDesc
+		auto& active_camera = internal.get_active_camera_ref();
+
+		struct GeneratePrimaryRaysArgs
 		{
 			u32 width;
 			u32 height;
-		} desc;
+			u32 accumulated_frames;
+			f32 blur_radius;
+			f32 focal_distance;
+			f32 camera_fov;
+			f32 pad[2];
+			glm::mat4 camera_transform;
+		} args;
 
-		desc.width = internal.render_width_px;
-		desc.height = internal.render_height_px;
+		args.width = internal.render_width_px;
+		args.height = internal.render_height_px;
+		args.accumulated_frames = internal.accumulated_frames;
+		args.blur_radius = active_camera.blur_radius;
+		args.focal_distance = active_camera.focal_distance;
+		args.camera_fov = 110;
+		args.camera_transform = Camera::get_instance_matrix(active_camera);
 
 		ComputeOperation("generate_primary_rays.cl")
-			.write({&desc, 1})
-			.write({&scene_data, 1})
+			.write({&args, 1})
 			.read_write((*internal.gpu_primary_ray_buffer))
 			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
 			.execute();
@@ -404,7 +414,6 @@ namespace Raytracer
 
 	void raytrace()
 	{
-		// TODO: we currently don't take into account world changes!
 		if(internal.render_dirty || !settings.accumulate_frames || internal.world_dirty)
 		{
 			scene_data.reset_accumulator = true;
@@ -416,8 +425,6 @@ namespace Raytracer
 
 		scene_data.accumulated_frames = internal.accumulated_frames;
 		scene_data.selected_object_idx = internal.selected_instance_idx;
-		scene_data.focal_distance = active_camera.focal_distance;
-		scene_data.blur_radius = active_camera.blur_radius;
 		scene_data.old_camera_transform = scene_data.camera_transform;
 		scene_data.camera_transform = Camera::get_instance_matrix(active_camera);
 		scene_data.inverse_camera_transform = glm::inverse(scene_data.camera_transform);
@@ -440,7 +447,7 @@ namespace Raytracer
 		if(accumulate_frames)
 		{
 			raytrace_generate_primary_rays();
-			raytrace_trace_rays(tlas);
+			raytrace_trace_rays();
 			raytrace_average_samples(screen_buffer);
 
 			scene_data.reset_accumulator = false;

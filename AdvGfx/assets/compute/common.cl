@@ -285,8 +285,6 @@ typedef struct SceneData
 	float old_camera_transform[16];
 	float exr_angle;
 	uint material_idx;
-	float focal_distance;
-	float blur_radius;
 	uint selected_object_idx;
 	ViewType view_type;
 } SceneData;
