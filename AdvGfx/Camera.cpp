@@ -48,7 +48,7 @@ bool freecam_camera_behavior(f32 delta_time_ms, Camera::Instance& camera)
 	i32 move_ver =	(ImGui::IsKeyDown(ImGuiKey_Space))	- (ImGui::IsKeyDown(ImGuiKey_LeftCtrl));
 	i32 move_ward =	(ImGui::IsKeyDown(ImGuiKey_W))		- (ImGui::IsKeyDown(ImGuiKey_S));
 				
-	glm::vec3 move_dir = -glm::vec3(move_hor, move_ver, -move_ward);
+	glm::vec3 move_dir = glm::vec3(move_hor, move_ver, -move_ward);
 
 	move_dir = glm::normalize(move_dir * glm::mat3(glm::eulerAngleXY(glm::radians(-camera.rotation.x), glm::radians(-camera.rotation.y))));
 
@@ -115,8 +115,8 @@ glm::mat4 Camera::get_instance_matrix(Camera::Instance& instance)
 {
 	glm::mat4 new_transform = glm::identity<glm::mat4>();
 			
-	new_transform *= glm::eulerAngleYX(glm::radians(instance.rotation.y), glm::radians(instance.rotation.x));
 	new_transform *= glm::translate(instance.position);
+	new_transform *= glm::eulerAngleYX(glm::radians(instance.rotation.y), glm::radians(instance.rotation.x));
 
 	return new_transform;
 }
