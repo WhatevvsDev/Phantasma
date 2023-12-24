@@ -1,25 +1,21 @@
 #pragma once
 
+// Required for Tri definition
 #include "Mesh.h"
 
 struct BVHNode
 {
-	glm::vec3 min { 1e30f };
-	uint left_first { 0 };
-	glm::vec3 max { -1e30f };
-	uint tri_count { 0 };
+	glm::vec3 min		{ 1e30f };
+	u32 left_first		{ 0 };
+	glm::vec3 max		{ -1e30f };
+	u32 primitive_count	{ 0 };
 };
 
 struct BVH
 {
-	BVH();
-
-	std::vector<uint>       triIdx;
-	std::vector<BVHNode>    bvhNodes;
-	std::vector<glm::vec3>  centroids;
-	uint nodes_used = 1;
-
-	float build_time = 0.0f;
+	std::vector<u32>       primitive_idx;
+	std::vector<BVHNode>   nodes;
+	u32 next_node_idx { 1 };
 };
 
 struct AABB
@@ -28,28 +24,14 @@ struct AABB
 	glm::vec3 max;
 };
 
-struct BVHConstructionAABBList
+struct BVHConstructionPrimitiveAABBData
 {
+	usize primitive_count;
 	std::vector<AABB> primitive_aabbs;
 	std::vector<glm::vec3> centroids;
 
-	BVHConstructionAABBList(const std::vector<Tri>& tris);
-	BVHConstructionAABBList(const std::vector<AABB>& aabbs);
-};
-
-
-// Does not actually hold the BVH, just creates it wherever it was called from
-struct BVHConstructor
-{
-	BVH& bvh;
-	BVHConstructionAABBList aabb_list;
-
-	BVHConstructor(BVH& bvh, const BVHConstructionAABBList& aabb_list);
-
-	void update_node_bounds(uint nodeIdx);
-	float evaluate_sah(BVHNode& node, int axis, float pos);
-	float find_best_split_plane(BVHNode& node, int& axis, float& splitPos);
-	void subdivide(uint nodeIdx);
+	BVHConstructionPrimitiveAABBData(const std::vector<Tri>& tris);
+	BVHConstructionPrimitiveAABBData(const std::vector<AABB>& aabbs);
 };
 
 struct TLASConstructor
@@ -59,5 +41,5 @@ struct TLASConstructor
 
 struct BLASConstructor
 {
-	BLASConstructor(BVH& bvh, const BVHConstructionAABBList& aabb_list);
+	BLASConstructor(BVH& bvh, const BVHConstructionPrimitiveAABBData& aabb_list);
 };

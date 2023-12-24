@@ -145,8 +145,8 @@ void Assets::import_mesh(const std::filesystem::path path)
 	MeshHeader loaded_mesh_header;
 	loaded_mesh_header.tris_count      = (u32)loaded_mesh.tris.size();
 	loaded_mesh_header.normals_count   = (u32)loaded_mesh.normals.size();
-	loaded_mesh_header.tri_idx_count   = (u32)loaded_mesh.bvh->triIdx.size();
-	loaded_mesh_header.bvh_node_count  = (u32)loaded_mesh.bvh->bvhNodes.size();
+	loaded_mesh_header.tri_idx_count   = (u32)loaded_mesh.bvh->primitive_idx.size();
+	loaded_mesh_header.bvh_node_count  = (u32)loaded_mesh.bvh->nodes.size();
 
 	u32 uvs_count	   = (u32)loaded_mesh.uvs.size();
 
@@ -168,12 +168,12 @@ void Assets::import_mesh(const std::filesystem::path path)
 	// Tri Idx	
 	loaded_mesh_header.tri_idx_offset = (u32)internal.consolidated_tri_idxs.size();
 	internal.consolidated_tri_idxs.reserve(loaded_mesh_header.tri_idx_count);
-	internal.consolidated_tri_idxs.insert(internal.consolidated_tri_idxs.end(), loaded_mesh.bvh->triIdx.begin(), loaded_mesh.bvh->triIdx.end());
+	internal.consolidated_tri_idxs.insert(internal.consolidated_tri_idxs.end(), loaded_mesh.bvh->primitive_idx.begin(), loaded_mesh.bvh->primitive_idx.end());
 
 	// BVH nodes
 	loaded_mesh_header.root_bvh_node_idx = (u32)internal.consolidated_nodes.size();
 	internal.consolidated_nodes.reserve(loaded_mesh_header.bvh_node_count);
-	internal.consolidated_nodes.insert(internal.consolidated_nodes.end(), loaded_mesh.bvh->bvhNodes.begin(), loaded_mesh.bvh->bvhNodes.end());
+	internal.consolidated_nodes.insert(internal.consolidated_nodes.end(), loaded_mesh.bvh->nodes.begin(), loaded_mesh.bvh->nodes.end());
 
 	internal.mesh_headers.push_back(loaded_mesh_header);
 	internal.mesh_header_compute_buffer = new ComputeWriteBuffer({internal.mesh_headers});

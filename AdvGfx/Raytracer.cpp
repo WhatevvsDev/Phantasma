@@ -432,8 +432,8 @@ namespace Raytracer
 			BVH built_tlas = BVH();
 			auto new_tlas = TLASConstructor(built_tlas);
 
-			tlas_idx = built_tlas.triIdx;
-			tlas = built_tlas.bvhNodes;
+			tlas_idx = built_tlas.primitive_idx;
+			tlas = built_tlas.nodes;
 			internal.world_dirty = false;
 		}
 
