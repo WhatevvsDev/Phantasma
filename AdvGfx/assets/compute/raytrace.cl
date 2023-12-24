@@ -1,6 +1,4 @@
 #define COSINE_WEIGHTED_BIAS 1
-#define STRATIFIED_4x4 1
-#define TLAS 1
 
 #define DEPTH 16
 
