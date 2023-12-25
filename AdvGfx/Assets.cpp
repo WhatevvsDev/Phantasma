@@ -112,10 +112,11 @@ void Assets::init()
 	find_disk_assets();
 }
 
-std::vector<DiskAsset>& Assets::get_disk_files_by_extension(const std::string& extension)
+const std::vector<DiskAsset>& Assets::get_disk_files_by_extension(const std::string& extension)
 {
-	// TODO: Don't know if theres a better way to do this?
-	static std::vector<DiskAsset> empty_vector;
+	// TODO: Don't know if theres a better way to do this? (What i meant is an "empty reference")
+	// EDIT: I guess this "works fine" now that I've made it const
+	const static std::vector<DiskAsset> empty_vector;
 
 	auto assets_vector = internal.disk_assets.find(extension);
 

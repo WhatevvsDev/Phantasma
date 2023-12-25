@@ -71,7 +71,7 @@ namespace Assets
 	std::vector<MeshHeader>& get_mesh_headers();
 	std::unordered_map<std::string, Mesh>& get_meshes();
 
-	std::vector<DiskAsset>& get_disk_files_by_extension(const std::string& extension);
+	const std::vector<DiskAsset>& get_disk_files_by_extension(const std::string& extension);
 
 	BVHNode get_root_bvh_node_of_mesh(u32 idx);
 }

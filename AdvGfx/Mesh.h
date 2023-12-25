@@ -2,6 +2,9 @@
 
 #include "tiny_gltf.h"
 
+// Disabling nameless union/struct warning
+#pragma warning (disable: 4201)
+
 struct BVH;
 
 struct Tri 
@@ -17,6 +20,7 @@ struct Tri
 			glm::vec3 vertex2;
 			float pad_2;
 		};
+		
 		struct
 		{
 			glm::vec4 vertices[3];
