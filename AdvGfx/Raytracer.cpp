@@ -130,12 +130,14 @@ namespace Raytracer
 
 		struct
 		{
+			const usize array_size { 512 };
 			Timer render_passes_timer;
-			f32 pre_render_time;
-			f32 tlas_build_time;
-			f32 primary_ray_gen_time;
-			f32 ray_trace_time;
-			f32 average_samples_time;
+
+			u32 current_index { 0 };
+			f32 pre_render_time[512] { };
+			f32 primary_ray_gen_time[512] { };
+			f32 ray_trace_time[512] { };
+			f32 average_samples_time[512] { };
 
 		} performance;
 	} internal;
@@ -379,7 +381,8 @@ namespace Raytracer
 
 		internal.accumulated_frames++;
 
-		internal.performance.ray_trace_time = internal.performance.render_passes_timer.lap_delta();
+		// TOOD: make this cleaner (for all of them)
+		internal.performance.ray_trace_time[internal.performance.current_index] = internal.performance.render_passes_timer.peek_delta();
 	}
 
 	void raytrace_average_samples(const ComputeReadWriteBuffer& screen_buffer)
@@ -408,7 +411,7 @@ namespace Raytracer
 			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
 			.execute();
 
-		internal.performance.average_samples_time = internal.performance.render_passes_timer.lap_delta();
+		internal.performance.average_samples_time[internal.performance.current_index] = internal.performance.render_passes_timer.peek_delta();
 	}
 
 	void raytrace_generate_primary_rays()
@@ -441,12 +444,15 @@ namespace Raytracer
 			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
 			.execute();
 
-		internal.performance.primary_ray_gen_time = internal.performance.render_passes_timer.lap_delta();
+		internal.performance.primary_ray_gen_time[internal.performance.current_index] = internal.performance.render_passes_timer.peek_delta();
 	}
 
 	void raytrace()
 	{
-		internal.performance.render_passes_timer.lap_delta();
+		internal.performance.current_index++;
+		internal.performance.current_index %= internal.performance.array_size;
+
+		internal.performance.render_passes_timer.reset();
 
 		if(internal.render_dirty || !settings.accumulate_frames || internal.world_dirty)
 		{
@@ -467,7 +473,7 @@ namespace Raytracer
 
 		bool accumulate_frames = !(settings.limit_accumulated_frames && (internal.accumulated_frames > (u32)settings.accumulated_frame_limit));
 
-		internal.performance.pre_render_time = internal.performance.render_passes_timer.lap_delta();
+		internal.performance.pre_render_time[internal.performance.current_index] = internal.performance.render_passes_timer.lap_delta();
 
 		if(internal.world_dirty)
 		{
@@ -479,14 +485,12 @@ namespace Raytracer
 			internal.world_dirty = false;
 		}
 
-		internal.performance.tlas_build_time = internal.performance.render_passes_timer.lap_delta();
 
 		if(accumulate_frames)
 		{
 			raytrace_generate_primary_rays();
 			raytrace_trace_rays();
 			raytrace_average_samples(screen_buffer);
-
 
 			scene_data.reset_accumulator = false;
 		}
@@ -622,6 +626,8 @@ namespace Raytracer
 		ImGui::PushStyleColor(ImGuiCol_WindowBg, {0, 0, 0, 0});
 		ImGui::DockSpaceOverViewport(0, ImGuiDockNodeFlags_PassthruCentralNode | ImGuiDockNodeFlags_AutoHideTabBar | ImGuiDockNodeFlags_NoDockingInCentralNode);
 		ImGui::PopStyleColor();
+
+		ImPlot::ShowDemoWindow();
 
 		if(ImGui::IsKeyPressed(ImGuiKey_Backspace) && !ImGui::IsAnyItemActive())
 		{
@@ -890,11 +896,20 @@ namespace Raytracer
 		if(ImGui::BeginTabItem("Performance"))
 		{
 			// TODO: make this a nice stacked graph
-			ImGui::Text(std::format("pre_render_time time is {} ms", internal.performance.pre_render_time).c_str());
-			ImGui::Text(std::format("tlas_build_time time is {} ms", internal.performance.tlas_build_time).c_str());
-			ImGui::Text(std::format("primary_ray_gen_time time is {} ms", internal.performance.primary_ray_gen_time).c_str());
-			ImGui::Text(std::format("ray_trace_time time is {} ms", internal.performance.ray_trace_time).c_str());
-			ImGui::Text(std::format("average_samples_time time is {} ms", internal.performance.average_samples_time).c_str());
+			ImGui::Text(std::format("pre_render_time time is {} ms", internal.performance.pre_render_time[internal.performance.current_index]).c_str());
+			ImGui::Text(std::format("primary_ray_gen_time time is {} ms", internal.performance.primary_ray_gen_time[internal.performance.current_index]).c_str());
+			ImGui::Text(std::format("ray_trace_time time is {} ms", internal.performance.ray_trace_time[internal.performance.current_index]).c_str());
+			ImGui::Text(std::format("average_samples_time time is {} ms", internal.performance.average_samples_time[internal.performance.current_index]).c_str());
+				
+			if (ImPlot::BeginPlot("Raytracing performance"))
+			{
+				// TODO: make a nice performance logger, that can get cumulative time and regular time and plot it on its own
+				ImPlot::PlotLine("average_samples_time",	internal.performance.pre_render_time,		internal.performance.array_size, 1.0f, 0.0f, ImPlotLineFlags_Shaded, internal.performance.current_index);
+				ImPlot::PlotLine("ray_trace_time",			internal.performance.ray_trace_time,		internal.performance.array_size, 1.0f, 0.0f, ImPlotLineFlags_Shaded, internal.performance.current_index);
+				ImPlot::PlotLine("primary_ray_gen_time",	internal.performance.primary_ray_gen_time,	internal.performance.array_size, 1.0f, 0.0f, ImPlotLineFlags_Shaded, internal.performance.current_index);
+				ImPlot::PlotLine("pre_render_time",			internal.performance.pre_render_time,		internal.performance.array_size, 1.0f, 0.0f, ImPlotLineFlags_Shaded, internal.performance.current_index);
+				ImPlot::EndPlot();
+			}
 
 			ImGui::EndTabItem();
 		}
