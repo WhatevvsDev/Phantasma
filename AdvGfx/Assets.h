@@ -68,8 +68,8 @@ namespace Assets
 	ComputeWriteBuffer& get_texture_compute_buffer();
 	ComputeWriteBuffer& get_texture_header_buffer();
 
-	std::vector<MeshHeader>& get_mesh_headers();
-	std::unordered_map<std::string, Mesh>& get_meshes();
+	const std::vector<MeshHeader>& get_mesh_headers();
+	const std::unordered_map<std::string, Mesh>& get_meshes();
 
 	const std::vector<DiskAsset>& get_disk_files_by_extension(const std::string& extension);
 

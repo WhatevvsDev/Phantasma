@@ -297,12 +297,12 @@ ComputeWriteBuffer& Assets::get_texture_header_buffer()
 	return *internal.texture_header_compute_buffer;
 }
 
-std::vector<MeshHeader>& Assets::get_mesh_headers()
+const std::vector<MeshHeader>& Assets::get_mesh_headers()
 {
 	return internal.mesh_headers;
 }
 
-std::unordered_map<std::string, Mesh>& Assets::get_meshes()
+const std::unordered_map<std::string, Mesh>& Assets::get_meshes()
 {
 	return internal.meshes_cpu;
 }
