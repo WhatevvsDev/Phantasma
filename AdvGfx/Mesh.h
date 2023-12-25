@@ -6,12 +6,22 @@ struct BVH;
 
 struct Tri 
 { 
-	glm::vec3 vertex0;
-	float pad_0;
-	glm::vec3 vertex1;
-	float pad_1;
-	glm::vec3 vertex2;
-	float pad_2;
+	union
+	{
+		struct
+		{
+			glm::vec3 vertex0;
+			float pad_0;
+			glm::vec3 vertex1;
+			float pad_1;
+			glm::vec3 vertex2;
+			float pad_2;
+		};
+		struct
+		{
+			glm::vec4 vertices[3];
+		};
+	};
 };
 
 struct Mesh

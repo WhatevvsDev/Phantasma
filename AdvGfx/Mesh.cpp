@@ -2,10 +2,17 @@
 
 #include "BVH.h"
 
-Timer build_timer;
+Timer mesh_build_timer;
+
+i32 get_gltf_type_size(tinygltf::Accessor accessor)
+{
+	return tinygltf::GetNumComponentsInType(accessor.type) * tinygltf::GetComponentSizeInBytes(accessor.componentType);
+}
 
 Mesh::Mesh(const std::string& path)
 {
+	mesh_build_timer.start();
+
 	tinygltf::Model model;
 	tinygltf::TinyGLTF loader;
 
@@ -15,11 +22,13 @@ Mesh::Mesh(const std::string& path)
 	// Loading mesh 
 	loader.LoadASCIIFromFile(&model, &error, &warning, path);
 
-	if(!error.empty())
+	if (!error.empty())
 		LOGERROR(error)
 
-	if(!warning.empty())
+	if (!warning.empty())
 		LOGDEFAULT(warning)
+
+	f32 imported_file_ms = mesh_build_timer.lap_delta();
 
 	auto primitive = model.meshes[0].primitives[0];
 
@@ -27,7 +36,7 @@ Mesh::Mesh(const std::string& path)
 	auto& vertex_position_accessor = model.accessors[primitive.attributes["POSITION"]];
 	auto& vertex_position_buffer = model.bufferViews[vertex_position_accessor.bufferView];
 
-	int vertex_position_data_size = tinygltf::GetNumComponentsInType(vertex_position_accessor.type) * tinygltf::GetComponentSizeInBytes(vertex_position_accessor.componentType);
+	int vertex_position_data_size = get_gltf_type_size(vertex_position_accessor);
 	int vertex_position_count = (int)vertex_position_buffer.byteLength / vertex_position_data_size;
 
 	// Vertex normals
@@ -44,7 +53,7 @@ Mesh::Mesh(const std::string& path)
 	auto& index_accessor = model.accessors[primitive.indices];
 	auto& index_buffer_view = model.bufferViews[index_accessor.bufferView];
 
-	int index_data_size = tinygltf::GetNumComponentsInType(index_accessor.type) * tinygltf::GetComponentSizeInBytes(index_accessor.componentType);
+	int index_data_size = get_gltf_type_size(index_accessor);
 	size_t index_count = index_buffer_view.byteLength / index_data_size;
 
 	bool indices_exist = (index_buffer_view.byteLength != 0);
@@ -68,44 +77,41 @@ Mesh::Mesh(const std::string& path)
 	auto vert_uv_buf = model.buffers[vertex_uv_buffer.buffer].data.data();
 
 	// TODO: This entire model loading part is so ugly and convoluted, fix this
+	// Edit: its been made slightly less horrible, but still needs a redo
 
 	for(int i = 0, t = 0; i < index_count; i += 3, t++)
 	{
-		int tri_indices[3] = { i + 0, i + 1, i + 2};
-		// Indices into the vertex buffer for each vertex of a triangle
-
-		if(indices_exist)
-			for(i32 j = 0; j < 3; j++)
-				tri_indices[j] = indices[i + j];
-
-
-		auto pos_buf = (glm::vec3*) &vert_pos_buf[vertex_position_buffer.byteOffset];
-		auto normal_buf = (glm::vec3*) &vert_nor_buf[vertex_normal_buffer.byteOffset];
-		auto uv_buf = (glm::vec2*) &vert_uv_buf[vertex_uv_buffer.byteOffset];
-
-		tris[t].vertex0 = pos_buf[tri_indices[0]];
-		tris[t].vertex1 = pos_buf[tri_indices[1]];
-		tris[t].vertex2 = pos_buf[tri_indices[2]];
-			
-		normals[i + 0] = glm::vec4(normal_buf[tri_indices[0]], 0);
-		normals[i + 1] = glm::vec4(normal_buf[tri_indices[1]], 0);
-		normals[i + 2] = glm::vec4(normal_buf[tri_indices[2]], 0);
-
-		if(has_uvs)
+		for (i32 j = 0; j < 3; j++)
 		{
-			uvs[i + 0] = uv_buf[tri_indices[0]];
-			uvs[i + 1] = uv_buf[tri_indices[1]];
-			uvs[i + 2] = uv_buf[tri_indices[2]];
+			auto pos_buf =		(glm::vec3*)&vert_pos_buf[vertex_position_buffer.byteOffset];
+			auto normal_buf =	(glm::vec3*)&vert_nor_buf[vertex_normal_buffer.byteOffset];
+			auto uv_buf =		(glm::vec2*)&vert_uv_buf[vertex_uv_buffer.byteOffset];
+
+			i32 index = indices_exist
+				? (indices[i + j])
+				: (i + j);
+
+			// To keep proper padding, vertices[] is glm::vec4
+			tris[t].vertices[j] = glm::vec4(pos_buf[index], tris[t].vertices[j].a);
+
+			normals[i + j] = glm::vec4(normal_buf[index], 0);
+
+			if (has_uvs)
+				uvs[i + j] = uv_buf[index];
+
 		}
 	}
 
 	std::string file_name_with_extension = path.substr(path.find_last_of("/\\") + 1);
 	name = file_name_with_extension;
 
-	build_timer.start();
-	build_timer.reset();
+	f32 parsed_data_time_ms = mesh_build_timer.lap_delta();
+
 	reconstruct_bvh();
-	LOGDEBUG(std::format("Built BVH for {} in {} ms", get_file_name_from_path_string(path), (u32)build_timer.to_now()));
+
+	f32 built_bvh_time_ms = mesh_build_timer.lap_delta();
+
+	LOGDEBUG(std::format("New mesh {} Imported in {} ms | Parsed in {} ms | Build BVH in {} ms", get_file_name_from_path_string(path), (u32)imported_file_ms, (u32)parsed_data_time_ms, (u32)built_bvh_time_ms));
 }
 
 void Mesh::reconstruct_bvh()
