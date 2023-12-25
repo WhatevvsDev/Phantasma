@@ -27,7 +27,11 @@
 
 /*
 
-	// Main TODO
+	// TODO
+
+	// Ask Jacco (or look at lighthouse) how he manages the different data for meshes (tris/idx/uv/normal). Does he pack it in one buffer?
+
+	// Main Feature TODO
 
 	// 1. Asset browser/manager
 	//		- A system that automatically detects, sorts and shows the state of various assets (whether its loaded to CPU/GPU or still on disk, etc.)
@@ -84,13 +88,13 @@ namespace Raytracer
 		glm::mat4 old_camera_transform	{ glm::identity<glm::mat4>() };
 		f32 exr_angle					{ 0.0f };
 		u32 material_idx				{ 0 };
-		u32 selected_object_idx			{ UINT_MAX };
-		ViewType view_type				{ ViewType::Render };
+		u32 pad[2];
 	} scene_data;
 
 	struct
 	{
-		i32 selected_instance_idx		{ -1 }; // Signed so we can easily tell if they are valid or not (kind of a waste)
+		ViewType view_type				{ ViewType::Render };
+		i32 selected_instance_idx		{ -1 }; // Signed so we can easily tell if they are valid or not (kind of a waste, also kind of not since its 1 bit who cares)
 		i32 hovered_instance_idx		{ -1 };
 
 		u32* buffer						{ nullptr };
@@ -109,6 +113,7 @@ namespace Raytracer
 		
 		ImGuizmo::OPERATION current_gizmo_operation { ImGuizmo::TRANSLATE };
 
+		ComputeWriteBuffer* exr_buffer{ nullptr };
 		ComputeGPUOnlyBuffer* gpu_accumulation_buffer { nullptr };
 		ComputeGPUOnlyBuffer* gpu_detail_buffer { nullptr };
 
@@ -122,11 +127,18 @@ namespace Raytracer
 		std::vector<Camera::Instance> cameras;
 
 		Camera::Instance& get_active_camera_ref() { return cameras[active_camera_idx]; }
-	} internal;
 
-	// TODO: Temporary variables, will be consolidated into one system later
-	ComputeReadBuffer* screen_compute_buffer	{ nullptr };
-	ComputeWriteBuffer* exr_buffer	{ nullptr };
+		struct
+		{
+			Timer render_passes_timer;
+			f32 pre_render_time;
+			f32 tlas_build_time;
+			f32 primary_ray_gen_time;
+			f32 ray_trace_time;
+			f32 average_samples_time;
+
+		} performance;
+	} internal;
 
 	// Resizes buffers and sets internal state
 	void resize(const RaytracerResizeDesc& desc)
@@ -183,8 +195,8 @@ namespace Raytracer
 	void switch_skybox(u32 index)
 	{
 		auto& exr = Assets::get_exr_by_index(index);
-		delete exr_buffer;
-		exr_buffer = new ComputeWriteBuffer({ exr.data, (usize)(exr.width * exr.height * 4) });
+		delete internal.exr_buffer;
+		internal.exr_buffer = new ComputeWriteBuffer({ exr.data, (usize)(exr.width * exr.height * 4) });
 		scene_data.exr_size[0] = exr.width;
 		scene_data.exr_size[1] = exr.height;
 
@@ -209,6 +221,8 @@ namespace Raytracer
 		switch_skybox(0);
 
 		World::deserialize_scene();
+
+		internal.performance.render_passes_timer.start();
 	}
 
 	// Saves data such as settings, or world state to phantasma.data.json
@@ -328,6 +342,15 @@ namespace Raytracer
 	std::vector<BVHNode> tlas{ BVHNode() };
 	std::vector<u32> tlas_idx{ };
 
+	void raytrace_save_render_to_file()
+	{
+		if (!ImGui::IsKeyReleased(ImGuiKey_P))
+			return;
+
+		stbi_write_jpg("render.jpg", internal.render_width_px, internal.render_height_px, internal.render_channel_count, internal.buffer, 100);
+		LOGDEBUG("Saved screenshot.");
+	}
+
 	// Averages out acquired samples, and renders them to the screen
 	void raytrace_trace_rays()
 	{
@@ -344,7 +367,7 @@ namespace Raytracer
 			.write(Assets::get_texture_compute_buffer())
 			.write(Assets::get_texture_header_buffer())
 			.write({&scene_data, 1})
-			.write(*exr_buffer)
+			.write(*internal.exr_buffer)
 			.write({&World::get_world_device_data(), 1})
 			.write(World::get_material_vector())
 			.write(tlas)
@@ -354,31 +377,38 @@ namespace Raytracer
 			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
 			.execute();
 
-			internal.accumulated_frames++;
+		internal.accumulated_frames++;
+
+		internal.performance.ray_trace_time = internal.performance.render_passes_timer.lap_delta();
 	}
 
 	void raytrace_average_samples(const ComputeReadWriteBuffer& screen_buffer)
 	{
-		f32 samples_reciprocal = 1.0f / (f32)internal.accumulated_frames;
+		struct GeneratePrimaryRaysArgs
+		{
+			f32 samples_reciprocal;
+			u32 width;
+			u32 height;
+			ViewType view_type;
+			u32 selected_object_idx;
+			u32 pad[3];
+		} args;
 
-		// TODO: pass this a buffer of heatmap colors, instead of hardcoding it into the shader
+		args.samples_reciprocal = 1.0f / (f32)internal.accumulated_frames;
+		args.width = internal.render_width_px;
+		args.height = internal.render_height_px;
+		args.view_type = internal.view_type;
+		args.selected_object_idx = internal.selected_instance_idx;
+
 		ComputeOperation("average_accumulated.cl")
 			.read_write((*internal.gpu_accumulation_buffer))
 			.read_write(screen_buffer)
-			.write({&samples_reciprocal, 1})
-			.write({&scene_data, 1})
+			.write({&args, 1})
 			.read_write(*internal.gpu_detail_buffer)
 			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
 			.execute();
-	}
 
-	void raytrace_save_render_to_file() 
-	{
-		if(!ImGui::IsKeyReleased(ImGuiKey_P))
-			return;
-
-		stbi_write_jpg("render.jpg", internal.render_width_px, internal.render_height_px, internal.render_channel_count, internal.buffer, 100);
-		LOGDEBUG("Saved screenshot.");
+		internal.performance.average_samples_time = internal.performance.render_passes_timer.lap_delta();
 	}
 
 	void raytrace_generate_primary_rays()
@@ -410,10 +440,14 @@ namespace Raytracer
 			.read_write((*internal.gpu_primary_ray_buffer))
 			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
 			.execute();
+
+		internal.performance.primary_ray_gen_time = internal.performance.render_passes_timer.lap_delta();
 	}
 
 	void raytrace()
 	{
+		internal.performance.render_passes_timer.lap_delta();
+
 		if(internal.render_dirty || !settings.accumulate_frames || internal.world_dirty)
 		{
 			scene_data.reset_accumulator = true;
@@ -424,7 +458,6 @@ namespace Raytracer
 		auto& active_camera = internal.get_active_camera_ref();
 
 		scene_data.accumulated_frames = internal.accumulated_frames;
-		scene_data.selected_object_idx = internal.selected_instance_idx;
 		scene_data.old_camera_transform = scene_data.camera_transform;
 		scene_data.camera_transform = Camera::get_instance_matrix(active_camera);
 		scene_data.inverse_camera_transform = glm::inverse(scene_data.camera_transform);
@@ -433,6 +466,8 @@ namespace Raytracer
 		ComputeReadWriteBuffer screen_buffer({internal.buffer, (usize)(render_area)});
 
 		bool accumulate_frames = !(settings.limit_accumulated_frames && (internal.accumulated_frames > (u32)settings.accumulated_frame_limit));
+
+		internal.performance.pre_render_time = internal.performance.render_passes_timer.lap_delta();
 
 		if(internal.world_dirty)
 		{
@@ -444,11 +479,14 @@ namespace Raytracer
 			internal.world_dirty = false;
 		}
 
+		internal.performance.tlas_build_time = internal.performance.render_passes_timer.lap_delta();
+
 		if(accumulate_frames)
 		{
 			raytrace_generate_primary_rays();
 			raytrace_trace_rays();
 			raytrace_average_samples(screen_buffer);
+
 
 			scene_data.reset_accumulator = false;
 		}
@@ -613,15 +651,15 @@ namespace Raytracer
 			
 			ImGui::Checkbox("Show onscreen log?", &settings.show_onscreen_log);
 
-			if (ImGui::BeginCombo("View Type", view_type_to_string(scene_data.view_type).c_str()))
+			if (ImGui::BeginCombo("View Type", view_type_to_string(internal.view_type).c_str()))
 			{
 				for(i32 i = 0; i < (i32)ViewType::ViewTypeRange; i++)
 				{
 					auto type = (ViewType)i;
-					bool is_type = scene_data.view_type == type;
+					bool is_type = internal.view_type == type;
 
 					if (ImGui::Selectable(view_type_to_string(type).c_str(), is_type))
-						scene_data.view_type = type;
+						internal.view_type = type;
 				}
 
 				ImGui::EndCombo();
@@ -847,6 +885,18 @@ namespace Raytracer
 				}
 				number_idx++;
 			}
+		}
+
+		if(ImGui::BeginTabItem("Performance"))
+		{
+			// TODO: make this a nice stacked graph
+			ImGui::Text(std::format("pre_render_time time is {} ms", internal.performance.pre_render_time).c_str());
+			ImGui::Text(std::format("tlas_build_time time is {} ms", internal.performance.tlas_build_time).c_str());
+			ImGui::Text(std::format("primary_ray_gen_time time is {} ms", internal.performance.primary_ray_gen_time).c_str());
+			ImGui::Text(std::format("ray_trace_time time is {} ms", internal.performance.ray_trace_time).c_str());
+			ImGui::Text(std::format("average_samples_time time is {} ms", internal.performance.average_samples_time).c_str());
+
+			ImGui::EndTabItem();
 		}
 
 		ImGui::EndTabBar();

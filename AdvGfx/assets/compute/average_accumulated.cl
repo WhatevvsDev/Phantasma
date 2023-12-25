@@ -8,21 +8,30 @@ float3 ACESFilm(float3 x)
     return clamp((x*(a*x + b)) / (x*(c*x + d) + e), 0.0f, 1.0f);
 }
 
+typedef struct AverageAccumulatedArgs
+{
+	float samples_reciprocal;
+	uint width;
+	uint height;
+	ViewType view_type;
+	uint selected_object_idx;
+	uint pad[3];
+} AverageAccumulatedArgs;
+
 void kernel average_accumulated(
 	global float* accumulation_buffer, 
 	global uint* render_buffer, 
-	global float* sample_count_reciprocal, 
-	global struct SceneData* scene_data,
+	global AverageAccumulatedArgs* args, 
 	global PixelDetailInformation* detail_buffer
 	)
 {     
 	int x = get_global_id(0);
 	int y = get_global_id(1);
 
-	uint pixel_idx = (x + y * scene_data->resolution.x);
+	uint pixel_idx = (x + y * args->width);
 	
-	int width = scene_data->resolution.x;
-	int height = scene_data->resolution.y;
+	int width = args->width;
+	int height = args->height;
 
 	uint neighbors_idx[8] = 
 	{
@@ -38,7 +47,7 @@ void kernel average_accumulated(
 
 	float3 color = 0;
 	
-	switch(scene_data->view_type)
+	switch(args->view_type)
 	{
 		case Render:
 		{
@@ -49,7 +58,7 @@ void kernel average_accumulated(
 				accumulation_buffer[pixel_idx * 4 + 2]
 			);
 
-			color *= *sample_count_reciprocal;
+			color *= args->samples_reciprocal;
 			color = ACESFilm(color);
 			color = sqrt(color);
 			break;
@@ -85,25 +94,24 @@ void kernel average_accumulated(
 		}
 	}
 	
-	int r = clamp((int)(color.x * 255.0f), 0, 255);
-	int g = clamp((int)(color.y * 255.0f), 0, 255);
-	int b = clamp((int)(color.z * 255.0f), 0, 255);
+	int r = saturate(color.r) * 255.0f;
+	int g = saturate(color.g) * 255.0f;
+	int b = saturate(color.b) * 255.0f;
 
 	bool outline_object = detail_buffer[pixel_idx].hit_object != UINT_MAX;
-	bool is_pixel_of_selected_object = detail_buffer[pixel_idx].hit_object == scene_data->selected_object_idx;
+	bool is_pixel_of_selected_object = detail_buffer[pixel_idx].hit_object == args->selected_object_idx;
 
 	if(outline_object && is_pixel_of_selected_object)
 	{
 		bool neighbor_is_different_object = false;
 
 		for(int i = 0; i < 8; i++)
-		neighbor_is_different_object |= detail_buffer[neighbors_idx[i]].hit_object - scene_data->selected_object_idx;
+		neighbor_is_different_object |= detail_buffer[neighbors_idx[i]].hit_object - args->selected_object_idx;
 		
 		if(neighbor_is_different_object)
 		{
-			r = 0xF2;
-			g = 0x99;
-			b = 0x29;
+			render_buffer[pixel_idx] = 0x2999F2;
+			return;
 		}
 	}
 
