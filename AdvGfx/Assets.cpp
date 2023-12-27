@@ -313,3 +313,8 @@ BVHNode Assets::get_root_bvh_node_of_mesh(u32 idx)
 
 	return internal.consolidated_nodes[mesh_header.root_bvh_node_idx];
 }
+
+const MeshHeader Assets::get_mesh_header(u32 idx)
+{
+	return internal.mesh_headers[idx];
+}

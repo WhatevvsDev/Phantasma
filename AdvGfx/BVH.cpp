@@ -162,33 +162,38 @@ f32 BVHConstructor::evaluate_sah(BVHNode& node, u32 axis, f32 pos)
 	glm::vec3 right_min = glm::vec3(1e30f);
 	glm::vec3 right_max = glm::vec3(1e-30f);
 
-	i32 left_count = 0;
-	i32 right_count = 0;
+	// Weight is triangle count
+	i32 left_weight = 0;
+	i32 right_weight = 0;
 
 	for (uint i = 0; i < node.primitive_count; i++)
 	{
-		const AABB& aabb = primitive_aabb_data.primitive_aabbs[bvh.primitive_idx[node.left_first + i]];
-		const glm::vec3& centroid = primitive_aabb_data.centroids[bvh.primitive_idx[node.left_first + i]];
+		const u32 primitive_index = bvh.primitive_idx[node.left_first + i];
+		const AABB& aabb = primitive_aabb_data.primitive_aabbs[primitive_index];
+		const glm::vec3& centroid = primitive_aabb_data.centroids[primitive_index];
+		const u32& weight = primitive_aabb_data.weights[primitive_index];
 
 		if (centroid[axis] < pos)
 		{
-			left_count++;
 			left_min = glm::min(left_min, aabb.min);
 			left_max = glm::max(left_max, aabb.max);
+			left_weight += weight;
 		}
 		else
 		{
-			right_count++;
 			right_min = glm::min(right_min, aabb.min);
 			right_max = glm::max(right_max, aabb.max);
+			right_weight += weight;
 		}
 	}
+	
+
 	glm::vec3 left_extent = left_max - left_min;
 	glm::vec3 right_extent = right_max - right_min;
 	f32 left_area = aabb_area(left_extent);
 	f32 right_area = aabb_area(right_extent);
 
-	f32 cost = left_count * left_area + right_count * right_area;
+	f32 cost = (left_weight) * left_area + (right_weight) * right_area;
 	return cost > 0 ? cost : 1e30f;
 }
 
@@ -233,6 +238,13 @@ BVHConstructionPrimitiveAABBData::BVHConstructionPrimitiveAABBData(const std::ve
 		primitive_aabbs[i] = get_triangle_aabb(triangle);
 		centroids[i] = aabb_centroid(primitive_aabbs[i]);
 	}
+
+	if (weights.empty())
+	{
+		weights.resize(primitive_count);
+		for (u32 i = 0; i < primitive_count; i++)
+			weights[i] = 1;
+	}
 }
 
 BVHConstructionPrimitiveAABBData::BVHConstructionPrimitiveAABBData(const std::vector<AABB>& aabbs)
@@ -246,6 +258,13 @@ BVHConstructionPrimitiveAABBData::BVHConstructionPrimitiveAABBData(const std::ve
 		primitive_aabbs[i] = aabbs[i];
 		centroids[i] = aabb_centroid(primitive_aabbs[i]);
 	}
+
+	if (weights.empty())
+	{
+		weights.resize(primitive_count);
+		for (u32 i = 0; i < primitive_count; i++)
+			weights[i] = 1;
+	}
 }
 
 void BuildTLAS(BVH& bvh)
@@ -253,27 +272,36 @@ void BuildTLAS(BVH& bvh)
 	auto& world_data = World::get_world_device_data();
 	u32 instance_count = world_data.mesh_instance_count;
 
-	std::vector<AABB> transformed_aabbs;
+	std::vector<AABB> transformed_aabbs;	
+	std::vector<u32> weights;
 
 	usize primitive_count = instance_count;
 
 	bvh.primitive_idx.resize(primitive_count);
 	bvh.nodes.resize(primitive_count * 2);
+	weights.resize(primitive_count);
+
 
 	for (u32 i = 0; i < instance_count; i++)
 	{
 		bvh.primitive_idx[i] = i;
+		u32 mesh_index = world_data.mesh_instances[i].mesh_idx;
 
-		auto bvhnode = Assets::get_root_bvh_node_of_mesh(world_data.mesh_instances[i].mesh_idx);
+		auto bvhnode = Assets::get_root_bvh_node_of_mesh(mesh_index);
 
 		AABB aabb = { bvhnode.min, bvhnode.max };
 
 		transform_aabb(aabb, world_data.mesh_instances[i].transform);
 
 		transformed_aabbs.push_back(aabb);
+		weights[i] = Assets::get_mesh_header(mesh_index).tris_count;
 	}
 
-	BVHConstructor(bvh, transformed_aabbs);
+	BVHConstructionPrimitiveAABBData primitive_data(transformed_aabbs);
+
+	primitive_data.weights = weights;
+
+	BVHConstructor(bvh, primitive_data);
 }
 
 void BuildBLAS(BVH& bvh, const BVHConstructionPrimitiveAABBData& aabb_list)
@@ -287,5 +315,10 @@ void BuildBLAS(BVH& bvh, const BVHConstructionPrimitiveAABBData& aabb_list)
 	for (i32 i = 0; i < primitive_count; i++)
 		bvh.primitive_idx[i] = i;
 
-	BVHConstructor(bvh, aabb_list.primitive_aabbs);
+	BVHConstructionPrimitiveAABBData primitive_data(aabb_list.primitive_aabbs);
+
+	for (i32 i = 0; i < primitive_count; i++)
+		primitive_data.weights[i] = 1;
+
+	BVHConstructor(bvh, primitive_data);
 }

@@ -29,6 +29,7 @@ struct BVHConstructionPrimitiveAABBData
 	usize primitive_count;
 	std::vector<AABB> primitive_aabbs;
 	std::vector<glm::vec3> centroids;
+	std::vector<u32> weights;
 
 	BVHConstructionPrimitiveAABBData(const std::vector<Tri>& tris);
 	BVHConstructionPrimitiveAABBData(const std::vector<AABB>& aabbs);

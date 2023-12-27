@@ -74,4 +74,5 @@ namespace Assets
 	const std::vector<DiskAsset>& get_disk_files_by_extension(const std::string& extension);
 
 	BVHNode get_root_bvh_node_of_mesh(u32 idx);
+	const MeshHeader get_mesh_header(u32 idx);
 }
