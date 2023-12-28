@@ -84,8 +84,7 @@ namespace Raytracer
 		u32 accumulated_frames			{ 0 };
 		u32 reset_accumulator			{ false };
 		glm::mat4 camera_transform		{ glm::identity<glm::mat4>() };
-		glm::mat4 inverse_camera_transform	{ glm::identity<glm::mat4>() };
-		glm::mat4 old_camera_transform	{ glm::identity<glm::mat4>() };
+		glm::mat4 inv_old_camera_transform	{ glm::identity<glm::mat4>() };
 		f32 exr_angle					{ 0.0f };
 		u32 material_idx				{ 0 };
 		u32 pad[2];
@@ -354,10 +353,11 @@ namespace Raytracer
 	}
 
 	// Averages out acquired samples, and renders them to the screen
-	void raytrace_trace_rays()
+	void raytrace_trace_rays(const ComputeReadWriteBuffer& screen_buffer)
 	{
 		ComputeOperation("raytrace.cl")
 			.read_write(*internal.gpu_accumulation_buffer)	
+			.read_write(screen_buffer)
 			.read(ComputeReadBuffer({&internal.hovered_instance_idx, 1}))
 			.read(ComputeReadBuffer({&internal.distance_to_hovered, 1}))
 			.write(Assets::get_normals_compute_buffer())
@@ -464,9 +464,8 @@ namespace Raytracer
 		auto& active_camera = internal.get_active_camera_ref();
 
 		scene_data.accumulated_frames = internal.accumulated_frames;
-		scene_data.old_camera_transform = scene_data.camera_transform;
+		scene_data.inv_old_camera_transform = glm::inverse(scene_data.camera_transform);
 		scene_data.camera_transform = Camera::get_instance_matrix(active_camera);
-		scene_data.inverse_camera_transform = glm::inverse(scene_data.camera_transform);
 
 		u32 render_area = internal.render_width_px * internal.render_height_px;
 		ComputeReadWriteBuffer screen_buffer({internal.buffer, (usize)(render_area)});
@@ -489,7 +488,7 @@ namespace Raytracer
 		if(accumulate_frames)
 		{
 			raytrace_generate_primary_rays();
-			raytrace_trace_rays();
+			raytrace_trace_rays(screen_buffer);
 			raytrace_average_samples(screen_buffer);
 
 			scene_data.reset_accumulator = false;

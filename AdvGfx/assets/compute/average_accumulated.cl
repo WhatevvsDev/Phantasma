@@ -61,6 +61,7 @@ void kernel average_accumulated(
 			color *= args->samples_reciprocal;
 			color = ACESFilm(color);
 			color = sqrt(color);
+			color = clamp(color, 0.0f, 1.0f);
 			break;
 		}
 		case Albedo:

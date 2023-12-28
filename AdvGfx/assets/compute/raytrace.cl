@@ -718,8 +718,34 @@ float3 to_float3(float* array)
 	return (float3)(array[0], array[1], array[2]);
 }
 
+//returns xy->uv > [-1..1] (with aspect), z < 0 if invalid
+float3 world_space_to_screen_space(float3 camera_position,float3 camera_target, float3 position_ws)
+{
+    float3 to_point = position_ws - camera_position;
+    float3 to_point_nrm = normalize(to_point);
+    
+    float3 camera_dir = normalize(camera_target - camera_position);
+	float3 view_right = normalize(cross((float3)(0.0,0.0,1.0),camera_dir));
+    float3 view_up = (cross(camera_dir,view_right));
+    
+    float3 fwd = camera_dir * EPSILON;
+    
+    float d = dot(camera_dir,to_point_nrm);
+    if(d < 0.01)
+        return (float3)(0.0,0.0,-1.0);
+    
+    d = EPSILON / d;
+    
+    to_point = to_point_nrm * d - fwd;
+    
+    float x = dot(to_point,view_right);
+    float y = dot(to_point,view_up);
+    return (float3)(x,y,1.0);
+}
+
 void kernel raytrace(
 	global float* accumulation_buffer, 
+	global uint* render_buffer, 
 	global int* mouse, 
 	global float* distance,
 	global float4* normals,
@@ -740,8 +766,8 @@ void kernel raytrace(
 	global Ray* primary_rays
 	)
 {     
-	int width = scene_data->resolution.x;
-	int height = scene_data->resolution.y;
+	uint width = scene_data->resolution.x;
+	uint height = scene_data->resolution.y;
 	float aspect_ratio = (float)(width) / (float)(height);
 
 	int x = get_global_id(0);
@@ -797,14 +823,45 @@ void kernel raytrace(
 
 	// <Reprojection>
 	{
+		// TODO: finish this, stationary UVs don't match up with actual UVs for some reason.
 		// Known information
-		float2 uv = (float2)((float)x / (float)width, (float)y / (float)height);
-		float4 cam_pos = (float4)(scene_data->camera_transform[12], scene_data->camera_transform[13], scene_data->camera_transform[14], 0.0f);
+		float2 uv = (float2)((float)x / (float)(width - 1), (float)y / (float)(height - 1));
 		float4 pixel_ws_pos = (float4)(detail_buffer[pixel_index].hit_position.xyz, 1.0f);
-		// TODO: Finish this
+		
+		// Reproject using old camera matrix
+		float3 reprojected = transform(pixel_ws_pos, scene_data->inv_old_camera_transform).xyz;
+
+		// Convert to screenspace
+		float2 reproj_uv = (reprojected.xy / reprojected.z / (float2)(aspect_ratio, 1.0f)) * 0.5f + 0.5f;
+		float2 reproj_uv01 = (float2)(1.0f - reproj_uv.x, reproj_uv.y);
+
+		// If sampling offscreen
+		bool offscreen = (reproj_uv01.x != clamp(reproj_uv01.x, 0.0f, 1.0f) || (reproj_uv01.y != clamp(reproj_uv01.y, 0.0f, 1.0f)));
+
+		// Get buffer index
+		uint rprj_x = reproj_uv01.x * width;
+		uint rprj_y = reproj_uv01.y * height;
+		uint reproj_pixel_index = (rprj_x + rprj_y * width);
+
+		// For testing
+		if(true)
+		{
+			accumulation_buffer[pixel_index * 4 + 0] = color.x;
+			accumulation_buffer[pixel_index * 4 + 1] = color.y;
+			accumulation_buffer[pixel_index * 4 + 2] = color.z;
+		}
+		else
+		{
+			accumulation_buffer[pixel_index * 4 + 0] = accumulation_buffer[reproj_pixel_index * 4 + 0];
+			accumulation_buffer[pixel_index * 4 + 1] = accumulation_buffer[reproj_pixel_index * 4 + 1];
+			accumulation_buffer[pixel_index * 4 + 2] = accumulation_buffer[reproj_pixel_index * 4 + 2];
+		}
 	}
 	// </Reprojection>
 
+	color = max(color, 0.0f);
+
+	return;
 	if(scene_data->reset_accumulator)
 	{
 		accumulation_buffer[pixel_index * 4 + 0] = color.x;

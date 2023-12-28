@@ -30,7 +30,7 @@ bool orbit_camera_behavior(f32 delta_time_ms, Camera::Instance& camera)
 		state_changed |= camera_is_orbiting;
 	}
 
-	glm::vec3 position_offset = glm::vec3(0.0f, 0.0f, -camera.orbit_camera_distance);
+	glm::vec3 position_offset = glm::vec3(0.0f, 0.0f, camera.orbit_camera_distance);
 
 	camera.rotation = glm::vec3(camera.orbit_camera_angle, camera.orbit_camera_t * 360.0f, 0.0f);
 	position_offset = position_offset * glm::mat3(glm::eulerAngleXY(glm::radians(-camera.rotation.x), glm::radians(-camera.rotation.y)));
