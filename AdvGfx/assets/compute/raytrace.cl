@@ -828,8 +828,10 @@ void kernel raytrace(
 		float2 uv = (float2)((float)x / (float)(width - 1), (float)y / (float)(height - 1));
 		float4 pixel_ws_pos = (float4)(detail_buffer[pixel_index].hit_position.xyz, 1.0f);
 		
+		/*
 		// Reproject using old camera matrix
-		float3 reprojected = transform(pixel_ws_pos, scene_data->inv_old_camera_transform).xyz;
+		float4 reprojected = transform((float4)(pixel_ws_pos.xyz, 1.0f), scene_data->inv_old_camera_transform);
+		reprojected /= reprojected.w;
 
 		// Convert to screenspace
 		float2 reproj_uv = (reprojected.xy / reprojected.z / (float2)(aspect_ratio, 1.0f)) * 0.5f + 0.5f;
@@ -842,6 +844,14 @@ void kernel raytrace(
 		uint rprj_x = reproj_uv01.x * width;
 		uint rprj_y = reproj_uv01.y * height;
 		uint reproj_pixel_index = (rprj_x + rprj_y * width);
+
+
+		float4 prevClipPos = transform(pixel_ws_pos, scene_data->inv_old_camera_transform);
+		prevClipPos /= prevClipPos.w;
+
+		float2 prevUV = (prevClipPos.xy / prevClipPos.w) + 1.0f;
+
+		//color = prevUV.xyy;
 
 		// For testing
 		if(true)
@@ -856,12 +866,13 @@ void kernel raytrace(
 			accumulation_buffer[pixel_index * 4 + 1] = accumulation_buffer[reproj_pixel_index * 4 + 1];
 			accumulation_buffer[pixel_index * 4 + 2] = accumulation_buffer[reproj_pixel_index * 4 + 2];
 		}
+		*/
 	}
 	// </Reprojection>
 
 	color = max(color, 0.0f);
 
-	return;
+	//return;
 	if(scene_data->reset_accumulator)
 	{
 		accumulation_buffer[pixel_index * 4 + 0] = color.x;

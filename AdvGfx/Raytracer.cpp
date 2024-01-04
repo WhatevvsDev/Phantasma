@@ -83,7 +83,9 @@ namespace Raytracer
 		i32 exr_size[2]					{ 0, 0 };
 		u32 accumulated_frames			{ 0 };
 		u32 reset_accumulator			{ false };
-		glm::mat4 camera_transform		{ glm::identity<glm::mat4>() };
+		glm::mat4 camera_transform{ glm::identity<glm::mat4>() };
+		glm::mat4 old_camera_transform{ glm::identity<glm::mat4>() };
+		glm::mat4 old_proj_camera_transform{ glm::identity<glm::mat4>() };
 		glm::mat4 inv_old_camera_transform	{ glm::identity<glm::mat4>() };
 		f32 exr_angle					{ 0.0f };
 		u32 material_idx				{ 0 };
@@ -463,7 +465,11 @@ namespace Raytracer
 
 		auto& active_camera = internal.get_active_camera_ref();
 
+		glm::mat4 projection = glm::perspectiveRH(glm::radians(90.0f), (f32)internal.render_width_px / (f32)internal.render_height_px, 0.1f, 1000.0f);
 		scene_data.accumulated_frames = internal.accumulated_frames;
+
+		scene_data.old_camera_transform = scene_data.camera_transform;
+		scene_data.old_proj_camera_transform = projection * scene_data.camera_transform;
 		scene_data.inv_old_camera_transform = glm::inverse(scene_data.camera_transform);
 		scene_data.camera_transform = Camera::get_instance_matrix(active_camera);
 
