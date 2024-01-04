@@ -8,18 +8,14 @@ struct MeshHeader
 	u32 tris_offset {};
 	u32 tris_count {};
 
-	u32 normals_offset {};
-	u32 normals_count {}; // Is in theory always 3x tris_count;
-
-	u32 uvs_offset {};
+	u32 vertex_data_offset {};
+	u32 vertex_data_count {}; // Is in theory always 3x tris_count
 
 	u32 root_bvh_node_idx {};
 	u32 bvh_node_count {}; // Technically could be unnecessary
 
 	u32 tri_idx_offset {};
 	u32 tri_idx_count {};
-	
-	u32 pad {};
 };
 
 struct TextureHeader	
@@ -60,8 +56,7 @@ namespace Assets
 	void reconstruct_bvh(const std::string mesh);
 
 	ComputeWriteBuffer& get_tris_compute_buffer();
-	ComputeWriteBuffer& get_normals_compute_buffer();
-	ComputeWriteBuffer& get_uvs_compute_buffer();
+	ComputeWriteBuffer& get_vertex_data_compute_buffer();
 	ComputeWriteBuffer& get_bvh_compute_buffer();
 	ComputeWriteBuffer& get_tri_idx_compute_buffer();
 	ComputeWriteBuffer& get_mesh_header_buffer();

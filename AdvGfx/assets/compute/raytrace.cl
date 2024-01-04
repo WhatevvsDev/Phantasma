@@ -39,18 +39,14 @@ typedef struct MeshHeader
 	uint tris_offset;
 	uint tris_count;
 
-	uint normals_offset;
-	uint normals_count; // Is in theory always 3x tris_count;
-
-	uint uvs_offset;
+	uint vertex_data_offset;
+	uint vertex_data_count; // Is in theory always 3x tris_count;
 
 	uint root_bvh_node_idx;
 	uint bvh_node_count; // Technically could be unnecessary
 
 	uint tri_idx_offset;
 	uint tri_idx_count;
-
-	uint pad;
 } MeshHeader;
 
 typedef struct TextureHeader
@@ -76,7 +72,7 @@ typedef struct WorldManagerDeviceData
 {
 	uint mesh_count;
 	uint pad_0[3];
-	MeshInstanceHeader instances[256];
+	MeshInstanceHeader instances[4096];
 } WorldManagerDeviceData;
 
 float3 get_exr_color(float3 direction, float* exr, int2 exr_size, float exr_angle, bool include_sun)
@@ -234,42 +230,46 @@ void intersect_bvh(BVHArgs* args)
 
 float3 tri_normal(Tri* tri)
 {
-	float3 a = (*tri).vertex0;
-	float3 b = (*tri).vertex1;
-	float3 c = (*tri).vertex2;
+	float3 a = tri->vertex0;
+	float3 b = tri->vertex1;
+	float3 c = tri->vertex2;
 
 	return normalize(cross(a - b, a - c));
 }
 
-float beers_law(float thickness, float absorbtion_coefficient)
+float beers_law(float thickness, float absorption_coefficient)
 {
-	return pow(EULER, -absorbtion_coefficient * thickness);
+	return pow(EULER, -absorption_coefficient * thickness);
 }
 
-float3 interpolate_tri_normal(float4* normals, struct Ray* ray)
+float3 interpolate_tri_normal(VertexData* vertex_data, struct RayIntersection* intersection)
 {
-	float u = ray->intersection->u;
-	float v = ray->intersection->v;
+	float u = intersection->u;
+	float v = intersection->v;
 	float w = 1.0f - u - v;
 
-	float3 v0_normal = normals[ray->intersection->tri_hit * 3 + 0].xyz;
-	float3 v1_normal = normals[ray->intersection->tri_hit * 3 + 1].xyz;
-	float3 v2_normal = normals[ray->intersection->tri_hit * 3 + 2].xyz;
+	uint idx = intersection->tri_hit * 3;
 
-	return normalize(v0_normal * w + v1_normal * u + v2_normal * v);
+	float3 v0_normal = vertex_data[idx + 0].normal * w;
+	float3 v1_normal = vertex_data[idx + 1].normal * u;
+	float3 v2_normal = vertex_data[idx + 2].normal * v;
+
+	return normalize(v0_normal + v1_normal + v2_normal);
 }
 
-float2 interpolate_tri_uvs(float2* uvs, struct Ray* ray)
+float2 interpolate_tri_uvs(VertexData* vertex_data, struct RayIntersection* intersection)
 {
-	float u = ray->intersection->u;
-	float v = ray->intersection->v;
+	float u = intersection->u;
+	float v = intersection->v;
 	float w = 1.0f - u - v;
 
-	float2 v0_uv = uvs[ray->intersection->tri_hit * 3 + 0].xy;
-	float2 v1_uv = uvs[ray->intersection->tri_hit * 3 + 1].xy;
-	float2 v2_uv = uvs[ray->intersection->tri_hit * 3 + 2].xy;
+	uint idx = intersection->tri_hit * 3;
 
-	return (v0_uv * w + v1_uv * u + v2_uv * v);
+	float2 v0_uv = vertex_data[idx + 0].uv * w;
+	float2 v1_uv = vertex_data[idx + 1].uv * u;
+	float2 v2_uv = vertex_data[idx + 2].uv * v;
+
+	return (v0_uv + v1_uv + v2_uv);
 }
 
 typedef enum MaterialType
@@ -284,7 +284,7 @@ typedef struct Material
 {
 	float4 albedo;
 	float ior;
-	float absorbtion_coefficient;
+	float absorption_coefficient;
 	MaterialType type;
 	float specularity;
 	float metallic;
@@ -295,8 +295,7 @@ typedef struct TraceArgs
 {
 	Ray* primary_ray;
 	BVHNode* blas_nodes;
-	float4* normals;
-	float2* uvs;
+	VertexData* vertex_data;
 	Tri* tris;
 	uint* trisIdx;
 	uint* rand_seed;
@@ -504,10 +503,13 @@ float3 trace(TraceArgs* args)
 			MeshHeader* mesh = &args->mesh_headers[instance->mesh_idx];	
 			Material mat = args->materials[instance->material_idx];
 
+			VertexData* vertex_data = &args->vertex_data[mesh->vertex_data_offset];
+
 			float3 hit_pos = current_ray.O + (current_ray.D * current_ray.t);
-			float3 normal = interpolate_tri_normal(&args->normals[mesh->normals_offset], &current_ray);
+			float3 normal = interpolate_tri_normal(vertex_data, current_ray.intersection);
 			float3 geo_normal = current_ray.intersection->geo_normal;
-			float2 uvs = interpolate_tri_uvs(&args->uvs[mesh->uvs_offset], &current_ray);
+			float2 uvs = interpolate_tri_uvs(vertex_data, current_ray.intersection);
+
 
 			// We have to apply transform so normals are world-space
 
@@ -635,7 +637,7 @@ float3 trace(TraceArgs* args)
 					else
 					{
 						current_ray.D = refracted(current_ray.D, normal, refraction_ratio);
-						float transmission_factor = inner_normal ? beers_law(old_ray_distance, mat.absorbtion_coefficient) : 1.0f;
+						float transmission_factor = inner_normal ? beers_law(old_ray_distance, mat.absorption_coefficient) : 1.0f;
 
 						e *= material_color * transmission_factor * t;
 						t *= material_color * transmission_factor;
@@ -748,8 +750,7 @@ void kernel raytrace(
 	global uint* render_buffer, 
 	global int* mouse, 
 	global float* distance,
-	global float4* normals,
-	global float2* uvs, 
+	global VertexData* vertex_data, 
 	global struct Tri* tris, 
 	global struct BVHNode* blas_nodes, 
 	global uint* trisIdx, 
@@ -786,8 +787,7 @@ void kernel raytrace(
 	struct TraceArgs trace_args;
 	trace_args.primary_ray = &ray;
 	trace_args.blas_nodes = blas_nodes;
-	trace_args.normals = normals;
-	trace_args.uvs = uvs;
+	trace_args.vertex_data = vertex_data;
 	trace_args.tris = tris;
 	trace_args.trisIdx = trisIdx;
 	trace_args.rand_seed = &rand_seed;

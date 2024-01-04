@@ -305,3 +305,15 @@ typedef struct PixelDetailInformation
 } PixelDetailInformation;
 
 #endif
+
+#ifndef PERVERTEXDATA
+
+#define PERVERTEXDATA
+
+typedef struct  VertexData
+{
+	float3 normal;
+	float2 uv;
+} VertexData;
+
+#endif

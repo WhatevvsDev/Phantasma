@@ -7,6 +7,14 @@
 
 struct BVH;
 
+struct VertexData
+{
+	glm::vec3 normal { 0.0f, 0.0f, 1.0f };
+	f32 pad_0;
+	glm::vec2 uv{ 0.0f, 0.0f };
+	f32 pad_1[2];
+};
+
 struct Tri 
 { 
 	union
@@ -32,8 +40,7 @@ struct Mesh
 {
 	Mesh(const std::string& path);
 	std::vector<Tri> tris{ };
-	std::vector<glm::vec4> normals{ };
-	std::vector<glm::vec2> uvs{ };
+	std::vector<VertexData> vertex_data;
 	BVH* bvh { nullptr } ;
 	std::string name { };
 

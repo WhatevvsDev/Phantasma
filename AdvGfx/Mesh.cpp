@@ -62,10 +62,7 @@ Mesh::Mesh(const std::string& path)
 		index_count = vertex_position_count;
 		
 	tris.resize(index_count / 3);
-	normals.resize(index_count);
-
-	if(has_uvs)
-		uvs.resize(index_count);
+	vertex_data.resize(index_count);
 
 	std::vector<int> indices;
 	
@@ -94,10 +91,10 @@ Mesh::Mesh(const std::string& path)
 			// To keep proper padding, vertices[] is glm::vec4
 			tris[t].vertices[j] = glm::vec4(pos_buf[index], tris[t].vertices[j].a);
 
-			normals[i + j] = glm::vec4(normal_buf[index], 0);
+			vertex_data[i + j].normal = normal_buf[index];
 
 			if (has_uvs)
-				uvs[i + j] = uv_buf[index];
+				vertex_data[i + j].uv = uv_buf[index];
 
 		}
 	}
