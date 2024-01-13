@@ -31,7 +31,7 @@ typedef struct BVHNode
     float minx, miny, minz;
     int left_first;
     float maxx, maxy, maxz;
-	int tri_count;
+	int primitive_count;
 } BVHNode;
 
 typedef struct MeshHeader
@@ -182,9 +182,9 @@ void intersect_bvh(BVHArgs* args)
 	{
 		args->blas_hits++;
 
-		if(node->tri_count > 0)
+		if(node->primitive_count > 0)
 		{
-			for (uint i = 0; i < node->tri_count; i++ )
+			for (uint i = 0; i < node->primitive_count; i++ )
 				intersect_tri( args->ray, &args->tris[args->mesh_header->tris_offset], args->trisIdx[node->left_first + i + args->mesh_header->tri_idx_offset], args->mesh_header);
 
 			if(stack_ptr == 0)
@@ -376,9 +376,9 @@ int intersect_tlas(BVHArgs* args)
 	{
 		args->tlas_hits++;
 
-		if(node->tri_count > 0)
+		if(node->primitive_count > 0)
 		{
-			for (uint i = 0; i < node->tri_count; i++ )
+			for (uint i = 0; i < node->primitive_count; i++ )
 			{
 				MeshInstanceHeader* instance = &args->world_data->instances[args->tlas_idx[node->left_first + i]];
 
@@ -466,13 +466,13 @@ float3 trace(TraceArgs* args)
 			break;
 
 		float oldt = current_ray.t;
-		int hit_header_idx = UINT_MAX;
+		int hit_mesh_header_idx = UINT_MAX;
 
 		bvh_args.ray = &current_ray;
 
 		if(args->world_data->mesh_count > 0)
 		{
-			hit_header_idx = intersect_tlas(&bvh_args);
+			hit_mesh_header_idx = intersect_tlas(&bvh_args);
 		}
 
 		bool is_primary_ray = (depth == DEPTH);
@@ -482,7 +482,7 @@ float3 trace(TraceArgs* args)
 			args->primary_ray->t = current_ray.t;
 			args->detail_buffer->tlas_hits = bvh_args.tlas_hits;
 			args->detail_buffer->blas_hits = bvh_args.blas_hits;
-			args->detail_buffer->hit_object = hit_header_idx;
+			args->detail_buffer->hit_object = hit_mesh_header_idx;
 			args->detail_buffer->hit_position = (float4)(current_ray.O + current_ray.D * current_ray.t, 0.0f);
 			args->detail_buffer->normal = (float4)(-current_ray.D, 0.0f);
 		}
@@ -493,8 +493,11 @@ float3 trace(TraceArgs* args)
 		{
 			float3 exr_color = get_exr_color(current_ray.D, args->exr, args->exr_size, args->exr_angle, is_primary_ray);
 
-			// Hacky way to get rid of fireflies
-			exr_color = clamp(exr_color, 0.0f , 32.0f);
+			// Slighly Biased way to get rid of fireflies
+			float sqr_length = dot(exr_color, exr_color);
+			float light_limit = 16.0f;
+			exr_color = (sqr_length < light_limit ? exr_color : normalize(exr_color) * light_limit);
+
 
 			if(is_primary_ray)
 			{
@@ -505,7 +508,7 @@ float3 trace(TraceArgs* args)
 		}
 		else
 		{
-			MeshInstanceHeader* instance = &(*args->world_data).instances[hit_header_idx];
+			MeshInstanceHeader* instance = &(*args->world_data).instances[hit_mesh_header_idx];
 			MeshHeader* mesh = &args->mesh_headers[instance->mesh_idx];	
 			Material mat = args->materials[instance->material_idx];
 
