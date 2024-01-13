@@ -56,12 +56,14 @@ namespace Raytracer
 		ViewTypeRange
 	};
 
-	struct PixelDetailInformation
+	struct PerPixelData
 	{
 		u32 hit_object;
 		u32 blas_hits;
 		u32 tlas_hits;
 		u32 pad;
+		glm::vec4 color;
+		glm::vec4 normal;
 		glm::vec4 hit_position;
 	};
 
@@ -216,7 +218,7 @@ namespace Raytracer
 		u32 render_area_px = internal.render_width_px * internal.render_height_px;
 
 		internal.gpu_accumulation_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * internal.render_channel_count * sizeof(float)));
-		internal.gpu_detail_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * sizeof(PixelDetailInformation)));
+		internal.gpu_detail_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * sizeof(PerPixelData)));
 		internal.gpu_primary_ray_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * 44)); // TODO: This is hardcoded, it should not be!
 
 		Assets::init();

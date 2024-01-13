@@ -312,7 +312,7 @@ typedef struct TraceArgs
 	float blur_radius;
 	BVHNode* tlas_nodes;
 	uint* tlas_idx;
-	PixelDetailInformation* detail_buffer;
+	PerPixelData* detail_buffer;
 	unsigned char* textures;
 } TraceArgs;
 
@@ -484,6 +484,7 @@ float3 trace(TraceArgs* args)
 			args->detail_buffer->blas_hits = bvh_args.blas_hits;
 			args->detail_buffer->hit_object = hit_header_idx;
 			args->detail_buffer->hit_position = (float4)(current_ray.O + current_ray.D * current_ray.t, 0.0f);
+			args->detail_buffer->normal = (float4)(-current_ray.D, 0.0f);
 		}
 		
 		bool hit_anything = current_ray.t < 1e30;
@@ -494,6 +495,11 @@ float3 trace(TraceArgs* args)
 
 			// Hacky way to get rid of fireflies
 			exr_color = clamp(exr_color, 0.0f , 32.0f);
+
+			if(is_primary_ray)
+			{
+				args->detail_buffer->albedo = (float4)(exr_color, 0.0f);
+			}
 
 			return t * exr_color;
 		}
@@ -534,8 +540,12 @@ float3 trace(TraceArgs* args)
 			if(inner_normal)
 				normal = -normal;
 
-			hemisphere_normal = tangent_to_base_vector(hemisphere_normal, normal);
+			if(is_primary_ray)
+			{
+				args->detail_buffer->normal = (float4)(normal, 0.0f);
+			}
 
+			hemisphere_normal = tangent_to_base_vector(hemisphere_normal, normal);
 
 			float old_ray_distance = current_ray.t;
 			current_ray.O = hit_pos + hemisphere_normal * EPSILON;
@@ -546,7 +556,6 @@ float3 trace(TraceArgs* args)
 			float random = RandomFloat(args->rand_seed);
 
 			float3 material_color = mat.albedo.xyz * (mat.albedo.a + 1.0f);
-			float3 texture_color = 0;
 
 			bool is_emissive = mat.albedo.a != 0.0f;
 
@@ -554,6 +563,7 @@ float3 trace(TraceArgs* args)
 			if(instance->texture_idx != -1)
 			{
 				TextureHeader header = args->texture_headers[instance->texture_idx];
+				float3 texture_color = 0;
 
 				// TODO: this is hacky, but will be replaced with actual UVs, surely
 				float u = uvs.x;
@@ -569,11 +579,21 @@ float3 trace(TraceArgs* args)
 				
 				texture_color = (float3)(texel[0], texel[1], texel[2]) / 255.0f;
 
-				material_color = texture_color * (mat.albedo.a + 1.0f);
+				material_color = texture_color;
+
+				if(is_primary_ray)
+				{
+					args->detail_buffer->albedo = (float4)(texture_color, 0.0f);
+				}
 			}
 			// </Texture Lookup>
 
-
+			if(is_primary_ray)
+			{
+				args->detail_buffer->albedo = (float4)(material_color, 0.0f);
+			}
+			// Add in emission late as to not taint the albedo buffer
+			material_color *=  (mat.albedo.a + 1.0f);
 
 			// <Russian roulette>
 			{
@@ -763,7 +783,7 @@ void kernel raytrace(
 	global struct Material* materials, 
 	global BVHNode* tlas_nodes,
 	global uint* tlas_idx,
-	global PixelDetailInformation* detail_buffer,
+	global PerPixelData* detail_buffer,
 	global Ray* primary_rays
 	)
 {     

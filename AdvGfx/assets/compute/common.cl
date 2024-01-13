@@ -251,11 +251,29 @@ float saturate(float value)
 	return clamp(value, 0.0f, 1.0f);
 }
 
+float float3_color_to_uint(float3 color)
+{
+	int r = saturate(color.r) * 255.0f;
+	int g = saturate(color.g) * 255.0f;
+	int b = saturate(color.b) * 255.0f;
+
+	return 0x00010000 * b + 0x00000100 * g + 0x00000001 * r;
+}
+
+float3 uint_color_to_float3(uint color)
+{
+	float r = ((color & 0x00ff0000) >> 16) / 255.0f;
+	float g = ((color & 0x0000ff00) >> 8)  / 255.0f;
+	float b = ((color & 0x000000ff) >> 0)  / 255.0f;
+
+	return (float3)(r, g, b);
+}
+
 // Structs
 
-#ifndef VIEW_TYPE
+#ifndef VIEW_TYPE_ENUM_DEFINED
 
-#define VIEW_TYPE
+#define VIEW_TYPE_ENUM_DEFINED
 
 typedef enum ViewType
 {
@@ -269,9 +287,9 @@ typedef enum ViewType
 
 #endif
 
-#ifndef SCENE_DATA
+#ifndef SCENE_DATA_STRUCT_DEFINED
 
-#define SCENE_DATA
+#define SCENE_DATA_STRUCT_DEFINED
 
 typedef struct SceneData
 {
@@ -291,24 +309,26 @@ typedef struct SceneData
 
 #endif
 
-#ifndef PIXELDETAILINFORMATION
+#ifndef PER_PIXEL_DATA_STRUCT_DEFINED
 
-#define PIXELDETAILINFORMATION
+#define PER_PIXEL_DATA_STRUCT_DEFINED
 
-typedef struct PixelDetailInformation
+typedef struct PerPixelData
 {
 	uint hit_object;
 	uint blas_hits;
 	uint tlas_hits;
 	uint pad;
+	float4 albedo;
+	float4 normal;
 	float4 hit_position;
-} PixelDetailInformation;
+} PerPixelData;
 
 #endif
 
-#ifndef PERVERTEXDATA
+#ifndef PER_VERTEX_DATA_STRUCT_DEFINED
 
-#define PERVERTEXDATA
+#define PER_VERTEX_DATA_STRUCT_DEFINED
 
 typedef struct  VertexData
 {

@@ -22,7 +22,7 @@ void kernel average_accumulated(
 	global float* accumulation_buffer, 
 	global uint* render_buffer, 
 	global AverageAccumulatedArgs* args, 
-	global PixelDetailInformation* detail_buffer
+	global PerPixelData* detail_buffer
 	)
 {     
 	int x = get_global_id(0);
@@ -66,12 +66,12 @@ void kernel average_accumulated(
 		}
 		case Albedo:
 		{
-			// Not implemented
+			color = detail_buffer[pixel_idx].albedo.xyz;
 			break;
 		}
 		case Normal:
 		{
-			// Not implemented
+			color = (detail_buffer[pixel_idx].normal.xyz + 1.0f) * 0.5f;
 			break;
 		}
 		case BLAS:
@@ -94,10 +94,6 @@ void kernel average_accumulated(
 			color = (float3)(1.0f, 0.0f, 1.0f);
 		}
 	}
-	
-	int r = saturate(color.r) * 255.0f;
-	int g = saturate(color.g) * 255.0f;
-	int b = saturate(color.b) * 255.0f;
 
 	bool outline_object = detail_buffer[pixel_idx].hit_object != UINT_MAX;
 	bool is_pixel_of_selected_object = detail_buffer[pixel_idx].hit_object == args->selected_object_idx;
@@ -116,5 +112,5 @@ void kernel average_accumulated(
 		}
 	}
 
-	render_buffer[pixel_idx] = 0x00010000 * b + 0x00000100 * g + 0x00000001 * r;
+	render_buffer[pixel_idx] = float3_color_to_uint(color);
 }
