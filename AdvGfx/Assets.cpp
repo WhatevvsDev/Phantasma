@@ -146,8 +146,6 @@ void Assets::import_mesh(const std::filesystem::path path)
 	loaded_mesh_header.tri_idx_count   = (u32)loaded_mesh.bvh->primitive_idx.size();
 	loaded_mesh_header.bvh_node_count  = (u32)loaded_mesh.bvh->nodes.size();
 
-	u32 uvs_count	   = (u32)loaded_mesh.vertex_data.size();
-
 	// Tris
 	loaded_mesh_header.tris_offset = (u32)internal.consolidated_tris.size();
 	internal.consolidated_tris.reserve(loaded_mesh_header.tris_count);
