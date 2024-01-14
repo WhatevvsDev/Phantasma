@@ -1,23 +1,14 @@
 
-// Starts timing
+// Starts timing from now
 void Timer::start()
 {
-	if (is_timing)
-		return;
-
 	start_time = Clock::now();
 	last_delta_time = start_time;
 	is_timing = true;
 }
 
-// Sets the "start" time of the timer to now
-void Timer::reset()
-{
-	start_time = Clock::now();
-}
-
 // Returns the time from start -> now in milliseconds
-float Timer::to_now()
+float Timer::start_to_now()
 {
 	if(!is_timing)
 	{

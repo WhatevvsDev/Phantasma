@@ -93,6 +93,9 @@
     <ClCompile Include="Camera.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Performance.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="App.h">
@@ -149,6 +152,9 @@
     <ClInclude Include="Camera.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Performance.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="assets\compute\average_accumulated.cl" />
@@ -156,5 +162,8 @@
     <CopyFileToFolders Include="assets\compute\example.cl" />
     <CopyFileToFolders Include="assets\compute\make_heatmap.cl" />
     <CopyFileToFolders Include="assets\compute\raytrace.cl" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="assets\compute\generate_primary_rays.cl" />
   </ItemGroup>
 </Project>

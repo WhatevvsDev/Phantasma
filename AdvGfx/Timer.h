@@ -14,11 +14,8 @@ public:
 	//Starts timing from now
 	void start();
 
-	//Sets the "start" time of the timer to now
-	void reset();
-
 	// Returns the time from start -> now in milliseconds
-	float to_now();
+	float start_to_now();
 
 	// Returns the time from last delta call -> now in milliseconds
 	float lap_delta();

@@ -116,6 +116,7 @@
     <ClCompile Include="implot_items.cpp" />
     <ClCompile Include="Math.cpp" />
     <ClCompile Include="Mesh.cpp" />
+    <ClCompile Include="Performance.cpp" />
     <ClCompile Include="Raytracer.cpp" />
     <ClCompile Include="Source.cpp" />
     <ClCompile Include="stdafx.cpp">
@@ -138,6 +139,7 @@
     <ClInclude Include="Material.h" />
     <ClInclude Include="Math.h" />
     <ClInclude Include="Mesh.h" />
+    <ClInclude Include="Performance.h" />
     <ClInclude Include="PrimitiveTypes.h" />
     <ClInclude Include="Raytracer.h" />
     <ClInclude Include="stdafx.h" />
