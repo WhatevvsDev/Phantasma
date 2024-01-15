@@ -566,27 +566,36 @@ float3 trace(TraceArgs* args)
 			if(instance->texture_idx != -1)
 			{
 				TextureHeader header = args->texture_headers[instance->texture_idx];
-				float3 texture_color = 0;
 
-				// TODO: this is hacky, but will be replaced with actual UVs, surely
-				float u = uvs.x;
-				float v = uvs.y;
+				const uint channels = 4;
 
-				uint channels = 4;
-				uint texel_x = u * header.width;
-				uint texel_y = v * header.height;
+				// Get coordinates, float, uint, fractional
+				float texel_xf = uvs.x * header.width;
+				float texel_yf = uvs.y * header.height;
+				uint texel_x_min = floor(texel_xf);
+				uint texel_y_min = floor(texel_yf);
+				float hor_fract = texel_xf - texel_x_min;
+				float ver_fract = texel_yf - texel_y_min;
 
-				uint texel_idx = (texel_x + texel_y * header.width) * channels;
-
-				uchar* texel = &args->textures[texel_idx + header.start_offset];
+				// sample texture at 4 spots
+				float3 texels[4];
+				uint top_idx = (texel_x_min + texel_y_min * header.width) * channels;
+				uint bot_idx = (texel_x_min + (texel_y_min + 1) * header.width) * channels;
+				uchar *top_texels = &args->textures[top_idx + header.start_offset];
+				uchar *bot_texels = &args->textures[bot_idx + header.start_offset];
+				texels[0] = (float3)(top_texels[0], top_texels[1], top_texels[2]);
+				texels[1] = (float3)(top_texels[4], top_texels[5], top_texels[6]);
+				texels[2] = (float3)(bot_texels[0], bot_texels[1], bot_texels[2]);
+				texels[3] = (float3)(bot_texels[4], bot_texels[5], bot_texels[6]);
 				
-				texture_color = (float3)(texel[0], texel[1], texel[2]) / 255.0f;
+				// interpolate
+				float3 bilinear_color = lerp(lerp(texels[0], texels[1], hor_fract), lerp(texels[2], texels[3], hor_fract), ver_fract) / 255.0f;
 
-				material_color = texture_color;
+				material_color = bilinear_color;
 
 				if(is_primary_ray)
 				{
-					args->detail_buffer->albedo = (float4)(texture_color, 0.0f);
+					args->detail_buffer->albedo = (float4)(bilinear_color, 0.0f);
 				}
 			}
 			// </Texture Lookup>
