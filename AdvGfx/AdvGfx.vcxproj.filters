@@ -157,13 +157,13 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="assets\compute\average_accumulated.cl" />
+    <CopyFileToFolders Include="assets\compute\rt_finalize.cl" />
     <CopyFileToFolders Include="assets\compute\common.cl" />
     <CopyFileToFolders Include="assets\compute\example.cl" />
     <CopyFileToFolders Include="assets\compute\make_heatmap.cl" />
-    <CopyFileToFolders Include="assets\compute\raytrace.cl" />
+    <CopyFileToFolders Include="assets\compute\rt_trace.cl" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="assets\compute\generate_primary_rays.cl" />
+    <None Include="assets\compute\rt_generate_rays.cl" />
   </ItemGroup>
 </Project>

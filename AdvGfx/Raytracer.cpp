@@ -347,7 +347,7 @@ namespace Raytracer
 	// Averages out acquired samples, and renders them to the screen
 	void raytrace_trace_rays(const ComputeReadWriteBuffer& screen_buffer)
 	{
-		ComputeOperation("raytrace.cl")
+		ComputeOperation("rt_trace.cl")
 			.read_write(*internal.gpu_accumulation_buffer)	
 			.read_write(screen_buffer)
 			.read(ComputeReadBuffer({&internal.hovered_instance_idx, 1}))
@@ -391,7 +391,7 @@ namespace Raytracer
 		args.view_type = internal.view_type;
 		args.selected_object_idx = internal.selected_instance_idx;
 
-		ComputeOperation("average_accumulated.cl")
+		ComputeOperation("rt_finalize.cl")
 			.read_write((*internal.gpu_accumulation_buffer))
 			.read_write(screen_buffer)
 			.write({&args, 1})
@@ -424,7 +424,7 @@ namespace Raytracer
 		args.camera_fov = 110;
 		args.camera_transform = Camera::get_instance_matrix(active_camera);
 
-		ComputeOperation("generate_primary_rays.cl")
+		ComputeOperation("rt_generate_rays.cl")
 			.write({&args, 1})
 			.read_write((*internal.gpu_primary_ray_buffer))
 			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})

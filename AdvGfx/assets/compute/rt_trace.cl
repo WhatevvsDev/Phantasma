@@ -625,6 +625,7 @@ float3 trace(TraceArgs* args)
 
 					float3 final_color = lerp(diffuse, specular, mat.specularity);
 
+
 					e += t * final_color;
 					t *= lerp(final_color, 1.0f, mat.specularity);
 
@@ -768,7 +769,7 @@ float3 world_space_to_screen_space(float3 camera_position,float3 camera_target, 
     return (float3)(x,y,1.0);
 }
 
-void kernel raytrace(
+void kernel rt_trace(
 	global float* accumulation_buffer, 
 	global uint* render_buffer, 
 	global int* mouse, 

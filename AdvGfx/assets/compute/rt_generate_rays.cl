@@ -19,7 +19,7 @@ typedef struct GeneratePrimaryRaysArgs
 	float camera_transform[16];
 } GeneratePrimaryRaysArgs;
 
-void kernel generate_primary_rays(
+void kernel rt_generate_rays(
 	global GeneratePrimaryRaysArgs* args,
 	global Ray* primary_rays
 	)

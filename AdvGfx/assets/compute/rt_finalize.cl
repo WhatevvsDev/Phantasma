@@ -18,7 +18,12 @@ typedef struct AverageAccumulatedArgs
 	uint pad[3];
 } AverageAccumulatedArgs;
 
-void kernel average_accumulated(
+double gaussian_weight(int i, int j, float var) 
+{
+    return 1 / (2 * M_PI) * exp(-0.5 * (i * i + j * j) / var / var);
+}
+
+void kernel rt_finalize(
 	global float* accumulation_buffer, 
 	global uint* render_buffer, 
 	global AverageAccumulatedArgs* args, 
@@ -26,24 +31,11 @@ void kernel average_accumulated(
 	)
 {     
 	int x = get_global_id(0);
-	int y = get_global_id(1);
-
-	uint pixel_idx = (x + y * args->width);
-	
+	int y = get_global_id(1);	
 	int width = args->width;
 	int height = args->height;
 
-	uint neighbors_idx[8] = 
-	{
-		clamp(x - 1, 0, width - 1) + clamp(y - 1, 0, height - 1) * width,
-		clamp(x - 1, 0, width - 1) + clamp(y + 1, 0, height - 1) * width,
-		clamp(x + 1, 0, width - 1) + clamp(y - 1, 0, height - 1) * width,
-		clamp(x + 1, 0, width - 1) + clamp(y + 1, 0, height - 1) * width,
-		clamp(x - 2, 0, width - 1) + clamp(y - 2, 0, height - 1) * width,
-		clamp(x - 2, 0, width - 1) + clamp(y + 2, 0, height - 1) * width,
-		clamp(x + 2, 0, width - 1) + clamp(y - 2, 0, height - 1) * width,
-		clamp(x + 2, 0, width - 1) + clamp(y + 2, 0, height - 1) * width
-	};
+	uint pixel_idx = (x + y * width);
 
 	float3 color = 0;
 	
@@ -57,7 +49,7 @@ void kernel average_accumulated(
 				accumulation_buffer[pixel_idx * 4 + 1], 
 				accumulation_buffer[pixel_idx * 4 + 2]
 			);
-
+			
 			color *= args->samples_reciprocal;
 			color = ACESFilm(color);
 			color = sqrt(color);
@@ -102,8 +94,29 @@ void kernel average_accumulated(
 	{
 		bool neighbor_is_different_object = false;
 
-		for(int i = 0; i < 8; i++)
-		neighbor_is_different_object |= detail_buffer[neighbors_idx[i]].hit_object - args->selected_object_idx;
+		for(int lx = -2; lx < 3; lx++)
+		{
+			for(int ly = -2; ly < 3; ly++)
+			{
+				if(x == 0 && y == 0)
+					continue;
+
+				int new_x = lx + x;
+				int new_y = ly + y;
+
+				if(!is_within_bounds(new_x, new_y, width, height))
+					continue;
+
+				int i = (new_x + new_y * width);
+
+				if(detail_buffer[i].hit_object - args->selected_object_idx)
+				{
+					neighbor_is_different_object = true;
+					goto draw_outline;
+				}
+			}
+		}
+		draw_outline:;
 		
 		if(neighbor_is_different_object)
 		{

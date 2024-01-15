@@ -269,6 +269,11 @@ float3 uint_color_to_float3(uint color)
 	return (float3)(r, g, b);
 }
 
+bool is_within_bounds(int x, int y, int width, int height)
+{
+	return (x >= 0 && y >= 0 && x < width && y < height);
+}
+
 // Structs
 
 #ifndef VIEW_TYPE_ENUM_DEFINED

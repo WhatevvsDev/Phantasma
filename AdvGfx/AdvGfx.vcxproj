@@ -149,7 +149,7 @@
     <ClInclude Include="World.h" />
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="assets\compute\average_accumulated.cl">
+    <CopyFileToFolders Include="assets\compute\rt_finalize.cl">
       <FileType>Document</FileType>
     </CopyFileToFolders>
     <CopyFileToFolders Include="assets\compute\common.cl">
@@ -161,12 +161,12 @@
     <CopyFileToFolders Include="assets\compute\make_heatmap.cl">
       <FileType>Document</FileType>
     </CopyFileToFolders>
-    <CopyFileToFolders Include="assets\compute\raytrace.cl">
+    <CopyFileToFolders Include="assets\compute\rt_trace.cl">
       <FileType>Document</FileType>
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
-    <None Include="assets\compute\generate_primary_rays.cl" />
+    <None Include="assets\compute\rt_generate_rays.cl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
