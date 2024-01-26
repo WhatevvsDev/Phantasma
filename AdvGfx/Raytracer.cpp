@@ -373,33 +373,6 @@ namespace Raytracer
 		internal.accumulated_frames++;
 	}
 
-	void raytrace_finalize(const ComputeReadWriteBuffer& screen_buffer)
-	{
-		struct FinalizeArgs
-		{
-			f32 samples_reciprocal;
-			u32 width;
-			u32 height;
-			ViewType view_type;
-			u32 selected_object_idx;
-			u32 pad[3];
-		} args;
-
-		args.samples_reciprocal = 1.0f / (f32)internal.accumulated_frames;
-		args.width = internal.render_width_px;
-		args.height = internal.render_height_px;
-		args.view_type = internal.view_type;
-		args.selected_object_idx = internal.selected_instance_idx;
-
-		ComputeOperation("rt_finalize.cl")
-			.read_write((*internal.gpu_accumulation_buffer))
-			.read_write(screen_buffer)
-			.write({&args, 1})
-			.read_write(*internal.gpu_detail_buffer)
-			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
-			.execute();
-	}
-
 	void raytrace_generate_primary_rays()
 	{
 		auto& active_camera = internal.get_active_camera_ref();
@@ -427,6 +400,82 @@ namespace Raytracer
 		ComputeOperation("rt_generate_rays.cl")
 			.write({&args, 1})
 			.read_write((*internal.gpu_primary_ray_buffer))
+			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
+			.execute();
+	}
+	
+	void raytrace_extend()
+	{
+		// TLAS
+		// Ray batch
+		// Ray count
+		// Extended batch
+		// Atomic shadow rays
+		// Atomic new rays <- Bounces
+
+		/*
+		global struct Tri* tris, 
+		global struct BVHNode* blas_nodes, 
+		global uint* trisIdx, 
+		global struct MeshHeader* mesh_headers, 
+		global struct SceneData* scene_data, 
+		global struct WorldManagerDeviceData* world_manager_data, 
+		global BVHNode* tlas_nodes,
+		global uint* tlas_idx,
+		global PerPixelData* detail_buffer,
+		global Ray* primary_rays
+		*/
+
+		ComputeOperation("rt_extend.cl")
+			.write(Assets::get_tris_compute_buffer())
+			.write(Assets::get_bvh_compute_buffer())
+			.write(Assets::get_tri_idx_compute_buffer())
+			.write(Assets::get_mesh_header_buffer())
+			.write({ &scene_data, 1 })
+			.write({ &World::get_world_device_data(), 1 })
+			.write(tlas)
+			.write(tlas_idx)
+			.read_write(*internal.gpu_detail_buffer)
+			.read_write((*internal.gpu_primary_ray_buffer))
+			.global_dispatch({ internal.render_width_px, internal.render_height_px, 1 })
+			.execute();
+
+		internal.accumulated_frames++;
+	}
+
+	void raytrace_shade()
+	{
+
+	}
+
+	void raytrace_connect()
+	{
+
+	}
+
+	void raytrace_finalize(const ComputeReadWriteBuffer& screen_buffer)
+	{
+		struct FinalizeArgs
+		{
+			f32 samples_reciprocal;
+			u32 width;
+			u32 height;
+			ViewType view_type;
+			u32 selected_object_idx;
+			u32 pad[3];
+		} args;
+
+		args.samples_reciprocal = 1.0f / (f32)internal.accumulated_frames;
+		args.width = internal.render_width_px;
+		args.height = internal.render_height_px;
+		args.view_type = internal.view_type;
+		args.selected_object_idx = internal.selected_instance_idx;
+
+		ComputeOperation("rt_finalize.cl")
+			.read_write((*internal.gpu_accumulation_buffer))
+			.read_write(screen_buffer)
+			.write({&args, 1})
+			.read_write(*internal.gpu_detail_buffer)
 			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
 			.execute();
 	}
@@ -475,8 +524,15 @@ namespace Raytracer
 		{
 			raytrace_generate_primary_rays();
 			perf::log_slice("raytrace_generate_primary_rays");
+
 			raytrace_trace_rays(screen_buffer);
 			perf::log_slice("raytrace_trace_rays");
+
+			//raytrace_extend();
+			//perf::log_slice("raytrace_extend");
+			//raytrace_shade();
+			//perf::log_slice("raytrace_shade");
+
 			raytrace_finalize(screen_buffer);
 			perf::log_slice("raytrace_finalize");
 

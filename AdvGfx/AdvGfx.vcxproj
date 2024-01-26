@@ -166,6 +166,7 @@
     </CopyFileToFolders>
   </ItemGroup>
   <ItemGroup>
+    <None Include="assets\compute\rt_extend.cl" />
     <None Include="assets\compute\rt_generate_rays.cl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

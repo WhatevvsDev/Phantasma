@@ -165,5 +165,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="assets\compute\rt_generate_rays.cl" />
+    <None Include="assets\compute\rt_extend.cl" />
   </ItemGroup>
 </Project>

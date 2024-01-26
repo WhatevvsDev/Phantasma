@@ -1,53 +1,4 @@
-#define COSINE_WEIGHTED_BIAS 1
-
 #define DEPTH 16
-
-typedef struct Tri 
-{ 
-    float3 vertex0;
-	float3 vertex1;
-	float3 vertex2;
-} Tri;
-
-typedef struct RayIntersection
-{
-	// Barycentrics, we can reconstruct w
-	float u;
-	float v;
-	int tri_hit;
-	float3 geo_normal;
-} RayIntersection;
-
-typedef struct __attribute__ ((packed)) Ray
-{ 
-    float3 O;
-    float t;
-    float3 D;
-	RayIntersection* intersection;
-} Ray;
-
-typedef struct BVHNode
-{
-    float minx, miny, minz;
-    int left_first;
-    float maxx, maxy, maxz;
-	int primitive_count;
-} BVHNode;
-
-typedef struct MeshHeader
-{
-	uint tris_offset;
-	uint tris_count;
-
-	uint vertex_data_offset;
-	uint vertex_data_count; // Is in theory always 3x tris_count;
-
-	uint root_bvh_node_idx;
-	uint bvh_node_count; // Technically could be unnecessary
-
-	uint tri_idx_offset;
-	uint tri_idx_count;
-} MeshHeader;
 
 typedef struct TextureHeader
 {
@@ -56,24 +7,6 @@ typedef struct TextureHeader
 	uint height;
 	uint pad;
 } TextureHeader;
-
-typedef struct MeshInstanceHeader
-{
-	float transform[16];
-	float inverse_transform[16];
-		
-	uint mesh_idx;
-	uint material_idx;
-	uint texture_idx;
-	uint pad;
-} MeshInstanceHeader;
-
-typedef struct WorldManagerDeviceData
-{
-	uint mesh_count;
-	uint pad_0[3];
-	MeshInstanceHeader instances[4096];
-} WorldManagerDeviceData;
 
 float3 get_exr_color(float3 direction, float* exr, int2 exr_size, float exr_angle, bool include_sun)
 {	
@@ -301,15 +234,11 @@ typedef struct TraceArgs
 	uint* rand_seed;
 	MeshHeader* mesh_headers;
 	TextureHeader* texture_headers;
-	uint mesh_idx;
 	float* exr;
 	int2 exr_size;
 	float exr_angle;
 	WorldManagerDeviceData* world_data;
 	Material* materials;
-	uint material_idx;
-	float focal_distance;
-	float blur_radius;
 	BVHNode* tlas_nodes;
 	uint* tlas_idx;
 	PerPixelData* detail_buffer;
@@ -437,7 +366,7 @@ int intersect_tlas(BVHArgs* args)
 
 float3 trace(TraceArgs* args)
 {
-	// Keeping track of current ray in the stack
+	// Keeping track of current ray
 	Ray current_ray = *args->primary_ray;
 	
 	uint depth = DEPTH;
@@ -532,14 +461,10 @@ float3 trace(TraceArgs* args)
 			normal = normalize(normal);
 			geo_normal = normalize(geo_normal);
 
-
 			bool inner_normal = dot(geo_normal, current_ray.D) > 0.0f;
 
-#if(COSINE_WEIGHTED_BIAS == 0)
 			float3 hemisphere_normal = malleys_method(args->rand_seed).xyz;
-#else
-			float3 hemisphere_normal = uniform_hemisphere_tangent(args->rand_seed).xyz;
-#endif
+
 			if(inner_normal)
 				normal = -normal;
 
@@ -829,7 +754,6 @@ void kernel rt_trace(
 	trace_args.exr_size = scene_data->exr_size;
 	trace_args.exr_angle = scene_data->exr_angle;
 	trace_args.world_data = world_manager_data;
-	trace_args.material_idx = scene_data->material_idx;
 	trace_args.materials = materials;
 	trace_args.tlas_nodes = tlas_nodes;
 	trace_args.tlas_idx = tlas_idx;

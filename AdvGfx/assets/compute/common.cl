@@ -342,3 +342,110 @@ typedef struct  VertexData
 } VertexData;
 
 #endif
+
+#ifndef TRI_DEFINED
+
+#define TRI_DEFINED
+
+typedef struct Tri 
+{ 
+    float3 vertex0;
+	float3 vertex1;
+	float3 vertex2;
+} Tri;
+
+#endif
+
+#ifndef RAY_INTERSECTION_DEFINED
+
+#define RAY_INTERSECTION_DEFINED
+
+typedef struct RayIntersection
+{
+	// Barycentrics, we can reconstruct w
+	float u;
+	float v;
+	int tri_hit;
+	float3 geo_normal;
+} RayIntersection;
+
+#endif
+
+#ifndef RAY_DEFINED
+
+#define RAY_DEFINED
+
+typedef struct __attribute__ ((packed)) Ray
+{ 
+    float3 O;
+    float t;
+    float3 D;
+	RayIntersection* intersection;
+} Ray;
+
+#endif
+
+#ifndef BVH_NODE_DEFINED
+
+#define BVH_NODE_DEFINED
+
+typedef struct BVHNode
+{
+    float minx, miny, minz;
+    int left_first;
+    float maxx, maxy, maxz;
+	int primitive_count;
+} BVHNode;
+
+#endif
+
+#ifndef MESH_HEADER_DEFINED
+
+#define MESH_HEADER_DEFINED
+
+typedef struct MeshHeader
+{
+	uint tris_offset;
+	uint tris_count;
+
+	uint vertex_data_offset;
+	uint vertex_data_count; // Is in theory always 3x tris_count;
+
+	uint root_bvh_node_idx;
+	uint bvh_node_count; // Technically could be unnecessary
+
+	uint tri_idx_offset;
+	uint tri_idx_count;
+} MeshHeader;
+
+#endif
+
+#ifndef MESH_INSTANCE_HEADER_DEFINED
+
+#define MESH_INSTANCE_HEADER_DEFINED
+
+typedef struct MeshInstanceHeader
+{
+	float transform[16];
+	float inverse_transform[16];
+		
+	uint mesh_idx;
+	uint material_idx;
+	uint texture_idx;
+	uint pad;
+} MeshInstanceHeader;
+
+#endif
+
+#ifndef WORLD_MANAGER_DEVICE_DATA_DEFINED
+
+#define WORLD_MANAGER_DEVICE_DATA_DEFINED
+
+typedef struct WorldManagerDeviceData
+{
+	uint mesh_count;
+	uint pad_0[3];
+	MeshInstanceHeader instances[4096];
+} WorldManagerDeviceData;
+
+#endif

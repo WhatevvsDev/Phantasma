@@ -1,12 +1,3 @@
-
-typedef struct __attribute__ ((packed)) Ray
-{ 
-    float3 O;
-    float t;
-    float3 D;
-	uint* intersection;
-} Ray;
-
 typedef struct GeneratePrimaryRaysArgs
 {
 	uint width;
