@@ -120,7 +120,9 @@ namespace Raytracer
 
 		ComputeWriteBuffer* exr_buffer{ nullptr };
 		ComputeGPUOnlyBuffer* gpu_accumulation_buffer { nullptr };
-		ComputeGPUOnlyBuffer* gpu_detail_buffer { nullptr };
+		ComputeGPUOnlyBuffer* gpu_detail_buffer{ nullptr };
+
+		ComputeGPUOnlyBuffer* gpu_extend_output_buffer{ nullptr };
 
 		ComputeGPUOnlyBuffer* gpu_primary_ray_buffer { nullptr };
 
@@ -197,6 +199,16 @@ namespace Raytracer
 		internal.render_dirty = true;
 	}
 
+	struct ExtendPerPixelOutput
+	{
+		int hit_mesh_header_idx;
+		float u;
+		float v;
+		int tri_hit;
+		float pad;
+		glm::vec4 geo_normal;
+	};
+
 	void init(const RaytracerInitDesc& desc)
 	{
 		Compute::init();
@@ -209,6 +221,7 @@ namespace Raytracer
 		internal.gpu_accumulation_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * internal.render_channel_count * sizeof(float)));
 		internal.gpu_detail_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * sizeof(PerPixelData)));
 		internal.gpu_primary_ray_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * 44)); // TODO: This is hardcoded, it should not be!
+		internal.gpu_extend_output_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * (48 + 44))); // TODO: This is hardcoded, it should not be!
 
 		Assets::init();
 
@@ -344,7 +357,6 @@ namespace Raytracer
 		LOGDEBUG("Saved screenshot.");
 	}
 
-	// Averages out acquired samples, and renders them to the screen
 	void raytrace_trace_rays(const ComputeReadWriteBuffer& screen_buffer)
 	{
 		ComputeOperation("rt_trace.cl")
@@ -413,19 +425,6 @@ namespace Raytracer
 		// Atomic shadow rays
 		// Atomic new rays <- Bounces
 
-		/*
-		global struct Tri* tris, 
-		global struct BVHNode* blas_nodes, 
-		global uint* trisIdx, 
-		global struct MeshHeader* mesh_headers, 
-		global struct SceneData* scene_data, 
-		global struct WorldManagerDeviceData* world_manager_data, 
-		global BVHNode* tlas_nodes,
-		global uint* tlas_idx,
-		global PerPixelData* detail_buffer,
-		global Ray* primary_rays
-		*/
-
 		ComputeOperation("rt_extend.cl")
 			.write(Assets::get_tris_compute_buffer())
 			.write(Assets::get_bvh_compute_buffer())
@@ -437,15 +436,31 @@ namespace Raytracer
 			.write(tlas_idx)
 			.read_write(*internal.gpu_detail_buffer)
 			.read_write((*internal.gpu_primary_ray_buffer))
+			.write((*internal.gpu_extend_output_buffer))
 			.global_dispatch({ internal.render_width_px, internal.render_height_px, 1 })
 			.execute();
 
 		internal.accumulated_frames++;
 	}
 
-	void raytrace_shade()
+	void raytrace_shade(const ComputeReadWriteBuffer& screen_buffer)
 	{
-
+		ComputeOperation("rt_shade.cl")
+			.write(Assets::get_vertex_data_compute_buffer())
+			.write(Assets::get_tris_compute_buffer())
+			.write(Assets::get_tri_idx_compute_buffer())
+			.write(Assets::get_mesh_header_buffer())
+			.write(Assets::get_texture_compute_buffer())
+			.write(Assets::get_texture_header_buffer())
+			.write({ &scene_data, 1 })
+			.write(*internal.exr_buffer)
+			.write({ &World::get_world_device_data(), 1 })
+			.write(World::get_material_vector())
+			.read_write(*internal.gpu_detail_buffer)
+			.read_write(screen_buffer)
+			.read((*internal.gpu_extend_output_buffer))
+			.global_dispatch({ internal.render_width_px, internal.render_height_px, 1 })
+			.execute();
 	}
 
 	void raytrace_connect()
@@ -453,6 +468,7 @@ namespace Raytracer
 
 	}
 
+	// Averages out acquired samples, and renders them to the screen
 	void raytrace_finalize(const ComputeReadWriteBuffer& screen_buffer)
 	{
 		struct FinalizeArgs
@@ -530,7 +546,7 @@ namespace Raytracer
 
 			//raytrace_extend();
 			//perf::log_slice("raytrace_extend");
-			//raytrace_shade();
+			//raytrace_shade(screen_buffer);
 			//perf::log_slice("raytrace_shade");
 
 			raytrace_finalize(screen_buffer);

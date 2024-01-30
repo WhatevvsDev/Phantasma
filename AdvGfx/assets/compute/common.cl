@@ -449,3 +449,16 @@ typedef struct WorldManagerDeviceData
 } WorldManagerDeviceData;
 
 #endif
+
+#ifndef EXTEND_PER_PIXEL_OUTPUT_DEFINED
+
+#define EXTEND_PER_PIXEL_OUTPUT_DEFINED
+
+typedef struct ExtendPerPixelOutput
+{
+	int hit_mesh_header_idx;
+	Ray old_ray;
+	RayIntersection intersection;
+} ExtendPerPixelOutput;
+
+#endif

@@ -223,6 +223,7 @@ typedef struct ExtendArgs
 	BVHNode* tlas_nodes;
 	uint* tlas_idx;
 	PerPixelData* detail_buffer;
+	ExtendPerPixelOutput* output;
 } ExtendArgs;
 
 float3 extend(ExtendArgs* args)
@@ -256,6 +257,8 @@ float3 extend(ExtendArgs* args)
 
     bool is_primary_ray = (depth == DEPTH);
 
+	args->output->hit_mesh_header_idx = 0x00ff00ff;
+
     if(is_primary_ray)
     {
         args->primary_ray->t = current_ray.t;
@@ -268,14 +271,16 @@ float3 extend(ExtendArgs* args)
     }
     
     bool hit_anything = current_ray.t < 1e30;
+	args->output->old_ray = current_ray;
+    args->output->hit_mesh_header_idx = hit_mesh_header_idx;
 
     if(!hit_anything)
     {
-        args->detail_buffer->normal = (float4)(0.0f);
-        // t is >= 1e30
+
     }
     else
     {
+		args->output->intersection = *current_ray.intersection;
         args->detail_buffer->normal = (float4)(current_ray.O + current_ray.D * current_ray.t, 0.0f);
         //MeshInstanceHeader* instance = &(*args->world_data).instances[hit_mesh_header_idx];
         //current_ray.intersection
@@ -293,7 +298,8 @@ void kernel rt_extend(
 	global BVHNode* tlas_nodes,
 	global uint* tlas_idx,
 	global PerPixelData* detail_buffer,
-	global Ray* primary_rays
+	global Ray* primary_rays,
+	global ExtendPerPixelOutput* extend_output
 	)
 {     
 	uint width = scene_data->resolution.x;
@@ -324,6 +330,7 @@ void kernel rt_extend(
 	extend_args.tlas_nodes = tlas_nodes;
 	extend_args.tlas_idx = tlas_idx;
 	extend_args.detail_buffer = &detail_buffer[pixel_index];
+	extend_args.output = &extend_output[pixel_index];
 
 	float3 color = extend(&extend_args);
 }
