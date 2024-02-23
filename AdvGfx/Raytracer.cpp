@@ -96,6 +96,12 @@ namespace Raytracer
 		u32 pad[2];
 	} scene_data;
 
+	struct WavefrontData
+	{
+		i32 passes = 8;
+		i32 ray_index = 0;
+	} wavefront;
+
 	struct
 	{
 		ViewType view_type				{ ViewType::Render };
@@ -124,7 +130,9 @@ namespace Raytracer
 
 		ComputeGPUOnlyBuffer* gpu_extend_output_buffer{ nullptr };
 
-		ComputeGPUOnlyBuffer* gpu_primary_ray_buffer { nullptr };
+		ComputeGPUOnlyBuffer* gpu_primary_ray_buffer{ nullptr };
+
+		ComputeReadWriteBuffer* gpu_wavefront_buffer{ nullptr };
 
 		//std::vector<DiskAsset> exr_assets_on_disk;
 		f32* loaded_exr_data { nullptr };
@@ -218,10 +226,14 @@ namespace Raytracer
 
 		u32 render_area_px = internal.render_width_px * internal.render_height_px;
 
+		const u32 GPU_RAY_STRUCT_SIZE = 92;
+
 		internal.gpu_accumulation_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * internal.render_channel_count * sizeof(float)));
 		internal.gpu_detail_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * sizeof(PerPixelData)));
-		internal.gpu_primary_ray_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * 44)); // TODO: This is hardcoded, it should not be!
-		internal.gpu_extend_output_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * (48 + 44))); // TODO: This is hardcoded, it should not be!
+		internal.gpu_primary_ray_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * GPU_RAY_STRUCT_SIZE)); // TODO: This is hardcoded, it should not be!
+		internal.gpu_extend_output_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * (48 + GPU_RAY_STRUCT_SIZE))); // TODO: This is hardcoded, it should not be!
+
+		internal.gpu_wavefront_buffer = new ComputeReadWriteBuffer(ComputeDataHandle(&wavefront, 1));
 
 		Assets::init();
 
@@ -412,6 +424,7 @@ namespace Raytracer
 		ComputeOperation("rt_generate_rays.cl")
 			.write({&args, 1})
 			.read_write((*internal.gpu_primary_ray_buffer))
+			.read_write(*internal.gpu_wavefront_buffer)
 			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
 			.execute();
 	}
@@ -436,6 +449,7 @@ namespace Raytracer
 			.write(tlas_idx)
 			.read_write(*internal.gpu_detail_buffer)
 			.read_write((*internal.gpu_primary_ray_buffer))
+			.read_write(*internal.gpu_wavefront_buffer)
 			.write((*internal.gpu_extend_output_buffer))
 			.global_dispatch({ internal.render_width_px, internal.render_height_px, 1 })
 			.execute();
@@ -458,7 +472,9 @@ namespace Raytracer
 			.write(World::get_material_vector())
 			.read_write(*internal.gpu_detail_buffer)
 			.read_write(screen_buffer)
-			.read((*internal.gpu_extend_output_buffer))
+			.read_write(*internal.gpu_wavefront_buffer)
+			.read_write((*internal.gpu_primary_ray_buffer))
+			.read_write((*internal.gpu_accumulation_buffer))
 			.global_dispatch({ internal.render_width_px, internal.render_height_px, 1 })
 			.execute();
 	}
@@ -544,10 +560,19 @@ namespace Raytracer
 			raytrace_trace_rays(screen_buffer);
 			perf::log_slice("raytrace_trace_rays");
 
-			//raytrace_extend();
-			//perf::log_slice("raytrace_extend");
-			//raytrace_shade(screen_buffer);
-			//perf::log_slice("raytrace_shade");
+			wavefront.passes = 2;
+
+			int prevent_forerver = 8;
+
+			//while (wavefront.passes > 0 && prevent_forerver > 0)
+			{
+			//	raytrace_extend();
+			//	perf::log_slice("raytrace_extend");
+			//	raytrace_shade(screen_buffer);
+			//	perf::log_slice("raytrace_shade");
+
+				prevent_forerver--;
+			}
 
 			raytrace_finalize(screen_buffer);
 			perf::log_slice("raytrace_finalize");

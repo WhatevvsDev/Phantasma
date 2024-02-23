@@ -28,32 +28,6 @@ float3 get_exr_color(float3 direction, float* exr, int2 exr_size, float exr_angl
 	return color.xyz * color.w;
 }
 
-void intersect_tri(Ray* ray, Tri* tris, uint triIdx, MeshHeader* header)
-{
-	const float3 edge1 = tris[triIdx].vertex1 - tris[triIdx].vertex0;
-	const float3 edge2 = tris[triIdx].vertex2 - tris[triIdx].vertex0;
-	const float3 h = cross( ray->D, edge2 );
-	const float a = dot( edge1, h );
-	if (fabs(a) < EPSILON) return; // ray parallel to triangle
-	const float f = 1 / a;
-	const float3 s = ray->O - tris[triIdx].vertex0;
-	const float u = f * dot( s, h );
-	if (u < 0 || u > 1) return;
-	const float3 q = cross( s, edge1 );
-	const float v = f * dot( ray->D, q );
-	if (v < 0 || u + v > 1) return;
-	const float t = f * dot( edge2, q );
-	if (t > 0.0001f) 
-	if(ray->t > t)
-	{
-		ray->t = t;
-		ray->intersection->tri_hit = triIdx;
-		ray->intersection->u = u;
-		ray->intersection->v = v;
-		ray->intersection->geo_normal = cross(edge1, edge2);
-	}
-}
-
 float3 tri_normal(Tri* tri)
 {
 	float3 a = tri->vertex0;
@@ -68,7 +42,7 @@ float beers_law(float thickness, float absorption_coefficient)
 	return pow(EULER, -absorption_coefficient * thickness);
 }
 
-float3 interpolate_tri_normal(VertexData* vertex_data, struct RayIntersection* intersection)
+float3 interpolate_tri_normal(VertexData* vertex_data, struct Ray* intersection)
 {
 	float u = intersection->u;
 	float v = intersection->v;
@@ -83,7 +57,7 @@ float3 interpolate_tri_normal(VertexData* vertex_data, struct RayIntersection* i
 	return normalize(v0_normal + v1_normal + v2_normal);
 }
 
-float2 interpolate_tri_uvs(VertexData* vertex_data, struct RayIntersection* intersection)
+float2 interpolate_tri_uvs(VertexData* vertex_data, struct Ray* intersection)
 {
 	float u = intersection->u;
 	float v = intersection->v;
@@ -171,14 +145,15 @@ typedef struct ShadeArgs
 	Material* materials;
 	PerPixelData* detail_buffer;
 	unsigned char* textures;
-    ExtendPerPixelOutput* extend_output;
+    Ray* importing_ray;
+    Ray* ray_buffer;
+    WavefrontData* wavefront_data;
 } ShadeArgs;
 
 float3 shade(ShadeArgs* args)
 {
 	// Keeping track of current ray
-	Ray current_ray = args->extend_output->old_ray;
-    current_ray.intersection = &args->extend_output->intersection;
+	Ray current_ray = *args->importing_ray;
     // Ray direction
     // Ray t
 	// Hit position
@@ -190,9 +165,8 @@ float3 shade(ShadeArgs* args)
 	float3 color = (float3)(0.0f);
 
 	float3 e = 0;
-	float3 t = 1;
 
-    int hit_mesh_header_idx = args->extend_output->hit_mesh_header_idx;
+    int hit_mesh_header_idx = current_ray.hit_mesh_header_idx;
 
     bool is_primary_ray = false;
     
@@ -213,7 +187,7 @@ float3 shade(ShadeArgs* args)
             args->detail_buffer->albedo = (float4)(exr_color, 0.0f);
         }
 
-        return t * exr_color;
+        return current_ray.energy * exr_color;
     }
     else
     {
@@ -224,9 +198,9 @@ float3 shade(ShadeArgs* args)
         VertexData* vertex_data = &args->vertex_data[mesh->vertex_data_offset];
 
         float3 hit_pos = current_ray.O + (current_ray.D * current_ray.t);
-        float3 normal = interpolate_tri_normal(vertex_data, current_ray.intersection);
-        float3 geo_normal = current_ray.intersection->geo_normal;
-        float2 uvs = interpolate_tri_uvs(vertex_data, current_ray.intersection);
+        float3 normal = interpolate_tri_normal(vertex_data, &current_ray);
+        float3 geo_normal = current_ray.geo_normal;
+        float2 uvs = interpolate_tri_uvs(vertex_data, &current_ray);
 
         // We have to apply transform so normals are world-space
 
@@ -242,11 +216,8 @@ float3 shade(ShadeArgs* args)
 
         bool inner_normal = dot(geo_normal, current_ray.D) > 0.0f;
 
-#if(COSINE_WEIGHTED_BIAS == 0)
         float3 hemisphere_normal = malleys_method(args->rand_seed).xyz;
-#else
-        float3 hemisphere_normal = uniform_hemisphere_tangent(args->rand_seed).xyz;
-#endif
+
         if(inner_normal)
             normal = -normal;
 
@@ -342,11 +313,8 @@ float3 shade(ShadeArgs* args)
                 float3 final_color = lerp(diffuse, specular, mat.specularity);
 
 
-                e += t * final_color;
-                t *= lerp(final_color, 1.0f, mat.specularity);
-
-                if(is_emissive)
-                    break;
+                e += current_ray.energy * final_color;
+                current_ray.energy *= lerp(final_color, 1.0f, mat.specularity);
 
                 break;
             }
@@ -356,8 +324,8 @@ float3 shade(ShadeArgs* args)
                 
                 new_ray.D = normalize(reflected_dir + random_unit_vector(args->rand_seed, normal) * (1.0f - mat.specularity));
                 
-                e += t * material_color * 0.5f;
-                t *= material_color * 0.5f;
+                e += current_ray.energy * material_color * 0.5f;
+                current_ray.energy *= material_color * 0.5f;
 
                 break;
             }
@@ -371,21 +339,28 @@ float3 shade(ShadeArgs* args)
                 if(reflectance > random)
                 {
                     new_ray.D = reflected(current_ray.D, normal);
-                    e *= t * material_color;
-                    t *= material_color;
+                    e *= current_ray.energy * material_color;
+                    current_ray.energy *= material_color;
                 }
                 else
                 {
                     new_ray.D = refracted(current_ray.D, normal, refraction_ratio);
                     float transmission_factor = inner_normal ? beers_law(old_ray_distance, mat.absorption_coefficient) : 1.0f;
 
-                    e *= material_color * transmission_factor * t;
-                    t *= material_color * transmission_factor;
+                    e *= material_color * transmission_factor * current_ray.energy;
+                    current_ray.energy *= material_color * transmission_factor;
                 }
                 break;
             }
         }
     }
+
+    int index = atomic_fetch_add(&args->wavefront_data->ray_count, 1);
+    new_ray.t = 1e30;
+    new_ray.screen_pos = current_ray.screen_pos;
+    new_ray.energy = e;
+    args->ray_buffer[index] = new_ray;
+
 	return e;
 }
 
@@ -431,13 +406,14 @@ void kernel rt_shade(
 	global struct WorldManagerDeviceData* world_manager_data, 
 	global struct Material* materials, 
 	global PerPixelData* detail_buffer,	
-    global uint* render_buffer, 
-    global ExtendPerPixelOutput* extend_output
+    global uint* render_buffer,
+	global WavefrontData* wavefront_data,
+    global Ray* ray_buffer,
+    global float* accumulation_buffer
     )
 {     
 	uint width = scene_data->resolution.x;
 	uint height = scene_data->resolution.y;
-    
     
     float aspect_ratio = (float)(width) / (float)(height);
 
@@ -447,6 +423,26 @@ void kernel rt_shade(
 	uint pixel_index = (x + y * width);
 
 	uint rand_seed = WangHash(pixel_index + scene_data->accumulated_frames * width * height);
+
+    // <Wavefront Early Return>
+    int actual_ray_count = atomic_load(&wavefront_data->ray_count);
+
+    barrier(CLK_GLOBAL_MEM_FENCE);
+
+    int ray_screen_index = ray_buffer[pixel_index].screen_pos.x + ray_buffer[pixel_index].screen_pos.y * width;
+
+    if(pixel_index >= actual_ray_count || actual_ray_count == 0)
+    {
+        //return;
+    }
+
+    if(pixel_index == 0)
+	{
+		atomic_store(&wavefront_data->ray_count, 0);
+	}
+    // <Wavefront Early Return>
+
+    Ray new_ray;
 
 	struct ShadeArgs shade_args;
 	shade_args.vertex_data = vertex_data;
@@ -462,15 +458,31 @@ void kernel rt_shade(
 	shade_args.materials = materials;
 	shade_args.detail_buffer = &detail_buffer[pixel_index];
 	shade_args.textures = textures;
-    shade_args.extend_output = &extend_output[pixel_index];
+    shade_args.ray_buffer = ray_buffer;
+    shade_args.wavefront_data = wavefront_data;
+    shade_args.importing_ray = &ray_buffer[pixel_index];
 
 	float3 color = shade(&shade_args);
     
-    render_buffer[pixel_index] = float3_color_to_uint(color);
+    barrier(CLK_GLOBAL_MEM_FENCE);
 
-	//color = max(color, 0.0f);
+    //render_buffer[pixel_index] = float3_color_to_uint(color);
 
-	return;
+	color = max(color, 0.0f);
+
+	//return;
+	if(scene_data->reset_accumulator)
+	{
+		accumulation_buffer[ray_screen_index * 4 + 0] = color.x;
+		accumulation_buffer[ray_screen_index * 4 + 1] = color.y;
+		accumulation_buffer[ray_screen_index * 4 + 2] = color.z;
+	}
+	else
+	{
+		accumulation_buffer[ray_screen_index * 4 + 0] += color.x;
+		accumulation_buffer[ray_screen_index * 4 + 1] += color.y;
+		accumulation_buffer[ray_screen_index * 4 + 2] += color.z;
+	}
 }
 
 /*

@@ -356,21 +356,6 @@ typedef struct Tri
 
 #endif
 
-#ifndef RAY_INTERSECTION_DEFINED
-
-#define RAY_INTERSECTION_DEFINED
-
-typedef struct RayIntersection
-{
-	// Barycentrics, we can reconstruct w
-	float u;
-	float v;
-	int tri_hit;
-	float3 geo_normal;
-} RayIntersection;
-
-#endif
-
 #ifndef RAY_DEFINED
 
 #define RAY_DEFINED
@@ -380,7 +365,13 @@ typedef struct __attribute__ ((packed)) Ray
     float3 O;
     float t;
     float3 D;
-	RayIntersection* intersection;
+	uint2 screen_pos;
+	float3 energy;
+	float u;
+	float v;
+	int tri_hit;
+	float3 geo_normal;
+	int hit_mesh_header_idx;
 } Ray;
 
 #endif
@@ -450,15 +441,14 @@ typedef struct WorldManagerDeviceData
 
 #endif
 
-#ifndef EXTEND_PER_PIXEL_OUTPUT_DEFINED
+#ifndef WAVEFRONT_DATA_DEFINED
 
-#define EXTEND_PER_PIXEL_OUTPUT_DEFINED
+#define WAVEFRONT_DATA_DEFINED
 
-typedef struct ExtendPerPixelOutput
+typedef struct WavefrontData
 {
-	int hit_mesh_header_idx;
-	Ray old_ray;
-	RayIntersection intersection;
-} ExtendPerPixelOutput;
+	int passes;
+	atomic_int ray_count;
+} WavefrontData;
 
 #endif

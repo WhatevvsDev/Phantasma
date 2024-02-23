@@ -12,7 +12,8 @@ typedef struct GeneratePrimaryRaysArgs
 
 void kernel rt_generate_rays(
 	global GeneratePrimaryRaysArgs* args,
-	global Ray* primary_rays
+	global Ray* ray_buffer,
+	global WavefrontData* wavefront_data
 	)
 {     
 	int x = get_global_id(0);
@@ -45,6 +46,14 @@ void kernel rt_generate_rays(
 	ray.O = cam_pos + disk_pos_world;
     ray.D = normalize(pixel_dir_world);
     ray.t = 1e30f;
+	ray.screen_pos.x = x;
+	ray.screen_pos.y = y;
+	ray.energy = 1.0f;
 
-	primary_rays[pixel_index] = ray;
+	if(pixel_index == 0)
+	{
+		atomic_store(&wavefront_data->ray_count, width * height);
+	}
+
+	ray_buffer[pixel_index] = ray;
 }

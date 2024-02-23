@@ -47,10 +47,10 @@ void intersect_tri(Ray* ray, Tri* tris, uint triIdx, MeshHeader* header)
 	if(ray->t > t)
 	{
 		ray->t = t;
-		ray->intersection->tri_hit = triIdx;
-		ray->intersection->u = u;
-		ray->intersection->v = v;
-		ray->intersection->geo_normal = cross(edge1, edge2);
+		ray->tri_hit = triIdx;
+		ray->u = u;
+		ray->v = v;
+		ray->geo_normal = cross(edge1, edge2);
 	}
 }
 
@@ -175,13 +175,13 @@ float beers_law(float thickness, float absorption_coefficient)
 	return pow(EULER, -absorption_coefficient * thickness);
 }
 
-float3 interpolate_tri_normal(VertexData* vertex_data, struct RayIntersection* intersection)
+float3 interpolate_tri_normal(VertexData* vertex_data, struct Ray* ray)
 {
-	float u = intersection->u;
-	float v = intersection->v;
+	float u = ray->u;
+	float v = ray->v;
 	float w = 1.0f - u - v;
 
-	uint idx = intersection->tri_hit * 3;
+	uint idx = ray->tri_hit * 3;
 
 	float3 v0_normal = vertex_data[idx + 0].normal * w;
 	float3 v1_normal = vertex_data[idx + 1].normal * u;
@@ -190,13 +190,13 @@ float3 interpolate_tri_normal(VertexData* vertex_data, struct RayIntersection* i
 	return normalize(v0_normal + v1_normal + v2_normal);
 }
 
-float2 interpolate_tri_uvs(VertexData* vertex_data, struct RayIntersection* intersection)
+float2 interpolate_tri_uvs(VertexData* vertex_data, struct Ray* ray)
 {
-	float u = intersection->u;
-	float v = intersection->v;
+	float u = ray->u;
+	float v = ray->v;
 	float w = 1.0f - u - v;
 
-	uint idx = intersection->tri_hit * 3;
+	uint idx = ray->tri_hit * 3;
 
 	float2 v0_uv = vertex_data[idx + 0].uv * w;
 	float2 v1_uv = vertex_data[idx + 1].uv * u;
@@ -444,9 +444,9 @@ float3 trace(TraceArgs* args)
 			VertexData* vertex_data = &args->vertex_data[mesh->vertex_data_offset];
 
 			float3 hit_pos = current_ray.O + (current_ray.D * current_ray.t);
-			float3 normal = interpolate_tri_normal(vertex_data, current_ray.intersection);
-			float3 geo_normal = current_ray.intersection->geo_normal;
-			float2 uvs = interpolate_tri_uvs(vertex_data, current_ray.intersection);
+			float3 normal = interpolate_tri_normal(vertex_data, &current_ray);
+			float3 geo_normal = current_ray.geo_normal;
+			float2 uvs = interpolate_tri_uvs(vertex_data, &current_ray);
 
 
 			// We have to apply transform so normals are world-space
@@ -737,10 +737,7 @@ void kernel rt_trace(
 	uint rand_seed = WangHash(pixel_index + scene_data->accumulated_frames * width * height);
 
 	// Actual raytracing
-	RayIntersection intersection;
-
 	struct Ray ray = primary_rays[pixel_index];
-	ray.intersection = &intersection;
 
 	struct TraceArgs trace_args;
 	trace_args.primary_ray = &ray;
