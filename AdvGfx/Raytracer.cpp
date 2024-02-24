@@ -560,17 +560,16 @@ namespace Raytracer
 			how_many_rays_need_to_be_dispatched_for_shade = render_area;
 			
 
-			printf("new rays1 \n");
-
 			while (bounces > 0 && how_many_rays_need_to_be_dispatched_for_shade > 100)
 			{
 				how_many_rays_need_to_be_dispatched_for_shade = wavefront.ray_index;
 				wavefront.ray_index = 0;
 
 				raytrace_extend();
+				// TODO: make slices work with multiple calls during one section.
 				//perf::log_slice("raytrace_extend");
 
-				printf("still got %i rays left for bounce %i \n", how_many_rays_need_to_be_dispatched_for_shade, bounce_count - bounces);
+				//printf("still got %i rays left for bounce %i \n", how_many_rays_need_to_be_dispatched_for_shade, bounce_count - bounces);
 
 
 				raytrace_shade(screen_buffer);
@@ -579,6 +578,8 @@ namespace Raytracer
 				bounces--;
 			}
 			internal.accumulated_frames++;
+
+			raytrace_trace_rays(screen_buffer);
 
 			raytrace_finalize(screen_buffer);
 			perf::log_slice("raytrace_finalize");
