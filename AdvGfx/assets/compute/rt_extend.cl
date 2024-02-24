@@ -307,11 +307,8 @@ void kernel rt_extend(
 	int x = get_global_id(0);
 	int y = get_global_id(1);
 
-	uint pixel_index = (x + y * width);
-
-	if(pixel_index >= atomic_load(&wavefront_data->ray_count))
-		return;
-
+	uint pixel_index = get_global_id(0);
+	
 	// Actual raytracing
 	struct ExtendArgs extend_args;
 	extend_args.blas_nodes = blas_nodes;

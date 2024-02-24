@@ -224,7 +224,7 @@ namespace Raytracer
 
 		u32 render_area_px = internal.render_width_px * internal.render_height_px;
 
-		const u32 GPU_RAY_STRUCT_SIZE = 92;
+		const u32 GPU_RAY_STRUCT_SIZE = 108;
 
 		internal.gpu_accumulation_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * internal.render_channel_count * sizeof(float)));
 		internal.gpu_detail_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * sizeof(PerPixelData)));
@@ -447,11 +447,13 @@ namespace Raytracer
 			.read_write(*internal.gpu_detail_buffer)
 			.read_write((*internal.gpu_primary_ray_buffer))
 			.read_write(*internal.gpu_wavefront_buffer)
-			.global_dispatch({ internal.render_width_px, internal.render_height_px, 1 })
+			.global_dispatch({ wavefront.ray_index ,1, 1 })
 			.execute();
 
 		internal.accumulated_frames++;
 	}
+
+	int how_many_rays_need_to_be_dispatched_for_shade;
 
 	void raytrace_shade(const ComputeReadWriteBuffer& screen_buffer)
 	{
@@ -471,7 +473,7 @@ namespace Raytracer
 			.read_write(*internal.gpu_wavefront_buffer)
 			.read_write((*internal.gpu_primary_ray_buffer))
 			.read_write((*internal.gpu_accumulation_buffer))
-			.global_dispatch({ internal.render_width_px, internal.render_height_px, 1 })
+			.global_dispatch({ how_many_rays_need_to_be_dispatched_for_shade ,1, 1 })
 			.execute();
 	}
 
@@ -556,14 +558,18 @@ namespace Raytracer
 			//raytrace_trace_rays(screen_buffer);
 			//perf::log_slice("raytrace_trace_rays");
 
-			wavefront.passes = 1;
-
+			wavefront.passes = 8;
+			wavefront.ray_index = render_area;
 			
 
-			while (wavefront.passes > 0)
+			while (wavefront.passes > 0 && wavefront.ray_index != 0)
 			{
 				raytrace_extend();
 				perf::log_slice("raytrace_extend");
+
+				how_many_rays_need_to_be_dispatched_for_shade = wavefront.ray_index;
+				wavefront.ray_index = 0;
+
 				raytrace_shade(screen_buffer);
 				perf::log_slice("raytrace_shade");
 

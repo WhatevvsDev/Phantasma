@@ -366,7 +366,8 @@ typedef struct __attribute__ ((packed)) Ray
     float t;
     float3 D;
 	uint2 screen_pos;
-	float3 energy;
+	float3 e_energy;
+	float3 t_energy;
 	float u;
 	float v;
 	int tri_hit;
