@@ -560,18 +560,16 @@ namespace Raytracer
 			raytrace_trace_rays(screen_buffer);
 			perf::log_slice("raytrace_trace_rays");
 
-			wavefront.passes = 2;
+			//wavefront.passes = 1;
 
-			int prevent_forerver = 8;
-
-			//while (wavefront.passes > 0 && prevent_forerver > 0)
+			//while (wavefront.passes > 0)
 			{
-			//	raytrace_extend();
-			//	perf::log_slice("raytrace_extend");
-			//	raytrace_shade(screen_buffer);
-			//	perf::log_slice("raytrace_shade");
+				//raytrace_extend();
+				//perf::log_slice("raytrace_extend");
+				//raytrace_shade(screen_buffer);
+				//perf::log_slice("raytrace_shade");
 
-				prevent_forerver--;
+				wavefront.passes--;
 			}
 
 			raytrace_finalize(screen_buffer);
@@ -711,8 +709,6 @@ namespace Raytracer
 		ImGui::PushStyleColor(ImGuiCol_WindowBg, {0, 0, 0, 0});
 		ImGui::DockSpaceOverViewport(0, ImGuiDockNodeFlags_PassthruCentralNode | ImGuiDockNodeFlags_AutoHideTabBar | ImGuiDockNodeFlags_NoDockingInCentralNode);
 		ImGui::PopStyleColor();
-
-		ImPlot::ShowDemoWindow();
 
 		if(ImGui::IsKeyPressed(ImGuiKey_Backspace) && !ImGui::IsAnyItemActive())
 		{

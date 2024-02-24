@@ -154,10 +154,6 @@ float3 shade(ShadeArgs* args)
 {
 	// Keeping track of current ray
 	Ray current_ray = *args->importing_ray;
-    // Ray direction
-    // Ray t
-	// Hit position
-    // intersection geo normal
 
     Ray new_ray;
 
@@ -429,60 +425,62 @@ void kernel rt_shade(
 
     barrier(CLK_GLOBAL_MEM_FENCE);
 
-    int ray_screen_index = ray_buffer[pixel_index].screen_pos.x + ray_buffer[pixel_index].screen_pos.y * width;
+    int ray_screen_index = (ray_buffer[pixel_index].screen_pos.y * width) + ray_buffer[pixel_index].screen_pos.x;
 
-    if(pixel_index >= actual_ray_count || actual_ray_count == 0)
+    bool skip = (pixel_index >= actual_ray_count);
+
+    if(pixel_index >= actual_ray_count) 
     {
-        //return;
+        return;
     }
 
     if(pixel_index == 0)
-	{
-		atomic_store(&wavefront_data->ray_count, 0);
-	}
+    {
+        atomic_store(&wavefront_data->ray_count, 0);
+    }
     // <Wavefront Early Return>
 
     Ray new_ray;
 
-	struct ShadeArgs shade_args;
-	shade_args.vertex_data = vertex_data;
-	shade_args.tris = tris;
-	shade_args.trisIdx = trisIdx;
-	shade_args.rand_seed = &rand_seed;
-	shade_args.mesh_headers = mesh_headers;
-	shade_args.texture_headers = texture_headers;
-	shade_args.exr = exr;
-	shade_args.exr_size = scene_data->exr_size;
-	shade_args.exr_angle = scene_data->exr_angle;
-	shade_args.world_data = world_manager_data;
-	shade_args.materials = materials;
-	shade_args.detail_buffer = &detail_buffer[pixel_index];
-	shade_args.textures = textures;
+    struct ShadeArgs shade_args;
+    shade_args.vertex_data = vertex_data;
+    shade_args.tris = tris;
+    shade_args.trisIdx = trisIdx;
+    shade_args.rand_seed = &rand_seed;
+    shade_args.mesh_headers = mesh_headers;
+    shade_args.texture_headers = texture_headers;
+    shade_args.exr = exr;
+    shade_args.exr_size = scene_data->exr_size;
+    shade_args.exr_angle = scene_data->exr_angle;
+    shade_args.world_data = world_manager_data;
+    shade_args.materials = materials;
+    shade_args.detail_buffer = &detail_buffer[pixel_index];
+    shade_args.textures = textures;
     shade_args.ray_buffer = ray_buffer;
     shade_args.wavefront_data = wavefront_data;
     shade_args.importing_ray = &ray_buffer[pixel_index];
 
-	float3 color = shade(&shade_args);
+    float3 color = shade(&shade_args);
     
     barrier(CLK_GLOBAL_MEM_FENCE);
 
-    //render_buffer[pixel_index] = float3_color_to_uint(color);
+    render_buffer[pixel_index] = float3_color_to_uint(color);
 
-	color = max(color, 0.0f);
+    color = max(color, 0.0f);
 
-	//return;
-	if(scene_data->reset_accumulator)
-	{
-		accumulation_buffer[ray_screen_index * 4 + 0] = color.x;
-		accumulation_buffer[ray_screen_index * 4 + 1] = color.y;
-		accumulation_buffer[ray_screen_index * 4 + 2] = color.z;
-	}
-	else
-	{
-		accumulation_buffer[ray_screen_index * 4 + 0] += color.x;
-		accumulation_buffer[ray_screen_index * 4 + 1] += color.y;
-		accumulation_buffer[ray_screen_index * 4 + 2] += color.z;
-	}
+    //return;
+    if(scene_data->reset_accumulator)
+    {
+        accumulation_buffer[ray_screen_index * 4 + 0] = color.x;
+        accumulation_buffer[ray_screen_index * 4 + 1] = color.y;
+        accumulation_buffer[ray_screen_index * 4 + 2] = color.z;
+    }
+    else
+    {
+        accumulation_buffer[ray_screen_index * 4 + 0] += color.x;
+        accumulation_buffer[ray_screen_index * 4 + 1] += color.y;
+        accumulation_buffer[ray_screen_index * 4 + 2] += color.z;
+    }
 }
 
 /*
