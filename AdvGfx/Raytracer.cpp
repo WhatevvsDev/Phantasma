@@ -554,7 +554,7 @@ namespace Raytracer
 			//raytrace_trace_rays(screen_buffer);
 			//perf::log_slice("raytrace_trace_rays");
 
-			const int bounce_count = 16;
+			const int bounce_count = 8;
 			int bounces = bounce_count;
 			wavefront.ray_index = render_area;
 			how_many_rays_need_to_be_dispatched_for_shade = render_area;
