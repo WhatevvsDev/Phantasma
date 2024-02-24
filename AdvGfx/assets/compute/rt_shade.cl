@@ -148,16 +148,14 @@ typedef struct ShadeArgs
     Ray* shading_ray;
     Ray* ray_buffer;
     WavefrontData* wavefront_data;
-    bool generated_new_ray;
 } ShadeArgs;
 
-float3 shade(ShadeArgs* args)
+bool shade(ShadeArgs* args)
 {
 	// Keeping track of current ray
     
     Ray* shading_ray = args->shading_ray;
     Ray new_ray;
-    args->generated_new_ray = false;
 
 	uint depth = DEPTH;
 	float3 color = (float3)(0.0f);
@@ -172,19 +170,21 @@ float3 shade(ShadeArgs* args)
     {
         float3 exr_color = get_exr_color(shading_ray->D, args->exr, args->exr_size, args->exr_angle);
 
-        // Slighly Biased way to get rid of fireflies
-        float sqr_length = dot(exr_color, exr_color);
-        float light_limit = 16.0f;
-        exr_color = (sqr_length < light_limit ? exr_color : normalize(exr_color) * light_limit);
-
         if(is_primary_ray)
         {
             args->detail_buffer->albedo = (float4)(exr_color, 0.0f);
         }
 
-        shading_ray->t_energy += shading_ray->e_energy * exr_color;
+        // Slighly Biased way to get rid of fireflies
+        float sqr_length = dot(exr_color, exr_color);
+        float light_limit = 16.0f;
+
+        if(args->wavefront_data->passes == 3)
+        exr_color = (sqr_length < light_limit ? exr_color : normalize(exr_color) * light_limit);
+
+        shading_ray->e_energy = shading_ray->t_energy * exr_color;
         
-        return 0;// e * exr_color;
+        return false;
     }
     else
     {
@@ -290,9 +290,7 @@ float3 shade(ShadeArgs* args)
             die_chance = clamp(die_chance, 0.0f, 1.0f);
 
             if(RandomFloat(args->rand_seed) > die_chance)
-            {
-                return 0.0f;
-            }
+                return false;
                 
             material_color /= die_chance;
         }
@@ -357,13 +355,13 @@ float3 shade(ShadeArgs* args)
     }
 
     int index = atomic_fetch_add(&args->wavefront_data->ray_count, 1);
-    args->generated_new_ray = true;
     new_ray.t = 1e30;
     new_ray.screen_pos = shading_ray->screen_pos;
     new_ray.e_energy = shading_ray->e_energy;
     new_ray.t_energy = shading_ray->t_energy;
     args->ray_buffer[index] = new_ray;
-	return 0;
+    
+	return true;
 }
 
 float3 to_float3(float* array)
@@ -450,16 +448,16 @@ void kernel rt_shade(
     shade_args.shading_ray = &shading_ray;
 
     
-    float3 color = shade(&shade_args);
+    bool bounce_ray = shade(&shade_args);
     
     //color = max(color, 0.0f);
 
-    render_buffer[ray_screen_index] = float3_color_to_uint(shading_ray.t_energy);
+    //render_buffer[ray_screen_index] = float3_color_to_uint(shading_ray.e_energy);
 
 
-    if(!shade_args.generated_new_ray)
+    if(!bounce_ray)
     {
-        color = shading_ray.e_energy;
+        float3 color = shading_ray.e_energy;
 
         if(scene_data->reset_accumulator)
         {

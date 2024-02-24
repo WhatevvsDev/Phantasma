@@ -48,8 +48,8 @@ void kernel rt_generate_rays(
     ray.t = 1e30f;
 	ray.screen_pos.x = x;
 	ray.screen_pos.y = y;
-	ray.e_energy = 1.0f;
-	ray.t_energy = 0.0f;
+	ray.e_energy = 0.0f;
+	ray.t_energy = 1.0f;
 
 	ray_buffer[pixel_index] = ray;
 }

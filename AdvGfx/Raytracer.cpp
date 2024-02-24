@@ -426,6 +426,8 @@ namespace Raytracer
 			.execute();
 	}
 	
+	int how_many_rays_need_to_be_dispatched_for_shade;
+
 	void raytrace_extend()
 	{
 		// TLAS
@@ -447,13 +449,11 @@ namespace Raytracer
 			.read_write(*internal.gpu_detail_buffer)
 			.read_write((*internal.gpu_primary_ray_buffer))
 			.read_write(*internal.gpu_wavefront_buffer)
-			.global_dispatch({ wavefront.ray_index ,1, 1 })
+			.global_dispatch({ how_many_rays_need_to_be_dispatched_for_shade ,1, 1 })
 			.execute();
 
-		internal.accumulated_frames++;
 	}
 
-	int how_many_rays_need_to_be_dispatched_for_shade;
 
 	void raytrace_shade(const ComputeReadWriteBuffer& screen_buffer)
 	{
@@ -564,17 +564,19 @@ namespace Raytracer
 
 			while (wavefront.passes > 0 && wavefront.ray_index != 0)
 			{
+				how_many_rays_need_to_be_dispatched_for_shade = wavefront.ray_index;
+				wavefront.ray_index = 0;
+
 				raytrace_extend();
 				perf::log_slice("raytrace_extend");
 
-				how_many_rays_need_to_be_dispatched_for_shade = wavefront.ray_index;
-				wavefront.ray_index = 0;
 
 				raytrace_shade(screen_buffer);
 				perf::log_slice("raytrace_shade");
 
 				wavefront.passes--;
 			}
+			internal.accumulated_frames++;
 
 			raytrace_finalize(screen_buffer);
 			perf::log_slice("raytrace_finalize");
