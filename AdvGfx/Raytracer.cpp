@@ -128,8 +128,6 @@ namespace Raytracer
 		ComputeGPUOnlyBuffer* gpu_accumulation_buffer { nullptr };
 		ComputeGPUOnlyBuffer* gpu_detail_buffer{ nullptr };
 
-		ComputeGPUOnlyBuffer* gpu_extend_output_buffer{ nullptr };
-
 		ComputeGPUOnlyBuffer* gpu_primary_ray_buffer{ nullptr };
 
 		ComputeReadWriteBuffer* gpu_wavefront_buffer{ nullptr };
@@ -231,7 +229,6 @@ namespace Raytracer
 		internal.gpu_accumulation_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * internal.render_channel_count * sizeof(float)));
 		internal.gpu_detail_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * sizeof(PerPixelData)));
 		internal.gpu_primary_ray_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * GPU_RAY_STRUCT_SIZE)); // TODO: This is hardcoded, it should not be!
-		internal.gpu_extend_output_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * (48 + GPU_RAY_STRUCT_SIZE))); // TODO: This is hardcoded, it should not be!
 
 		internal.gpu_wavefront_buffer = new ComputeReadWriteBuffer(ComputeDataHandle(&wavefront, 1));
 
@@ -450,7 +447,6 @@ namespace Raytracer
 			.read_write(*internal.gpu_detail_buffer)
 			.read_write((*internal.gpu_primary_ray_buffer))
 			.read_write(*internal.gpu_wavefront_buffer)
-			.write((*internal.gpu_extend_output_buffer))
 			.global_dispatch({ internal.render_width_px, internal.render_height_px, 1 })
 			.execute();
 
@@ -557,17 +553,19 @@ namespace Raytracer
 			raytrace_generate_primary_rays();
 			perf::log_slice("raytrace_generate_primary_rays");
 
-			raytrace_trace_rays(screen_buffer);
-			perf::log_slice("raytrace_trace_rays");
+			//raytrace_trace_rays(screen_buffer);
+			//perf::log_slice("raytrace_trace_rays");
 
-			//wavefront.passes = 1;
+			wavefront.passes = 1;
 
-			//while (wavefront.passes > 0)
+			
+
+			while (wavefront.passes > 0)
 			{
-				//raytrace_extend();
-				//perf::log_slice("raytrace_extend");
-				//raytrace_shade(screen_buffer);
-				//perf::log_slice("raytrace_shade");
+				raytrace_extend();
+				perf::log_slice("raytrace_extend");
+				raytrace_shade(screen_buffer);
+				perf::log_slice("raytrace_shade");
 
 				wavefront.passes--;
 			}

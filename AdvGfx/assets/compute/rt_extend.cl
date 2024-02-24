@@ -216,7 +216,6 @@ typedef struct ExtendArgs
 	BVHNode* blas_nodes;
 	Tri* tris;
 	uint* trisIdx;
-	uint* rand_seed;
 	MeshHeader* mesh_headers;
 	WorldManagerDeviceData* world_data;
 	BVHNode* tlas_nodes;
@@ -310,14 +309,14 @@ void kernel rt_extend(
 
 	uint pixel_index = (x + y * width);
 
-	uint rand_seed = WangHash(pixel_index + scene_data->accumulated_frames * width * height);
+	if(pixel_index >= atomic_load(&wavefront_data->ray_count))
+		return;
 
 	// Actual raytracing
 	struct ExtendArgs extend_args;
 	extend_args.blas_nodes = blas_nodes;
 	extend_args.tris = tris;
 	extend_args.trisIdx = trisIdx;
-	extend_args.rand_seed = &rand_seed;
 	extend_args.mesh_headers = mesh_headers;
 	extend_args.world_data = world_manager_data;
 	extend_args.tlas_nodes = tlas_nodes;
