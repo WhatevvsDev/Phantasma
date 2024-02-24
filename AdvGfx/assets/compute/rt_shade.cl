@@ -154,13 +154,13 @@ bool shade(ShadeArgs* args)
 {
 	// Keeping track of current ray
     
-    Ray* shading_ray = args->shading_ray;
+    Ray shading_ray = *args->shading_ray;
     Ray new_ray;
 
 	uint depth = DEPTH;
 	float3 color = (float3)(0.0f);
 
-    int hit_mesh_header_idx = shading_ray->hit_mesh_header_idx;
+    int hit_mesh_header_idx = shading_ray.hit_mesh_header_idx;
 
     bool is_primary_ray = false;
     
@@ -168,7 +168,7 @@ bool shade(ShadeArgs* args)
 
     if(!hit_anything)
     {
-        float3 exr_color = get_exr_color(shading_ray->D, args->exr, args->exr_size, args->exr_angle);
+        float3 exr_color = get_exr_color(shading_ray.D, args->exr, args->exr_size, args->exr_angle);
 
         if(is_primary_ray)
         {
@@ -182,8 +182,8 @@ bool shade(ShadeArgs* args)
         if(args->wavefront_data->passes == 3)
         exr_color = (sqr_length < light_limit ? exr_color : normalize(exr_color) * light_limit);
 
-        shading_ray->e_energy = shading_ray->t_energy * exr_color;
-        
+        shading_ray.e_energy = shading_ray.t_energy * exr_color;
+        *args->shading_ray = shading_ray;
         return false;
     }
     else
@@ -194,10 +194,10 @@ bool shade(ShadeArgs* args)
 
         VertexData* vertex_data = &args->vertex_data[mesh->vertex_data_offset];
 
-        float3 hit_pos = shading_ray->O + (shading_ray->D * shading_ray->t);
-        float3 normal = interpolate_tri_normal(vertex_data, shading_ray);
-        float3 geo_normal = shading_ray->geo_normal;
-        float2 uvs = interpolate_tri_uvs(vertex_data, shading_ray);
+        float3 hit_pos = shading_ray.O + (shading_ray.D * shading_ray.t);
+        float3 normal = interpolate_tri_normal(vertex_data, &shading_ray);
+        float3 geo_normal = shading_ray.geo_normal;
+        float2 uvs = interpolate_tri_uvs(vertex_data, &shading_ray);
 
         // We have to apply transform so normals are world-space
 
@@ -211,7 +211,7 @@ bool shade(ShadeArgs* args)
         normal = normalize(normal);
         geo_normal = normalize(geo_normal);
 
-        bool inner_normal = dot(geo_normal, shading_ray->D) > 0.0f;
+        bool inner_normal = dot(geo_normal, shading_ray.D) > 0.0f;
 
         float3 hemisphere_normal = malleys_method(args->rand_seed).xyz;
 
@@ -225,12 +225,12 @@ bool shade(ShadeArgs* args)
 
         hemisphere_normal = tangent_to_base_vector(hemisphere_normal, normal);
 
-        float old_ray_distance = shading_ray->t;
+        float old_ray_distance = shading_ray.t;
         new_ray.O = hit_pos + hemisphere_normal * EPSILON;
         new_ray.t = 1e30f;
         depth--;
 
-        float3 reflected_dir = reflected(shading_ray->D, normal);
+        float3 reflected_dir = reflected(shading_ray.D, normal);
         float random = RandomFloat(args->rand_seed);
 
         float3 material_color = mat.albedo.xyz * (mat.albedo.a + 1.0f);
@@ -312,19 +312,19 @@ bool shade(ShadeArgs* args)
                 float3 final_color = lerp(diffuse, specular, mat.specularity);
 
 
-                shading_ray->e_energy += shading_ray->t_energy * final_color;
-                shading_ray->t_energy *= lerp(final_color, 1.0f, mat.specularity);
+                shading_ray.e_energy += shading_ray.t_energy * final_color;
+                shading_ray.t_energy *= lerp(final_color, 1.0f, mat.specularity);
 
                 break;
             }
             case Metal:
             {
-                float3 reflected_dir = reflected(shading_ray->D, normal) * (1.0f + EPSILON);
+                float3 reflected_dir = reflected(shading_ray.D, normal) * (1.0f + EPSILON);
                 
                 new_ray.D = normalize(reflected_dir + random_unit_vector(args->rand_seed, normal) * (1.0f - mat.specularity));
                 
-                shading_ray->e_energy += shading_ray->t_energy * material_color * 0.5f;
-                shading_ray->t_energy *= material_color * 0.5f;
+                shading_ray.e_energy += shading_ray.t_energy * material_color * 0.5f;
+                shading_ray.t_energy *= material_color * 0.5f;
 
                 break;
             }
@@ -332,33 +332,34 @@ bool shade(ShadeArgs* args)
             {
                 float refraction_ratio = (inner_normal ? (1.0f / mat.ior) : mat.ior);// <- Only use with objects that are enclosed
 
-                float reflectance = fresnel(shading_ray->D, normal, refraction_ratio);
+                float reflectance = fresnel(shading_ray.D, normal, refraction_ratio);
                 float transmittance = 1.0f - reflectance;
             
                 if(reflectance > random)
                 {
-                    new_ray.D = reflected(shading_ray->D, normal);
-                    shading_ray->e_energy *= shading_ray->t_energy * material_color;
-                    shading_ray->t_energy *= material_color;
+                    new_ray.D = reflected(shading_ray.D, normal);
+                    shading_ray.e_energy *= shading_ray.t_energy * material_color;
+                    shading_ray.t_energy *= material_color;
                 }
                 else
                 {
-                    new_ray.D = refracted(shading_ray->D, normal, refraction_ratio);
+                    new_ray.D = refracted(shading_ray.D, normal, refraction_ratio);
                     float transmission_factor = inner_normal ? beers_law(old_ray_distance, mat.absorption_coefficient) : 1.0f;
 
-                    shading_ray->e_energy *= material_color * transmission_factor * shading_ray->t_energy;
-                    shading_ray->t_energy *= material_color * transmission_factor;
+                    shading_ray.e_energy *= material_color * transmission_factor * shading_ray.t_energy;
+                    shading_ray.t_energy *= material_color * transmission_factor;
                 }
                 break;
             }
         }
     }
 
+    *args->shading_ray = shading_ray;
     int index = atomic_fetch_add(&args->wavefront_data->ray_count, 1);
     new_ray.t = 1e30;
-    new_ray.screen_pos = shading_ray->screen_pos;
-    new_ray.e_energy = shading_ray->e_energy;
-    new_ray.t_energy = shading_ray->t_energy;
+    new_ray.screen_pos = shading_ray.screen_pos;
+    new_ray.e_energy = shading_ray.e_energy;
+    new_ray.t_energy = shading_ray.t_energy;
     args->ray_buffer[index] = new_ray;
     
 	return true;
@@ -409,7 +410,7 @@ void kernel rt_shade(
     global uint* render_buffer,
 	global WavefrontData* wavefront_data,
     global Ray* ray_buffer,
-    global float* accumulation_buffer
+    global float4* accumulation_buffer
     )
 {     
 	uint width = scene_data->resolution.x;
@@ -458,73 +459,6 @@ void kernel rt_shade(
     if(!bounce_ray)
     {
         float3 color = shading_ray.e_energy;
-
-        if(scene_data->reset_accumulator)
-        {
-            accumulation_buffer[ray_screen_index * 4 + 0] = color.x;
-            accumulation_buffer[ray_screen_index * 4 + 1] = color.y;
-            accumulation_buffer[ray_screen_index * 4 + 2] = color.z;
-        }
-        else
-        {
-            accumulation_buffer[ray_screen_index * 4 + 0] += color.x;
-            accumulation_buffer[ray_screen_index * 4 + 1] += color.y;
-            accumulation_buffer[ray_screen_index * 4 + 2] += color.z;
-        }
+        accumulation_buffer[ray_screen_index] += (float4)(color, 0.0f);
     }
 }
-
-/*
-float3 rt_shade()
-{
-	// Work only with active rays
-    //if (idx.x < rayCount[0])
-    //{
-		// If ray did not intersect, sample sky
-        //if ()
-       // {
-            
-            //float3 exr_color = get_exr_color(current_ray.D, args->exr, args->exr_size, args->exr_angle, is_primary_ray);
-
-			// Slighly Biased way to get rid of fireflies
-			//float sqr_length = dot(exr_color, exr_color);
-			//float light_limit = 16.0f;
-			//exr_color = (sqr_length < light_limit ? exr_color : normalize(exr_color) * light_limit);
-
-
-			if(is_primary_ray)
-			{
-				args->detail_buffer->albedo = (float4)(exr_color, 0.0f);
-			}
-
-			return t * exr_color;
-            
-            //return;
-        //}
-        
-        // Get model / Triangles / Etc.
-    
-	    // Get transforms
-        // Get world space normal
-        // Get texture coordinates
-		// Get albedo from the base color (I guess could be my material?)
-       
-        //float3 rayThroughput = rayBatch[idx.x].m_Throughput;
-        //float3 BRDF = albedo / PI;
-        
-		// Get random seed
-		// Sample a random light source (NEE?)
-        // Generate valid shadow ray
-
-		// Russian Roulette
-
-		// Sampling hemisphere
-        
-		// generate a new ray
-    //}
-    // Once a cycle we update a wavefront loop iterator (bounce count)
-    //if (idx.x == 0)
-    //{
-    //    seedData[1]++;
-    //}
-}*/

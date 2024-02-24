@@ -406,7 +406,8 @@ namespace Raytracer
 			f32 blur_radius;
 			f32 focal_distance;
 			f32 camera_fov;
-			f32 pad[2];
+			bool reset_accumulator;
+			f32 pad[1];
 			glm::mat4 camera_transform;
 		} args;
 
@@ -417,11 +418,13 @@ namespace Raytracer
 		args.focal_distance = active_camera.focal_distance;
 		args.camera_fov = 110;
 		args.camera_transform = Camera::get_instance_matrix(active_camera);
+		args.reset_accumulator = scene_data.reset_accumulator;
 
 		ComputeOperation("rt_generate_rays.cl")
 			.write({&args, 1})
 			.read_write((*internal.gpu_primary_ray_buffer))
 			.read_write(*internal.gpu_wavefront_buffer)
+			.read_write((*internal.gpu_accumulation_buffer))
 			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
 			.execute();
 	}
@@ -430,13 +433,6 @@ namespace Raytracer
 
 	void raytrace_extend()
 	{
-		// TLAS
-		// Ray batch
-		// Ray count
-		// Extended batch
-		// Atomic shadow rays
-		// Atomic new rays <- Bounces
-
 		ComputeOperation("rt_extend.cl")
 			.write(Assets::get_tris_compute_buffer())
 			.write(Assets::get_bvh_compute_buffer())
@@ -558,28 +554,35 @@ namespace Raytracer
 			//raytrace_trace_rays(screen_buffer);
 			//perf::log_slice("raytrace_trace_rays");
 
-			wavefront.passes = 8;
+			const int bounce_count = 16;
+			int bounces = bounce_count;
 			wavefront.ray_index = render_area;
+			how_many_rays_need_to_be_dispatched_for_shade = render_area;
 			
 
-			while (wavefront.passes > 0 && wavefront.ray_index != 0)
+			printf("new rays1 \n");
+
+			while (bounces > 0 && how_many_rays_need_to_be_dispatched_for_shade > 100)
 			{
 				how_many_rays_need_to_be_dispatched_for_shade = wavefront.ray_index;
 				wavefront.ray_index = 0;
 
 				raytrace_extend();
-				perf::log_slice("raytrace_extend");
+				//perf::log_slice("raytrace_extend");
+
+				printf("still got %i rays left for bounce %i \n", how_many_rays_need_to_be_dispatched_for_shade, bounce_count - bounces);
 
 
 				raytrace_shade(screen_buffer);
-				perf::log_slice("raytrace_shade");
+				//perf::log_slice("raytrace_shade");
 
-				wavefront.passes--;
+				bounces--;
 			}
 			internal.accumulated_frames++;
 
 			raytrace_finalize(screen_buffer);
 			perf::log_slice("raytrace_finalize");
+
 
 			scene_data.reset_accumulator = false;
 		}

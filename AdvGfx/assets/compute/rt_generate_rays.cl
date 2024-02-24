@@ -6,14 +6,16 @@ typedef struct GeneratePrimaryRaysArgs
 	float blur_radius;
 	float focal_distance;
 	float camera_fov;
-	float pad[2];
+	bool reset_accumulator;
+	float pad[1];
 	float camera_transform[16];
 } GeneratePrimaryRaysArgs;
 
 void kernel rt_generate_rays(
 	global GeneratePrimaryRaysArgs* args,
 	global Ray* ray_buffer,
-	global WavefrontData* wavefront_data
+	global WavefrontData* wavefront_data,
+	global float4* accumulation_buffer
 	)
 {     
 	int x = get_global_id(0);
@@ -41,6 +43,11 @@ void kernel rt_generate_rays(
 	// Get position from matrix
 	float3 cam_pos = (float3)(args->camera_transform[12], args->camera_transform[13], args->camera_transform[14]);
 	
+	if(args->reset_accumulator)
+	{
+		accumulation_buffer[pixel_index] = 0;
+	}
+
 	// Actual raytracing
 	struct Ray ray;
 	ray.O = cam_pos + disk_pos_world;
