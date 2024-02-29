@@ -102,6 +102,11 @@ namespace Raytracer
 		i32 ray_index = 0;
 	} wavefront;
 
+	struct ExtendData
+	{
+
+	};
+
 	struct
 	{
 		ViewType view_type				{ ViewType::Render };
@@ -224,12 +229,11 @@ namespace Raytracer
 
 		u32 render_area_px = internal.render_width_px * internal.render_height_px;
 
-		const u32 GPU_RAY_STRUCT_SIZE = 108;
+		const u32 GPU_RAY_STRUCT_SIZE = 108; // TODO: This is hardcoded, it should not be!
 
 		internal.gpu_accumulation_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * internal.render_channel_count * sizeof(float)));
 		internal.gpu_detail_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * sizeof(PerPixelData)));
-		internal.gpu_primary_ray_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * GPU_RAY_STRUCT_SIZE)); // TODO: This is hardcoded, it should not be!
-
+		internal.gpu_primary_ray_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * GPU_RAY_STRUCT_SIZE));
 		internal.gpu_wavefront_buffer = new ComputeReadWriteBuffer(ComputeDataHandle(&wavefront, 1));
 
 		Assets::init();
@@ -442,8 +446,8 @@ namespace Raytracer
 			.write({ &World::get_world_device_data(), 1 })
 			.write(tlas)
 			.write(tlas_idx)
-			.read_write(*internal.gpu_detail_buffer)
-			.read_write((*internal.gpu_primary_ray_buffer))
+			.write(*internal.gpu_detail_buffer)
+			.write((*internal.gpu_primary_ray_buffer))
 			.read_write(*internal.gpu_wavefront_buffer)
 			.global_dispatch({ how_many_rays_need_to_be_dispatched_for_shade ,1, 1 })
 			.execute();
@@ -554,6 +558,7 @@ namespace Raytracer
 			//raytrace_trace_rays(screen_buffer);
 			//perf::log_slice("raytrace_trace_rays");
 
+			
 			const int bounce_count = 8;
 			int bounces = bounce_count;
 			wavefront.ray_index = render_area;
@@ -565,12 +570,11 @@ namespace Raytracer
 				how_many_rays_need_to_be_dispatched_for_shade = wavefront.ray_index;
 				wavefront.ray_index = 0;
 
-				raytrace_extend();
 				// TODO: make slices work with multiple calls during one section.
+				raytrace_extend();
 				//perf::log_slice("raytrace_extend");
 
 				//printf("still got %i rays left for bounce %i \n", how_many_rays_need_to_be_dispatched_for_shade, bounce_count - bounces);
-
 
 				raytrace_shade(screen_buffer);
 				//perf::log_slice("raytrace_shade");
@@ -578,8 +582,7 @@ namespace Raytracer
 				bounces--;
 			}
 			internal.accumulated_frames++;
-
-			raytrace_trace_rays(screen_buffer);
+			
 
 			raytrace_finalize(screen_buffer);
 			perf::log_slice("raytrace_finalize");

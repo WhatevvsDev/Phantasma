@@ -179,8 +179,8 @@ bool shade(ShadeArgs* args)
         float sqr_length = dot(exr_color, exr_color);
         float light_limit = 16.0f;
 
-        if(args->wavefront_data->passes == 3)
-        exr_color = (sqr_length < light_limit ? exr_color : normalize(exr_color) * light_limit);
+        if(args->wavefront_data->passes == 8)
+            exr_color = (sqr_length < light_limit ? exr_color : normalize(exr_color) * light_limit);
 
         shading_ray.e_energy = shading_ray.t_energy * exr_color;
         *args->shading_ray = shading_ray;
@@ -426,9 +426,10 @@ void kernel rt_shade(
 
 	uint rand_seed = WangHash(pixel_index + scene_data->accumulated_frames * width * height);
 
-    
     Ray shading_ray = ray_buffer[pixel_index];
     int ray_screen_index = (shading_ray.screen_pos.y * width) + shading_ray.screen_pos.x;
+
+    barrier(CLK_GLOBAL_MEM_FENCE);
 
     struct ShadeArgs shade_args;
     shade_args.vertex_data = vertex_data;
@@ -449,14 +450,14 @@ void kernel rt_shade(
     shade_args.shading_ray = &shading_ray;
 
     
-    bool bounce_ray = shade(&shade_args);
+    bool generated_bounce_ray = shade(&shade_args);
     
     //color = max(color, 0.0f);
 
     //render_buffer[ray_screen_index] = float3_color_to_uint(shading_ray.e_energy);
 
 
-    if(!bounce_ray)
+    if(!generated_bounce_ray)
     {
         float3 color = shading_ray.e_energy;
         accumulation_buffer[ray_screen_index] += (float4)(color, 0.0f);

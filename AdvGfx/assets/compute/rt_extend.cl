@@ -51,11 +51,13 @@ void intersect_tri(Ray* ray, Tri* tris, uint triIdx, MeshHeader* header)
 
 float intersect_aabb(Ray* ray, BVHNode* node )
 {
-	float tx1 = (node->minx - ray->O.x) / ray->D.x, tx2 = (node->maxx - ray->O.x) / ray->D.x;
+	float3 inv_D = 1.0f / ray->D;
+
+	float tx1 = (node->minx - ray->O.x) * inv_D.x, tx2 = (node->maxx - ray->O.x) * inv_D.x;
 	float tmin = min( tx1, tx2 ), tmax = max( tx1, tx2 );
-	float ty1 = (node->miny - ray->O.y) / ray->D.y, ty2 = (node->maxy - ray->O.y) / ray->D.y;
+	float ty1 = (node->miny - ray->O.y) * inv_D.y, ty2 = (node->maxy - ray->O.y) * inv_D.y;
 	tmin = max( tmin, min( ty1, ty2 ) ), tmax = min( tmax, max( ty1, ty2 ) );
-	float tz1 = (node->minz - ray->O.z) / ray->D.z, tz2 = (node->maxz - ray->O.z) / ray->D.z;
+	float tz1 = (node->minz - ray->O.z) * inv_D.z, tz2 = (node->maxz - ray->O.z) * inv_D.z;
 	tmin = max( tmin, min( tz1, tz2 ) ), tmax = min( tmax, max( tz1, tz2 ) );
 	if (tmax >= tmin && tmin < ray->t && tmax > 0) 
 		return tmin; 
@@ -63,7 +65,7 @@ float intersect_aabb(Ray* ray, BVHNode* node )
 		return 1e30f;
 }
 
-void intersect_bvh(BVHArgs* args)
+void intersect_blas(BVHArgs* args)
 {
 	// Keeping track of current node in the stack
 	uint node_offset = args->mesh_header->root_bvh_node_idx;
@@ -162,7 +164,7 @@ int intersect_tlas(BVHArgs* args)
 				args->mesh_header = &args->mesh_headers[instance->mesh_idx];
 				args->inverse_transform = instance->inverse_transform;
 				
-				intersect_bvh(args);
+				intersect_blas(args);
 
 				if(args->ray->t < dist)
 				{

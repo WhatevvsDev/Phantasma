@@ -344,11 +344,11 @@ void ComputeOperation::execute()
 
     for(auto& buffer : read_buffers)
     {
-         CHECKCL(compute.queue.enqueueReadBuffer(buffer->internal_buffer, CL_TRUE, 0, buffer->data_handle.data_byte_size, buffer->data_handle.data_ptr));
+        CHECKCL(compute.queue.enqueueReadBuffer(buffer->internal_buffer, CL_TRUE, 0, buffer->data_handle.data_byte_size, buffer->data_handle.data_ptr));
     }
     for(auto& buffer : readwrite_buffers)
     {
-         CHECKCL(compute.queue.enqueueReadBuffer(buffer->internal_buffer, CL_TRUE, 0, buffer->data_handle.data_byte_size, buffer->data_handle.data_ptr));
+        CHECKCL(compute.queue.enqueueReadBuffer(buffer->internal_buffer, CL_TRUE, 0, buffer->data_handle.data_byte_size, buffer->data_handle.data_ptr));
     }
 }
 
