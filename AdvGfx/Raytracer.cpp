@@ -134,6 +134,7 @@ namespace Raytracer
 		ComputeGPUOnlyBuffer* gpu_detail_buffer{ nullptr };
 
 		ComputeGPUOnlyBuffer* gpu_primary_ray_buffer{ nullptr };
+		ComputeGPUOnlyBuffer* gpu_extend_output{ nullptr };
 
 		ComputeReadWriteBuffer* gpu_wavefront_buffer{ nullptr };
 
@@ -210,13 +211,12 @@ namespace Raytracer
 		internal.render_dirty = true;
 	}
 
-	struct ExtendPerPixelOutput
+	struct ExtendOutput
 	{
 		int hit_mesh_header_idx;
+		int tri_hit;
 		float u;
 		float v;
-		int tri_hit;
-		float pad;
 		glm::vec4 geo_normal;
 	};
 
@@ -229,12 +229,14 @@ namespace Raytracer
 
 		u32 render_area_px = internal.render_width_px * internal.render_height_px;
 
-		const u32 GPU_RAY_STRUCT_SIZE = 108; // TODO: This is hardcoded, it should not be!
+		const u32 GPU_RAY_STRUCT_SIZE = 76; // TODO: This is hardcoded, it should not be!
 
 		internal.gpu_accumulation_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * internal.render_channel_count * sizeof(float)));
 		internal.gpu_detail_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * sizeof(PerPixelData)));
 		internal.gpu_primary_ray_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * GPU_RAY_STRUCT_SIZE));
 		internal.gpu_wavefront_buffer = new ComputeReadWriteBuffer(ComputeDataHandle(&wavefront, 1));
+		internal.gpu_extend_output = new ComputeGPUOnlyBuffer((usize)render_area_px * sizeof(ExtendOutput));
+
 
 		Assets::init();
 
@@ -449,6 +451,7 @@ namespace Raytracer
 			.write(*internal.gpu_detail_buffer)
 			.write((*internal.gpu_primary_ray_buffer))
 			.read_write(*internal.gpu_wavefront_buffer)
+			.write(*internal.gpu_extend_output)
 			.global_dispatch({ how_many_rays_need_to_be_dispatched_for_shade ,1, 1 })
 			.execute();
 
@@ -473,6 +476,7 @@ namespace Raytracer
 			.read_write(*internal.gpu_wavefront_buffer)
 			.read_write((*internal.gpu_primary_ray_buffer))
 			.read_write((*internal.gpu_accumulation_buffer))
+			.write(*internal.gpu_extend_output)
 			.global_dispatch({ how_many_rays_need_to_be_dispatched_for_shade ,1, 1 })
 			.execute();
 	}

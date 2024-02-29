@@ -21,9 +21,11 @@ typedef struct BVHArgs
 	uint blas_hits;
 	uint tlas_hits;
 
+	ExtendOutput* extend_output;
+
 } BVHArgs;
 
-void intersect_tri(Ray* ray, Tri* tris, uint triIdx, MeshHeader* header)
+void intersect_tri(Ray* ray, Tri* tris, uint triIdx, MeshHeader* header, ExtendOutput* extend_output)
 {
 	const float3 edge1 = tris[triIdx].vertex1 - tris[triIdx].vertex0;
 	const float3 edge2 = tris[triIdx].vertex2 - tris[triIdx].vertex0;
@@ -42,10 +44,10 @@ void intersect_tri(Ray* ray, Tri* tris, uint triIdx, MeshHeader* header)
 	if(ray->t > t)
 	{
 		ray->t = t;
-		ray->tri_hit = triIdx;
-		ray->u = u;
-		ray->v = v;
-		ray->geo_normal = cross(edge1, edge2);
+		extend_output->tri_hit = triIdx;
+		extend_output->u = u;
+		extend_output->v = v;
+		extend_output->geo_normal = (float4)(cross(edge1, edge2), 0.0f);
 	}
 }
 
@@ -92,7 +94,7 @@ void intersect_blas(BVHArgs* args)
 		if(node->primitive_count > 0)
 		{
 			for (uint i = 0; i < node->primitive_count; i++ )
-				intersect_tri( args->ray, &args->tris[args->mesh_header->tris_offset], args->trisIdx[node->left_first + i + args->mesh_header->tri_idx_offset], args->mesh_header);
+				intersect_tri( args->ray, &args->tris[args->mesh_header->tris_offset], args->trisIdx[node->left_first + i + args->mesh_header->tri_idx_offset], args->mesh_header, args->extend_output);
 
 			if(stack_ptr == 0)
 				break;
@@ -225,6 +227,7 @@ typedef struct ExtendArgs
 	PerPixelData* detail_buffer;
 	Ray* ray_buffer;
 	Ray* thread_ray;
+	ExtendOutput* output;
 } ExtendArgs;
 
 float3 extend(ExtendArgs* args)
@@ -246,20 +249,17 @@ float3 extend(ExtendArgs* args)
 	bvh_args.blas_hits = 0;
 	bvh_args.tlas_hits = 0;
 
-    float oldt = current_ray.t;
     int hit_mesh_header_idx = UINT_MAX;
 
     bvh_args.ray = &current_ray;
+	bvh_args.extend_output = args->output;
 
     if(args->world_data->mesh_count > 0)
     {
-        hit_mesh_header_idx = intersect_tlas(&bvh_args);
+        args->output->hit_mesh_header_idx = intersect_tlas(&bvh_args);
     }
 
     bool is_primary_ray = (depth == DEPTH);
-
-	args->thread_ray->hit_mesh_header_idx = 0x00ff00ff;
-
     if(is_primary_ray)
     {
         args->thread_ray->t = current_ray.t;
@@ -273,17 +273,11 @@ float3 extend(ExtendArgs* args)
     
     bool hit_anything = current_ray.t < 1e30;
 	*args->thread_ray = current_ray;
-    args->thread_ray->hit_mesh_header_idx = hit_mesh_header_idx;
+    //args->thread_ray->hit_mesh_header_idx = hit_mesh_header_idx;
 
-    if(!hit_anything)
-    {
-
-    }
-    else
+    if(hit_anything)
     {
         args->detail_buffer->normal = (float4)(current_ray.O + current_ray.D * current_ray.t, 0.0f);
-        //MeshInstanceHeader* instance = &(*args->world_data).instances[hit_mesh_header_idx];
-        //current_ray.intersection
     }
 	return 0;
 }
@@ -299,7 +293,8 @@ void kernel rt_extend(
 	global uint* tlas_idx,
 	global PerPixelData* detail_buffer,
 	global Ray* primary_rays,
-	global WavefrontData* wavefront_data
+	global WavefrontData* wavefront_data,
+	global ExtendOutput* extend_output
 	)
 {     
 	uint width = scene_data->resolution.x;
@@ -311,6 +306,9 @@ void kernel rt_extend(
 
 	uint pixel_index = get_global_id(0);
 	
+	// Reset value
+	extend_output[pixel_index].hit_mesh_header_idx = UINT_MAX;
+
 	// Actual raytracing
 	struct ExtendArgs extend_args;
 	extend_args.blas_nodes = blas_nodes;
@@ -323,6 +321,7 @@ void kernel rt_extend(
 	extend_args.detail_buffer = &detail_buffer[pixel_index];
 	extend_args.ray_buffer = primary_rays;
 	extend_args.thread_ray = &primary_rays[pixel_index];
+	extend_args.output = &extend_output[pixel_index];
 
 	float3 color = extend(&extend_args);
 }

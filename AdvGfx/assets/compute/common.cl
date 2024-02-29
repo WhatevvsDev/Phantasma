@@ -368,11 +368,6 @@ typedef struct __attribute__ ((packed)) Ray
 	uint2 screen_pos;
 	float3 e_energy;
 	float3 t_energy;
-	float u;
-	float v;
-	int tri_hit;
-	float3 geo_normal;
-	int hit_mesh_header_idx;
 } Ray;
 
 #endif
@@ -451,5 +446,20 @@ typedef struct WavefrontData
 	int passes;
 	atomic_int ray_count;
 } WavefrontData;
+
+#endif
+
+#ifndef EXTEND_OUTPUT_DEFINED
+
+#define EXTEND_OUTPUT_DEFINED
+
+typedef struct ExtendOutput
+{
+	int hit_mesh_header_idx;
+	int tri_hit;
+	float u;
+	float v;
+	float4 geo_normal;
+} ExtendOutput;
 
 #endif

@@ -18,12 +18,18 @@ void kernel rt_generate_rays(
 	global float4* accumulation_buffer
 	)
 {     
+
+
+	
 	int x = get_global_id(0);
 	int y = get_global_id(1);
 	int width = args->width;
 	int height = args->height;
 
 	uint pixel_index = (x + y * width);
+
+	//if(pixel_index == 0)
+	//	printf("Size of ray: %u \n", sizeof(Ray));
 
 	uint rand_seed = WangHash(pixel_index + args->accumulated_frames * width * height);
 

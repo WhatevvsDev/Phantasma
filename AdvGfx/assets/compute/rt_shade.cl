@@ -42,13 +42,13 @@ float beers_law(float thickness, float absorption_coefficient)
 	return pow(EULER, -absorption_coefficient * thickness);
 }
 
-float3 interpolate_tri_normal(VertexData* vertex_data, struct Ray* intersection)
+float3 interpolate_tri_normal(VertexData* vertex_data, struct ExtendOutput* extend_output)
 {
-	float u = intersection->u;
-	float v = intersection->v;
+	float u = extend_output->u;
+	float v = extend_output->v;
 	float w = 1.0f - u - v;
 
-	uint idx = intersection->tri_hit * 3;
+	uint idx = extend_output->tri_hit * 3;
 
 	float3 v0_normal = vertex_data[idx + 0].normal * w;
 	float3 v1_normal = vertex_data[idx + 1].normal * u;
@@ -57,13 +57,13 @@ float3 interpolate_tri_normal(VertexData* vertex_data, struct Ray* intersection)
 	return normalize(v0_normal + v1_normal + v2_normal);
 }
 
-float2 interpolate_tri_uvs(VertexData* vertex_data, struct Ray* intersection)
+float2 interpolate_tri_uvs(VertexData* vertex_data, struct ExtendOutput* extend_output)
 {
-	float u = intersection->u;
-	float v = intersection->v;
+	float u = extend_output->u;
+	float v = extend_output->v;
 	float w = 1.0f - u - v;
 
-	uint idx = intersection->tri_hit * 3;
+	uint idx = extend_output->tri_hit * 3;
 
 	float2 v0_uv = vertex_data[idx + 0].uv * w;
 	float2 v1_uv = vertex_data[idx + 1].uv * u;
@@ -148,19 +148,19 @@ typedef struct ShadeArgs
     Ray* shading_ray;
     Ray* ray_buffer;
     WavefrontData* wavefront_data;
+    ExtendOutput* extend_output;
 } ShadeArgs;
 
 bool shade(ShadeArgs* args)
 {
 	// Keeping track of current ray
-    
     Ray shading_ray = *args->shading_ray;
     Ray new_ray;
 
 	uint depth = DEPTH;
 	float3 color = (float3)(0.0f);
 
-    int hit_mesh_header_idx = shading_ray.hit_mesh_header_idx;
+    int hit_mesh_header_idx = args->extend_output->hit_mesh_header_idx;
 
     bool is_primary_ray = false;
     
@@ -195,9 +195,9 @@ bool shade(ShadeArgs* args)
         VertexData* vertex_data = &args->vertex_data[mesh->vertex_data_offset];
 
         float3 hit_pos = shading_ray.O + (shading_ray.D * shading_ray.t);
-        float3 normal = interpolate_tri_normal(vertex_data, &shading_ray);
-        float3 geo_normal = shading_ray.geo_normal;
-        float2 uvs = interpolate_tri_uvs(vertex_data, &shading_ray);
+        float3 normal = interpolate_tri_normal(vertex_data, args->extend_output);
+        float3 geo_normal = args->extend_output->geo_normal.xyz;
+        float2 uvs = interpolate_tri_uvs(vertex_data, args->extend_output);
 
         // We have to apply transform so normals are world-space
 
@@ -410,7 +410,8 @@ void kernel rt_shade(
     global uint* render_buffer,
 	global WavefrontData* wavefront_data,
     global Ray* ray_buffer,
-    global float4* accumulation_buffer
+    global float4* accumulation_buffer,
+    global ExtendOutput* extend_output
     )
 {     
 	uint width = scene_data->resolution.x;
@@ -448,7 +449,7 @@ void kernel rt_shade(
     shade_args.ray_buffer = ray_buffer;
     shade_args.wavefront_data = wavefront_data;
     shade_args.shading_ray = &shading_ray;
-
+    shade_args.extend_output = &extend_output[pixel_index];
     
     bool generated_bounce_ray = shade(&shade_args);
     
