@@ -143,7 +143,6 @@ typedef struct ShadeArgs
 	float exr_angle;
 	WorldManagerDeviceData* world_data;
 	Material* materials;
-	PerPixelData* detail_buffer;
 	unsigned char* textures;
     Ray* shading_ray;
     Ray* ray_buffer;
@@ -169,11 +168,6 @@ bool shade(ShadeArgs* args)
     if(!hit_anything)
     {
         float3 exr_color = get_exr_color(shading_ray.D, args->exr, args->exr_size, args->exr_angle);
-
-        if(is_primary_ray)
-        {
-            args->detail_buffer->albedo = (float4)(exr_color, 0.0f);
-        }
 
         // Slighly Biased way to get rid of fireflies
         float sqr_length = dot(exr_color, exr_color);
@@ -217,11 +211,6 @@ bool shade(ShadeArgs* args)
 
         if(inner_normal)
             normal = -normal;
-
-        if(is_primary_ray)
-        {
-            args->detail_buffer->normal = (float4)(normal, 0.0f);
-        }
 
         hemisphere_normal = tangent_to_base_vector(hemisphere_normal, normal);
 
@@ -270,19 +259,10 @@ bool shade(ShadeArgs* args)
 
             material_color = bilinear_color;
 
-            if(is_primary_ray)
-            {
-                args->detail_buffer->albedo = (float4)(bilinear_color, 0.0f);
-            }
         }
         // </Texture Lookup>
 
-        if(is_primary_ray)
-        {
-            args->detail_buffer->albedo = (float4)(material_color, 0.0f);
-        }
-        // Add in emission late as to not taint the albedo buffer
-        material_color *=  (mat.albedo.a + 1.0f);
+        material_color *= (mat.albedo.a + 1.0f);
 
         // <Russian roulette>
         {
@@ -406,8 +386,6 @@ void kernel rt_shade(
 	global float* exr, 
 	global struct WorldManagerDeviceData* world_manager_data, 
 	global struct Material* materials, 
-	global PerPixelData* detail_buffer,	
-    global uint* render_buffer,
 	global WavefrontData* wavefront_data,
     global Ray* ray_buffer,
     global float4* accumulation_buffer,
@@ -423,7 +401,7 @@ void kernel rt_shade(
 	int y = get_global_id(1);
 
 	//uint pixel_index = (x + y * width);
-	uint pixel_index = get_global_id(0);
+	uint pixel_index = (x + y * width);
 
 	uint rand_seed = WangHash(pixel_index + scene_data->accumulated_frames * width * height);
 
@@ -444,7 +422,6 @@ void kernel rt_shade(
     shade_args.exr_angle = scene_data->exr_angle;
     shade_args.world_data = world_manager_data;
     shade_args.materials = materials;
-    shade_args.detail_buffer = &detail_buffer[pixel_index];
     shade_args.textures = textures;
     shade_args.ray_buffer = ray_buffer;
     shade_args.wavefront_data = wavefront_data;
@@ -454,9 +431,6 @@ void kernel rt_shade(
     bool generated_bounce_ray = shade(&shade_args);
     
     //color = max(color, 0.0f);
-
-    //render_buffer[ray_screen_index] = float3_color_to_uint(shading_ray.e_energy);
-
 
     if(!generated_bounce_ray)
     {

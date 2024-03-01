@@ -13,13 +13,10 @@ typedef struct BVHArgs
 	Tri* tris;
 	uint* trisIdx;
 
-	MeshHeader* mesh_header;
+	MeshHeader* blas_mesh_header; // Return?
 	float* inverse_transform;
 
 	uint* tlas_idx;
-
-	uint blas_hits;
-	uint tlas_hits;
 
 	ExtendOutput* extend_output;
 
@@ -70,7 +67,7 @@ float intersect_aabb(Ray* ray, BVHNode* node )
 void intersect_blas(BVHArgs* args)
 {
 	// Keeping track of current node in the stack
-	uint node_offset = args->mesh_header->root_bvh_node_idx;
+	uint node_offset = args->blas_mesh_header->root_bvh_node_idx;
 	BVHNode* node = &args->blas_nodes[node_offset];
 	BVHNode* traversal_stack[32];
 	uint stack_ptr = 0; 
@@ -89,12 +86,10 @@ void intersect_blas(BVHArgs* args)
 
 	while(1)
 	{
-		args->blas_hits++;
-
 		if(node->primitive_count > 0)
 		{
 			for (uint i = 0; i < node->primitive_count; i++ )
-				intersect_tri( args->ray, &args->tris[args->mesh_header->tris_offset], args->trisIdx[node->left_first + i + args->mesh_header->tri_idx_offset], args->mesh_header, args->extend_output);
+				intersect_tri( args->ray, &args->tris[args->blas_mesh_header->tris_offset], args->trisIdx[node->left_first + i + args->blas_mesh_header->tri_idx_offset], args->blas_mesh_header, args->extend_output);
 
 			if(stack_ptr == 0)
 				break;
@@ -155,15 +150,13 @@ int intersect_tlas(BVHArgs* args)
 
 	while(1)
 	{
-		args->tlas_hits++;
-
 		if(node->primitive_count > 0)
 		{
 			for (uint i = 0; i < node->primitive_count; i++ )
 			{
 				MeshInstanceHeader* instance = &args->world_data->instances[args->tlas_idx[node->left_first + i]];
 
-				args->mesh_header = &args->mesh_headers[instance->mesh_idx];
+				args->blas_mesh_header = &args->mesh_headers[instance->mesh_idx];
 				args->inverse_transform = instance->inverse_transform;
 				
 				intersect_blas(args);
@@ -225,17 +218,16 @@ typedef struct ExtendArgs
 	BVHNode* tlas_nodes;
 	uint* tlas_idx;
 	PerPixelData* detail_buffer;
-	Ray* ray_buffer;
 	Ray* thread_ray;
 	ExtendOutput* output;
 } ExtendArgs;
 
-float3 extend(ExtendArgs* args)
+void extend(ExtendArgs* args)
 {
 	// Keeping track of current ray in the stack
 	Ray current_ray = *args->thread_ray;
 	
-	uint depth = DEPTH;
+	//uint depth = DEPTH;
 	float3 color = (float3)(0.0f);
 
 	BVHArgs bvh_args;
@@ -246,40 +238,20 @@ float3 extend(ExtendArgs* args)
 	bvh_args.tlas_idx = args->tlas_idx;
 	bvh_args.mesh_headers = args->mesh_headers;
 	bvh_args.world_data = args->world_data;
-	bvh_args.blas_hits = 0;
-	bvh_args.tlas_hits = 0;
 
     int hit_mesh_header_idx = UINT_MAX;
 
     bvh_args.ray = &current_ray;
 	bvh_args.extend_output = args->output;
 
-    if(args->world_data->mesh_count > 0)
-    {
-        args->output->hit_mesh_header_idx = intersect_tlas(&bvh_args);
-    }
+    if(args->world_data->mesh_count == 0)
+		return;
 
-    bool is_primary_ray = (depth == DEPTH);
-    if(is_primary_ray)
-    {
-        args->thread_ray->t = current_ray.t;
-        args->detail_buffer->tlas_hits = bvh_args.tlas_hits;
-        args->detail_buffer->blas_hits = bvh_args.blas_hits;
-        args->detail_buffer->hit_object = hit_mesh_header_idx;
-        args->detail_buffer->hit_position = (float4)(current_ray.O + current_ray.D * current_ray.t, 0.0f);
-        args->detail_buffer->normal = (float4)(-current_ray.D, 0.0f);
-        // detail buffer
-    }
-    
-    bool hit_anything = current_ray.t < 1e30;
+    args->output->hit_mesh_header_idx = intersect_tlas(&bvh_args);
+
 	*args->thread_ray = current_ray;
-    //args->thread_ray->hit_mesh_header_idx = hit_mesh_header_idx;
 
-    if(hit_anything)
-    {
-        args->detail_buffer->normal = (float4)(current_ray.O + current_ray.D * current_ray.t, 0.0f);
-    }
-	return 0;
+	return;
 }
 
 void kernel rt_extend(
@@ -291,9 +263,7 @@ void kernel rt_extend(
 	global struct WorldManagerDeviceData* world_manager_data, 
 	global BVHNode* tlas_nodes,
 	global uint* tlas_idx,
-	global PerPixelData* detail_buffer,
 	global Ray* primary_rays,
-	global WavefrontData* wavefront_data,
 	global ExtendOutput* extend_output
 	)
 {     
@@ -304,7 +274,7 @@ void kernel rt_extend(
 	int x = get_global_id(0);
 	int y = get_global_id(1);
 
-	uint pixel_index = get_global_id(0);
+	uint pixel_index = x + y * width;
 	
 	// Reset value
 	extend_output[pixel_index].hit_mesh_header_idx = UINT_MAX;
@@ -318,10 +288,9 @@ void kernel rt_extend(
 	extend_args.world_data = world_manager_data;
 	extend_args.tlas_nodes = tlas_nodes;
 	extend_args.tlas_idx = tlas_idx;
-	extend_args.detail_buffer = &detail_buffer[pixel_index];
-	extend_args.ray_buffer = primary_rays;
+	//extend_args.detail_buffer = &detail_buffer[pixel_index];
 	extend_args.thread_ray = &primary_rays[pixel_index];
 	extend_args.output = &extend_output[pixel_index];
 
-	float3 color = extend(&extend_args);
+	extend(&extend_args);
 }

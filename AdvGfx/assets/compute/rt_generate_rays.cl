@@ -19,8 +19,6 @@ void kernel rt_generate_rays(
 	)
 {     
 
-
-	
 	int x = get_global_id(0);
 	int y = get_global_id(1);
 	int width = args->width;

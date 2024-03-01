@@ -102,10 +102,6 @@ namespace Raytracer
 		i32 ray_index = 0;
 	} wavefront;
 
-	struct ExtendData
-	{
-
-	};
 
 	struct
 	{
@@ -137,6 +133,7 @@ namespace Raytracer
 		ComputeGPUOnlyBuffer* gpu_extend_output{ nullptr };
 
 		ComputeReadWriteBuffer* gpu_wavefront_buffer{ nullptr };
+		ComputeWriteBuffer* scene_data_buffer{ nullptr };
 
 		//std::vector<DiskAsset> exr_assets_on_disk;
 		f32* loaded_exr_data { nullptr };
@@ -236,7 +233,8 @@ namespace Raytracer
 		internal.gpu_primary_ray_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * GPU_RAY_STRUCT_SIZE));
 		internal.gpu_wavefront_buffer = new ComputeReadWriteBuffer(ComputeDataHandle(&wavefront, 1));
 		internal.gpu_extend_output = new ComputeGPUOnlyBuffer((usize)render_area_px * sizeof(ExtendOutput));
-
+		
+		internal.scene_data_buffer = new ComputeWriteBuffer({ &scene_data, 1 });
 
 		Assets::init();
 
@@ -435,24 +433,35 @@ namespace Raytracer
 			.execute();
 	}
 	
-	int how_many_rays_need_to_be_dispatched_for_shade;
+	int shade_new_bounced_ray_count;
 
 	void raytrace_extend()
 	{
+		struct ExtendArgs
+		{
+			u32 width;
+			u32 height;
+			u32 accumulated_frames;
+			f32 blur_radius;
+			f32 focal_distance;
+			f32 camera_fov;
+			bool reset_accumulator;
+			f32 pad[1];
+			glm::mat4 camera_transform;
+		} args;
+
 		ComputeOperation("rt_extend.cl")
 			.write(Assets::get_tris_compute_buffer())
 			.write(Assets::get_bvh_compute_buffer())
 			.write(Assets::get_tri_idx_compute_buffer())
 			.write(Assets::get_mesh_header_buffer())
-			.write({ &scene_data, 1 })
+			.write(*internal.scene_data_buffer)
 			.write({ &World::get_world_device_data(), 1 })
 			.write(tlas)
 			.write(tlas_idx)
-			.write(*internal.gpu_detail_buffer)
-			.write((*internal.gpu_primary_ray_buffer))
-			.read_write(*internal.gpu_wavefront_buffer)
+			.write(*internal.gpu_primary_ray_buffer)
 			.write(*internal.gpu_extend_output)
-			.global_dispatch({ how_many_rays_need_to_be_dispatched_for_shade ,1, 1 })
+			.global_dispatch({ shade_new_bounced_ray_count ,1, 1 })
 			.execute();
 
 	}
@@ -471,13 +480,11 @@ namespace Raytracer
 			.write(*internal.exr_buffer)
 			.write({ &World::get_world_device_data(), 1 })
 			.write(World::get_material_vector())
-			.read_write(*internal.gpu_detail_buffer)
-			.read_write(screen_buffer)
 			.read_write(*internal.gpu_wavefront_buffer)
-			.read_write((*internal.gpu_primary_ray_buffer))
-			.read_write((*internal.gpu_accumulation_buffer))
+			.write((*internal.gpu_primary_ray_buffer))
+			.write((*internal.gpu_accumulation_buffer))
 			.write(*internal.gpu_extend_output)
-			.global_dispatch({ how_many_rays_need_to_be_dispatched_for_shade ,1, 1 })
+			.global_dispatch({ shade_new_bounced_ray_count ,1, 1 })
 			.execute();
 	}
 
@@ -561,17 +568,15 @@ namespace Raytracer
 
 			//raytrace_trace_rays(screen_buffer);
 			//perf::log_slice("raytrace_trace_rays");
-
 			
 			const int bounce_count = 8;
 			int bounces = bounce_count;
 			wavefront.ray_index = render_area;
-			how_many_rays_need_to_be_dispatched_for_shade = render_area;
+			shade_new_bounced_ray_count = render_area;
 			
 
-			while (bounces > 0 && how_many_rays_need_to_be_dispatched_for_shade > 100)
+			while (bounces > 0)
 			{
-				how_many_rays_need_to_be_dispatched_for_shade = wavefront.ray_index;
 				wavefront.ray_index = 0;
 
 				// TODO: make slices work with multiple calls during one section.
@@ -582,6 +587,10 @@ namespace Raytracer
 
 				raytrace_shade(screen_buffer);
 				//perf::log_slice("raytrace_shade");
+				
+				shade_new_bounced_ray_count = wavefront.ray_index;
+				if (wavefront.ray_index == 0)
+					break;
 
 				bounces--;
 			}

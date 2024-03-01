@@ -25,7 +25,7 @@ struct WorldDeviceData
 {
 	u32 mesh_instance_count;
 	u32 pad_0[3];
-	MeshInstanceHeader mesh_instances[4096]; // TODO: we do this because you can't get the proper size of a struct if it has a std::vector in it. find a workaround?
+	MeshInstanceHeader mesh_instances[1024]; // TODO: we do this because you can't get the proper size of a struct if it has a std::vector in it. find a workaround?
 };
 
 namespace World

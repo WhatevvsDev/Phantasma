@@ -60,7 +60,7 @@ std::vector<Material>& World::get_material_vector()
 
 WorldDeviceData& World::get_world_device_data()
 {
-	memset(internal.device_data.mesh_instances, 0, 4096 * sizeof(MeshInstanceHeader));
+	memset(internal.device_data.mesh_instances, 0, 1024 * sizeof(MeshInstanceHeader));
 	memcpy(internal.device_data.mesh_instances, internal.mesh_instances.data(), internal.mesh_instances.size() * sizeof(MeshInstanceHeader));
 	internal.device_data.mesh_instance_count = (u32)internal.mesh_instances.size();
 

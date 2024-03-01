@@ -432,7 +432,7 @@ typedef struct WorldManagerDeviceData
 {
 	uint mesh_count;
 	uint pad_0[3];
-	MeshInstanceHeader instances[4096];
+	MeshInstanceHeader instances[1024];
 } WorldManagerDeviceData;
 
 #endif
