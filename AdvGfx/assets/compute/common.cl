@@ -443,8 +443,8 @@ typedef struct WorldManagerDeviceData
 
 typedef struct WavefrontData
 {
-	int passes;
-	atomic_int ray_count;
+	atomic_int extended_ray_count;
+	atomic_int shaded_ray_count;
 } WavefrontData;
 
 #endif

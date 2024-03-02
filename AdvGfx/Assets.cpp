@@ -62,6 +62,9 @@ void find_disk_assets()
 		if(file_is_common_shader_source)
 			continue;
 
+		if (file_name == "rt_trace")
+			continue;
+
 		switch(hashstr(file_extension.c_str()))
 		{
 			default:

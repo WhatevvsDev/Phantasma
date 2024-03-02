@@ -261,14 +261,6 @@ ComputeOperation& ComputeOperation::write(const ComputeGPUOnlyBuffer& buffer)
     return *this;
 }
 
-ComputeOperation& ComputeOperation::read_write(const ComputeGPUOnlyBuffer& buffer)
-{
-    kernel->cl_kernel.setArg(arg_count, buffer.internal_buffer);
-
-    arg_count++;
-    return *this;
-}
-
 ComputeOperation& ComputeOperation::write(const ComputeDataHandle& data)
 {
     // Create and push new temporary buffer

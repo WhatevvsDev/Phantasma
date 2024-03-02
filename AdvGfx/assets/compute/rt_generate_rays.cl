@@ -64,7 +64,7 @@ void kernel rt_generate_rays(
 
 	if(pixel_index == 0)
 	{
-		atomic_store(&wavefront_data->ray_count, width * height);
+		atomic_store(&wavefront_data->extended_ray_count, width * height);
 	}
 
 	ray_buffer[pixel_index] = ray;

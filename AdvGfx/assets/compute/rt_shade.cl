@@ -173,8 +173,7 @@ bool shade(ShadeArgs* args)
         float sqr_length = dot(exr_color, exr_color);
         float light_limit = 16.0f;
 
-        if(args->wavefront_data->passes == 8)
-            exr_color = (sqr_length < light_limit ? exr_color : normalize(exr_color) * light_limit);
+        exr_color = (sqr_length < light_limit ? exr_color : normalize(exr_color) * light_limit);
 
         shading_ray.e_energy = shading_ray.t_energy * exr_color;
         *args->shading_ray = shading_ray;
@@ -335,7 +334,7 @@ bool shade(ShadeArgs* args)
     }
 
     *args->shading_ray = shading_ray;
-    int index = atomic_fetch_add(&args->wavefront_data->ray_count, 1);
+    int index = atomic_fetch_add(&args->wavefront_data->extended_ray_count, 1);
     new_ray.t = 1e30;
     new_ray.screen_pos = shading_ray.screen_pos;
     new_ray.e_energy = shading_ray.e_energy;
@@ -399,9 +398,18 @@ void kernel rt_shade(
 
 	int x = get_global_id(0);
 	int y = get_global_id(1);
-
-	//uint pixel_index = (x + y * width);
 	uint pixel_index = (x + y * width);
+
+    if(pixel_index == 0)
+    {
+        atomic_store(&wavefront_data->extended_ray_count, 0);
+    }
+
+
+    int ray_limit = atomic_load(&wavefront_data->shaded_ray_count);
+
+    if(pixel_index >= ray_limit)
+        return;
 
 	uint rand_seed = WangHash(pixel_index + scene_data->accumulated_frames * width * height);
 

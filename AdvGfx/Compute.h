@@ -123,8 +123,6 @@ struct ComputeOperation
 
 	ComputeOperation& read_write(const ComputeReadWriteBuffer& buffer);
 
-	ComputeOperation& read_write(const ComputeGPUOnlyBuffer& buffer);
-
 	ComputeOperation& global_dispatch(glm::ivec3 size);
 
 	void execute();

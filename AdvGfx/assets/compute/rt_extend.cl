@@ -1,5 +1,3 @@
-#define DEPTH 16
-
 typedef struct BVHArgs
 {
 	Ray* ray;
@@ -227,7 +225,6 @@ void extend(ExtendArgs* args)
 	// Keeping track of current ray in the stack
 	Ray current_ray = *args->thread_ray;
 	
-	//uint depth = DEPTH;
 	float3 color = (float3)(0.0f);
 
 	BVHArgs bvh_args;
@@ -264,7 +261,8 @@ void kernel rt_extend(
 	global BVHNode* tlas_nodes,
 	global uint* tlas_idx,
 	global Ray* primary_rays,
-	global ExtendOutput* extend_output
+	global ExtendOutput* extend_output,
+	global WavefrontData* wavefront_data
 	)
 {     
 	uint width = scene_data->resolution.x;
@@ -275,7 +273,12 @@ void kernel rt_extend(
 	int y = get_global_id(1);
 
 	uint pixel_index = x + y * width;
+
+	int ray_limit = atomic_load(&wavefront_data->extended_ray_count);
 	
+	if(pixel_index >= ray_limit)
+        return;
+
 	// Reset value
 	extend_output[pixel_index].hit_mesh_header_idx = UINT_MAX;
 
@@ -293,4 +296,9 @@ void kernel rt_extend(
 	extend_args.output = &extend_output[pixel_index];
 
 	extend(&extend_args);
+
+	if(pixel_index == 0)
+    {
+        atomic_store(&wavefront_data->shaded_ray_count, atomic_load(&wavefront_data->extended_ray_count));
+    }
 }
