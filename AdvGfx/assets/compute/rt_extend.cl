@@ -277,7 +277,14 @@ void kernel rt_extend(
 	int ray_limit = atomic_load(&wavefront_data->extended_ray_count);
 	
 	if(pixel_index >= ray_limit)
+	{
+		if(pixel_index == 0)
+		{
+			atomic_store(&wavefront_data->shaded_ray_count, 0);
+			atomic_store(&wavefront_data->extended_ray_count, 0);
+		}
         return;
+	}
 
 	// Reset value
 	extend_output[pixel_index].hit_mesh_header_idx = UINT_MAX;

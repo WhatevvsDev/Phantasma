@@ -432,6 +432,9 @@ namespace Raytracer
 			.execute();
 	}
 
+	ComputeWriteBuffer* tlas_buffer{ nullptr };
+	ComputeWriteBuffer* tlas_idx_buffer{ nullptr };
+
 	void raytrace_extend()
 	{
 		struct ExtendArgs
@@ -454,8 +457,8 @@ namespace Raytracer
 			.write(Assets::get_mesh_header_buffer())
 			.write(*internal.scene_data_buffer)
 			.write({ &World::get_world_device_data(), 1 })
-			.write(tlas)
-			.write(tlas_idx)
+			.write(*tlas_buffer)
+			.write(*tlas_idx_buffer)
 			.write(*internal.gpu_primary_ray_buffer)
 			.write(*internal.gpu_extend_output)
 			.write(*internal.gpu_wavefront_buffer)
@@ -556,6 +559,12 @@ namespace Raytracer
 			tlas = built_tlas.nodes;
 			internal.world_dirty = false;
 			perf::log_slice("tlas re/build");
+
+			delete tlas_buffer;
+			delete tlas_idx_buffer;
+
+			tlas_buffer = new ComputeWriteBuffer(tlas);
+			tlas_idx_buffer = new ComputeWriteBuffer(tlas_idx);
 
 		}
 
