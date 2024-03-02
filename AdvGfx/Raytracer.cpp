@@ -46,7 +46,7 @@
 */
 
 namespace Raytracer
-{	
+{
 	enum class ViewType : u32
 	{
 		Render,
@@ -71,28 +71,28 @@ namespace Raytracer
 
 	struct
 	{
-		i32 accumulated_frame_limit		{ 32 };
-		i32 fps_limit					{ 80 };
+		i32 accumulated_frame_limit{ 32 };
+		i32 fps_limit{ 80 };
 
-		bool show_onscreen_log			{ true };
-		bool accumulate_frames			{ true };
-		bool limit_accumulated_frames	{ false };
-		bool fps_limit_enabled			{ false };
+		bool show_onscreen_log{ true };
+		bool accumulate_frames{ true };
+		bool limit_accumulated_frames{ false };
+		bool fps_limit_enabled{ false };
 	} settings;
 
 	struct SceneData
 	{
-		u32 resolution[2]				{ 0, 0 };
-		u32 mouse_pos[2]				{ 0, 0 };
-		i32 exr_size[2]					{ 0, 0 };
-		u32 accumulated_frames			{ 0 };
-		u32 reset_accumulator			{ false };
+		u32 resolution[2]{ 0, 0 };
+		u32 mouse_pos[2]{ 0, 0 };
+		i32 exr_size[2]{ 0, 0 };
+		u32 accumulated_frames{ 0 };
+		u32 reset_accumulator{ false };
 		glm::mat4 camera_transform{ glm::identity<glm::mat4>() };
 		glm::mat4 old_camera_transform{ glm::identity<glm::mat4>() };
 		glm::mat4 old_proj_camera_transform{ glm::identity<glm::mat4>() };
-		glm::mat4 inv_old_camera_transform	{ glm::identity<glm::mat4>() };
-		f32 exr_angle					{ 0.0f };
-		u32 material_idx				{ 0 };
+		glm::mat4 inv_old_camera_transform{ glm::identity<glm::mat4>() };
+		f32 exr_angle{ 0.0f };
+		u32 material_idx{ 0 };
 		u32 pad[2];
 	} scene_data;
 
@@ -104,28 +104,28 @@ namespace Raytracer
 
 	struct
 	{
-		ViewType view_type				{ ViewType::Render };
-		i32 selected_instance_idx		{ -1 }; // Signed so we can easily tell if they are valid or not (kind of a waste, also kind of not since its 1 bit who cares)
-		i32 hovered_instance_idx		{ -1 };
+		ViewType view_type{ ViewType::Render };
+		i32 selected_instance_idx{ -1 }; // Signed so we can easily tell if they are valid or not (kind of a waste, also kind of not since its 1 bit who cares)
+		i32 hovered_instance_idx{ -1 };
 
-		u32* buffer						{ nullptr };
+		u32* buffer{ nullptr };
 
-		bool show_debug_ui				{ false };
-		bool render_dirty				{ true };
-		bool world_dirty				{ true };
-		bool focus_on_clicked			{ false };
+		bool show_debug_ui{ false };
+		bool render_dirty{ true };
+		bool world_dirty{ true };
+		bool focus_on_clicked{ false };
 
-		f32 distance_to_hovered			{ 0.0f };
+		f32 distance_to_hovered{ 0.0f };
 
-		u32 accumulated_frames			{ 0 };
-		u32 render_width_px				{ 0 };
-		u32 render_height_px			{ 0 };
-		const u32 render_channel_count	{ 4 };
-		
-		ImGuizmo::OPERATION current_gizmo_operation { ImGuizmo::TRANSLATE };
+		u32 accumulated_frames{ 0 };
+		u32 render_width_px{ 0 };
+		u32 render_height_px{ 0 };
+		const u32 render_channel_count{ 4 };
+
+		ImGuizmo::OPERATION current_gizmo_operation{ ImGuizmo::TRANSLATE };
 
 		ComputeWriteBuffer* exr_buffer{ nullptr };
-		ComputeGPUOnlyBuffer* gpu_accumulation_buffer { nullptr };
+		ComputeGPUOnlyBuffer* gpu_accumulation_buffer{ nullptr };
 		ComputeGPUOnlyBuffer* gpu_detail_buffer{ nullptr };
 
 		ComputeGPUOnlyBuffer* gpu_primary_ray_buffer{ nullptr };
@@ -135,10 +135,10 @@ namespace Raytracer
 		ComputeWriteBuffer* scene_data_buffer{ nullptr };
 
 		//std::vector<DiskAsset> exr_assets_on_disk;
-		f32* loaded_exr_data { nullptr };
-		std::string current_exr { "None" };
+		f32* loaded_exr_data{ nullptr };
+		std::string current_exr{ "None" };
 
-		u32 active_camera_idx { 0 };
+		u32 active_camera_idx{ 0 };
 		std::vector<Camera::Instance> cameras;
 
 		Camera::Instance& get_active_camera_ref() { return cameras[active_camera_idx]; }
@@ -149,7 +149,7 @@ namespace Raytracer
 	{
 		bool replace_buffer = desc.new_buffer_ptr != nullptr;
 
-		if(replace_buffer)
+		if (replace_buffer)
 		{
 			internal.buffer = desc.new_buffer_ptr;
 		}
@@ -179,7 +179,7 @@ namespace Raytracer
 
 		bool file_opened_successfully = f.good();
 
-		if(file_opened_successfully)
+		if (file_opened_successfully)
 		{
 			json save_data = json::parse(f);
 
@@ -192,7 +192,7 @@ namespace Raytracer
 			TryFromJSONVal(save_data, internal, cameras);
 		}
 
-		if(internal.cameras.empty())
+		if (internal.cameras.empty())
 			internal.cameras.push_back(Camera::Instance());
 	}
 
@@ -232,7 +232,7 @@ namespace Raytracer
 		internal.gpu_primary_ray_buffer = new ComputeGPUOnlyBuffer((usize)(render_area_px * GPU_RAY_STRUCT_SIZE));
 		internal.gpu_wavefront_buffer = new ComputeGPUOnlyBuffer(sizeof(WavefrontData));
 		internal.gpu_extend_output = new ComputeGPUOnlyBuffer((usize)render_area_px * sizeof(ExtendOutput));
-		
+
 		internal.scene_data_buffer = new ComputeWriteBuffer({ &scene_data, 1 });
 
 		Assets::init();
@@ -267,23 +267,23 @@ namespace Raytracer
 
 	void update_instance_selection_behavior()
 	{
-		if(!internal.show_debug_ui)
+		if (!internal.show_debug_ui)
 			return;
-		
+
 		bool clicked_on_non_gizmo = (ImGui::GetIO().MouseClicked[0] && (!ImGuizmo::IsOver() || internal.selected_instance_idx == -1) && !ImGui::IsWindowHovered() && !ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem | ImGuiHoveredFlags_AnyWindow));
 
 		auto cursor_pos = ImGui::GetIO().MousePos;
 
 		scene_data.mouse_pos[0] = glm::clamp((u32)cursor_pos.x, 0u, internal.render_width_px - 1);
 		scene_data.mouse_pos[1] = glm::clamp((u32)cursor_pos.y, 0u, internal.render_height_px - 1);
-		
-		if(clicked_on_non_gizmo)
-		{
-			bool valid_focus_hover = internal.distance_to_hovered > 0.0f; 
 
-			if(internal.focus_on_clicked)
+		if (clicked_on_non_gizmo)
+		{
+			bool valid_focus_hover = internal.distance_to_hovered > 0.0f;
+
+			if (internal.focus_on_clicked)
 			{
-				if(valid_focus_hover)
+				if (valid_focus_hover)
 				{
 					internal.get_active_camera_ref().focal_distance = internal.distance_to_hovered;
 					internal.focus_on_clicked = false;
@@ -303,13 +303,13 @@ namespace Raytracer
 		bool rotate = ImGui::IsKeyPressed(ImGuiKey_R);
 		bool scale = ImGui::IsKeyPressed(ImGuiKey_E);
 
-		if(translate)
+		if (translate)
 			internal.current_gizmo_operation = ImGuizmo::TRANSLATE;
 
-		if(rotate)
+		if (rotate)
 			internal.current_gizmo_operation = ImGuizmo::ROTATE;
 
-		if(scale)
+		if (scale)
 			internal.current_gizmo_operation = ImGuizmo::SCALE;
 	}
 
@@ -324,29 +324,29 @@ namespace Raytracer
 		if (ImGui::IsKeyPressed(ImGuiKey_F1))
 		{
 			internal.show_debug_ui = !internal.show_debug_ui;
-		}			
+		}
 	}
 
 	void update(const f32 delta_time_ms)
-	{		
+	{
 		perf::new_frame();
 		update_input();
 
 		auto& active_camera = internal.get_active_camera_ref();
 
-		bool pressed_any_move_key =	
-			(ImGui::IsKeyDown(ImGuiKey_W) || 
-			ImGui::IsKeyDown(ImGuiKey_A) || 
-			ImGui::IsKeyDown(ImGuiKey_S) || 
-			ImGui::IsKeyDown(ImGuiKey_D)) &&
+		bool pressed_any_move_key =
+			(ImGui::IsKeyDown(ImGuiKey_W) ||
+				ImGui::IsKeyDown(ImGuiKey_A) ||
+				ImGui::IsKeyDown(ImGuiKey_S) ||
+				ImGui::IsKeyDown(ImGuiKey_D)) &&
 			!ImGui::IsAnyItemFocused();
 
 		bool ui_closed = !internal.show_debug_ui;
 
-		if(ui_closed && pressed_any_move_key)
+		if (ui_closed && pressed_any_move_key)
 			active_camera.movement_type = Camera::MovementType::Freecam;
 
-		if(ui_closed || active_camera.movement_type == Camera::MovementType::Orbit)
+		if (ui_closed || active_camera.movement_type == Camera::MovementType::Orbit)
 			internal.render_dirty |= Camera::update_instance(delta_time_ms, active_camera);
 
 		update_instance_selection_behavior();
@@ -369,13 +369,13 @@ namespace Raytracer
 		LOGDEBUG("Saved screenshot.");
 	}
 
-	void raytrace_trace_rays(const ComputeReadWriteBuffer& screen_buffer)
+	void raytrace_trace_rays(const ComputeReadBuffer& screen_buffer)
 	{
 		ComputeOperation("rt_trace.cl")
-			.write(*internal.gpu_accumulation_buffer)	
-			.read_write(screen_buffer)
-			.read(ComputeReadBuffer({&internal.hovered_instance_idx, 1}))
-			.read(ComputeReadBuffer({&internal.distance_to_hovered, 1}))
+			.write(*internal.gpu_accumulation_buffer)
+			.read(screen_buffer)
+			.read(ComputeReadBuffer({ &internal.hovered_instance_idx, 1 }))
+			.read(ComputeReadBuffer({ &internal.distance_to_hovered, 1 }))
 			.write(Assets::get_vertex_data_compute_buffer())
 			.write(Assets::get_tris_compute_buffer())
 			.write(Assets::get_bvh_compute_buffer())
@@ -383,15 +383,15 @@ namespace Raytracer
 			.write(Assets::get_mesh_header_buffer())
 			.write(Assets::get_texture_compute_buffer())
 			.write(Assets::get_texture_header_buffer())
-			.write({&scene_data, 1})
+			.write({ &scene_data, 1 })
 			.write(*internal.exr_buffer)
-			.write({&World::get_world_device_data(), 1})
+			.write({ &World::get_world_device_data(), 1 })
 			.write(World::get_material_vector())
 			.write(tlas)
 			.write(tlas_idx)
 			.write(*internal.gpu_detail_buffer)
 			.write((*internal.gpu_primary_ray_buffer))
-			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
+			.global_dispatch({ internal.render_width_px, internal.render_height_px, 1 })
 			.execute();
 
 		internal.accumulated_frames++;
@@ -424,14 +424,14 @@ namespace Raytracer
 		args.reset_accumulator = scene_data.reset_accumulator;
 
 		ComputeOperation("rt_generate_rays.cl")
-			.write({&args, 1})
+			.write({ &args, 1 })
 			.write((*internal.gpu_primary_ray_buffer))
 			.write(*internal.gpu_wavefront_buffer)
 			.write((*internal.gpu_accumulation_buffer))
-			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
+			.global_dispatch({ internal.render_width_px, internal.render_height_px, 1 })
 			.execute();
 	}
-	
+
 	void raytrace_extend()
 	{
 		struct ExtendArgs
@@ -465,7 +465,7 @@ namespace Raytracer
 	}
 
 
-	void raytrace_shade(const ComputeReadWriteBuffer& screen_buffer)
+	void raytrace_shade()
 	{
 		ComputeOperation("rt_shade.cl")
 			.write(Assets::get_vertex_data_compute_buffer())
@@ -479,8 +479,8 @@ namespace Raytracer
 			.write({ &World::get_world_device_data(), 1 })
 			.write(World::get_material_vector())
 			.write(*internal.gpu_wavefront_buffer)
-			.write((*internal.gpu_primary_ray_buffer))
-			.write((*internal.gpu_accumulation_buffer))
+			.write(*internal.gpu_primary_ray_buffer)
+			.write(*internal.gpu_accumulation_buffer)
 			.write(*internal.gpu_extend_output)
 			.global_dispatch({ internal.render_width_px * internal.render_height_px ,1, 1 })
 			.execute();
@@ -492,7 +492,7 @@ namespace Raytracer
 	}
 
 	// Averages out acquired samples, and renders them to the screen
-	void raytrace_finalize(const ComputeReadWriteBuffer& screen_buffer)
+	void raytrace_finalize(const ComputeReadBuffer& screen_buffer)
 	{
 		struct FinalizeArgs
 		{
@@ -512,10 +512,10 @@ namespace Raytracer
 
 		ComputeOperation("rt_finalize.cl")
 			.write((*internal.gpu_accumulation_buffer))
-			.read_write(screen_buffer)
-			.write({&args, 1})
+			.read(screen_buffer)
+			.write({ &args, 1 })
 			.write(*internal.gpu_detail_buffer)
-			.global_dispatch({internal.render_width_px, internal.render_height_px, 1})
+			.global_dispatch({ internal.render_width_px, internal.render_height_px, 1 })
 			.execute();
 	}
 
@@ -523,7 +523,7 @@ namespace Raytracer
 	{
 		perf::log_section("render passes");
 
-		if(internal.render_dirty || !settings.accumulate_frames || internal.world_dirty)
+		if (internal.render_dirty || !settings.accumulate_frames || internal.world_dirty)
 		{
 			scene_data.reset_accumulator = true;
 			internal.render_dirty = false;
@@ -541,13 +541,13 @@ namespace Raytracer
 		scene_data.camera_transform = Camera::get_instance_matrix(active_camera);
 
 		u32 render_area = internal.render_width_px * internal.render_height_px;
-		ComputeReadWriteBuffer screen_buffer({internal.buffer, (usize)(render_area)});
+		ComputeReadBuffer screen_buffer({ internal.buffer, (usize)(render_area) });
 
 		bool accumulate_frames = !(settings.limit_accumulated_frames && (internal.accumulated_frames > (u32)settings.accumulated_frame_limit));
 
 		perf::log_slice("pre render");
 
-		if(internal.world_dirty)
+		if (internal.world_dirty)
 		{
 			BVH built_tlas = BVH();
 			BuildTLAS(built_tlas);
@@ -559,19 +559,19 @@ namespace Raytracer
 
 		}
 
-		if(accumulate_frames)
+		if (accumulate_frames)
 		{
 			raytrace_generate_primary_rays();
 			perf::log_slice("raytrace_generate_primary_rays");
 
 			//raytrace_trace_rays(screen_buffer);
 			//perf::log_slice("raytrace_trace_rays");
-			
+
 			const int bounce_count = 8;
 			int bounces = bounce_count;
 			//wavefront.ray_index = render_area;
 			//shade_new_bounced_ray_count = render_area;
-			
+
 
 			while (bounces > 0)
 			{
@@ -583,13 +583,13 @@ namespace Raytracer
 
 				//printf("still got %i rays left for bounce %i \n", how_many_rays_need_to_be_dispatched_for_shade, bounce_count - bounces);
 
-				raytrace_shade(screen_buffer);
+				raytrace_shade();
 				//perf::log_slice("raytrace_shade");
 
 				bounces--;
 			}
 			internal.accumulated_frames++;
-			
+
 
 			raytrace_finalize(screen_buffer);
 			perf::log_slice("raytrace_finalize");
@@ -603,26 +603,26 @@ namespace Raytracer
 
 	constexpr std::string material_type_to_string(const MaterialType& type)
 	{
-		switch(type)
+		switch (type)
 		{
-			case MaterialType::Diffuse: return "Diffuse";
-			case MaterialType::Metal: return "Metal";
-			case MaterialType::Dielectric: return "Dielectric";
-			case MaterialType::CookTorranceBRDF: return "Cook-Torrance";
+		case MaterialType::Diffuse: return "Diffuse";
+		case MaterialType::Metal: return "Metal";
+		case MaterialType::Dielectric: return "Dielectric";
+		case MaterialType::CookTorranceBRDF: return "Cook-Torrance";
 		}
 		return "";
 	}
 
 	constexpr std::string view_type_to_string(const ViewType& type)
 	{
-		switch(type)
+		switch (type)
 		{
-			case ViewType::Render: return "Render";
-			case ViewType::Albedo: return "Albedo";
-			case ViewType::Normal: return "Normal";
-			case ViewType::BLAS: return "BLAS";
-			case ViewType::TLAS: return "TLAS";
-			case ViewType::AS: return "AS";
+		case ViewType::Render: return "Render";
+		case ViewType::Albedo: return "Albedo";
+		case ViewType::Normal: return "Normal";
+		case ViewType::BLAS: return "BLAS";
+		case ViewType::TLAS: return "TLAS";
+		case ViewType::AS: return "AS";
 		}
 		return "";
 	}
@@ -633,35 +633,35 @@ namespace Raytracer
 		bool is_metal = material.type == MaterialType::Metal;
 		bool is_dielectric = material.type == MaterialType::Dielectric;
 		bool is_cook_torrance = material.type == MaterialType::CookTorranceBRDF;
-		
+
 		internal.render_dirty |= ImGui::ColorPicker3("Albedo", glm::value_ptr(material.albedo), ImGuiColorEditFlags_NoInputs);
 		internal.render_dirty |= ImGui::DragFloat("Emissiveness", &material.albedo.a, 0.01f, 0.0f, 100.0f);
-		
-		if(is_dielectric)
-		internal.render_dirty |= ImGui::DragFloat("Absorbtion", &material.absorbtion_coefficient, 0.01f, 0.0f, 1.0f);
 
-		if(is_dielectric)
-		internal.render_dirty |= ImGui::DragFloat("IOR", &material.ior, 0.01f, 1.0f, 2.0f);
-					
-		if(is_diffuse || is_metal || is_cook_torrance)
-		internal.render_dirty |= ImGui::DragFloat("Specularity", &material.specularity, 0.01f, 0.0f, 1.0f);
-		
-		if(is_cook_torrance)
-		internal.render_dirty |= ImGui::DragFloat("Roughness", &material.roughness, 0.01f, 0.0f, 1.0f);
+		if (is_dielectric)
+			internal.render_dirty |= ImGui::DragFloat("Absorbtion", &material.absorbtion_coefficient, 0.01f, 0.0f, 1.0f);
 
-		if(is_cook_torrance)
-		internal.render_dirty |= ImGui::DragFloat("Metallic", &material.metallic, 0.01f, 0.0f, 1.0f);
+		if (is_dielectric)
+			internal.render_dirty |= ImGui::DragFloat("IOR", &material.ior, 0.01f, 1.0f, 2.0f);
+
+		if (is_diffuse || is_metal || is_cook_torrance)
+			internal.render_dirty |= ImGui::DragFloat("Specularity", &material.specularity, 0.01f, 0.0f, 1.0f);
+
+		if (is_cook_torrance)
+			internal.render_dirty |= ImGui::DragFloat("Roughness", &material.roughness, 0.01f, 0.0f, 1.0f);
+
+		if (is_cook_torrance)
+			internal.render_dirty |= ImGui::DragFloat("Metallic", &material.metallic, 0.01f, 0.0f, 1.0f);
 
 		MaterialType old_type = material.type;
 
-		if(ImGui::BeginCombo("Material Type", material_type_to_string(material.type).c_str()))
+		if (ImGui::BeginCombo("Material Type", material_type_to_string(material.type).c_str()))
 		{
-			for(i32 i = 0; i < (i32)MaterialType::MaterialTypeRange; i++)
+			for (i32 i = 0; i < (i32)MaterialType::MaterialTypeRange; i++)
 			{
 				MaterialType type = (MaterialType)i;
 				bool is_type = type == material.type;
 
-				if(ImGui::Selectable(material_type_to_string(type).c_str(), is_type))
+				if (ImGui::Selectable(material_type_to_string(type).c_str(), is_type))
 					material.type = type;
 			}
 
@@ -673,9 +673,9 @@ namespace Raytracer
 
 	void ui_selected_instance()
 	{
-		if(internal.selected_instance_idx == -1)
+		if (internal.selected_instance_idx == -1)
 		{
-			ImGui::Dummy({0, 100 + 170});
+			ImGui::Dummy({ 0, 100 + 170 });
 			return;
 		}
 
@@ -689,29 +689,29 @@ namespace Raytracer
 		glm::vec3 scale;
 
 		ImGuizmo::DecomposeMatrixToComponents(glm::value_ptr(instance.transform), glm::value_ptr(translation), glm::value_ptr(rotation), glm::value_ptr(scale));
-				
+
 		transformed |= ImGui::InputFloat3("Translation", glm::value_ptr(translation));
 		transformed |= ImGui::InputFloat3("Rotation", glm::value_ptr(rotation));
 		transformed |= ImGui::InputFloat3("Scale", glm::value_ptr(scale));
-				
+
 		ImGuizmo::RecomposeMatrixFromComponents(glm::value_ptr(translation), glm::value_ptr(rotation), glm::value_ptr(scale), glm::value_ptr(instance.transform));
 
-		if(transformed)
+		if (transformed)
 		{
 			instance.inverse_transform = glm::inverse(instance.transform);
 			internal.render_dirty = true;
 			internal.world_dirty = true;
 		}
 
-		ImGui::Dummy({0, 20});
+		ImGui::Dummy({ 0, 20 });
 		ImGui::SeparatorText("Material");
 
 		internal.render_dirty |= ImGui::InputInt("Texture index", &instance.texture_idx, 1, 1);
 		instance.texture_idx = glm::clamp(instance.texture_idx, -1, (i32)Assets::get_texture_count() - 1);
 
-		i32 mat_idx_proxy = (i32) instance.material_idx;
+		i32 mat_idx_proxy = (i32)instance.material_idx;
 		internal.render_dirty |= ImGui::InputInt("Material", &mat_idx_proxy, 1);
-		if(mat_idx_proxy > (i32)World::get_material_count() - 1)
+		if (mat_idx_proxy > (i32)World::get_material_count() - 1)
 			World::add_material();
 		mat_idx_proxy = glm::max(mat_idx_proxy, 0);
 		instance.material_idx = (u32)mat_idx_proxy;
@@ -723,18 +723,18 @@ namespace Raytracer
 	{
 		auto& active_camera = internal.get_active_camera_ref();
 
-		if(!internal.show_debug_ui)
+		if (!internal.show_debug_ui)
 			return;
 
-		ImGui::PushStyleColor(ImGuiCol_WindowBg, {0, 0, 0, 0});
+		ImGui::PushStyleColor(ImGuiCol_WindowBg, { 0, 0, 0, 0 });
 		ImGui::DockSpaceOverViewport(0, ImGuiDockNodeFlags_PassthruCentralNode | ImGuiDockNodeFlags_AutoHideTabBar | ImGuiDockNodeFlags_NoDockingInCentralNode);
 		ImGui::PopStyleColor();
 
-		if(ImGui::IsKeyPressed(ImGuiKey_Backspace) && !ImGui::IsAnyItemActive())
+		if (ImGui::IsKeyPressed(ImGuiKey_Backspace) && !ImGui::IsAnyItemActive())
 		{
 			bool any_instance_is_selected = internal.selected_instance_idx >= 0;
 
-			if(any_instance_is_selected)
+			if (any_instance_is_selected)
 			{
 				World::remove_mesh_instance(internal.selected_instance_idx);
 				internal.world_dirty = true;
@@ -742,7 +742,7 @@ namespace Raytracer
 
 			bool selected_index_out_of_range = (i32)World::get_world_device_data().mesh_instance_count <= internal.selected_instance_idx;
 
-			if(selected_index_out_of_range)
+			if (selected_index_out_of_range)
 			{
 				internal.selected_instance_idx = -1;
 			}
@@ -751,16 +751,16 @@ namespace Raytracer
 		ImGui::Begin("Controls Window", 0, ImGuiWindowFlags_NoTitleBar);
 		ImGui::BeginTabBar("Controls Window Tab Bar");
 
-		if(ImGui::BeginTabItem("Settings"))
+		if (ImGui::BeginTabItem("Settings"))
 		{
 			ImGui::SeparatorText("General");
 			ImGui::Indent();
-			
+
 			ImGui::Checkbox("Show onscreen log?", &settings.show_onscreen_log);
 
 			if (ImGui::BeginCombo("View Type", view_type_to_string(internal.view_type).c_str()))
 			{
-				for(i32 i = 0; i < (i32)ViewType::ViewTypeRange; i++)
+				for (i32 i = 0; i < (i32)ViewType::ViewTypeRange; i++)
 				{
 					auto type = (ViewType)i;
 					bool is_type = internal.view_type == type;
@@ -773,7 +773,7 @@ namespace Raytracer
 			}
 
 			ImGui::Unindent();
-			ImGui::Dummy({20, 20});
+			ImGui::Dummy({ 20, 20 });
 			ImGui::SeparatorText("Camera");
 			ImGui::Indent();
 
@@ -791,20 +791,20 @@ namespace Raytracer
 				ImGui::EndCombo();
 			}
 
-			if(active_camera.movement_type == Camera::MovementType::Orbit)
+			if (active_camera.movement_type == Camera::MovementType::Orbit)
 			{
 				internal.render_dirty |= ImGui::DragFloat3("Position", glm::value_ptr(active_camera.orbit_camera_position), 0.1f);
 				internal.render_dirty |= ImGui::DragFloat("Distance", &active_camera.orbit_camera_distance, 0.1f);
 				internal.render_dirty |= ImGui::DragFloat("Angle", &active_camera.orbit_camera_angle, 0.25f);
 				active_camera.orbit_camera_angle = glm::clamp(active_camera.orbit_camera_angle, -89.9f, 89.9f);
-				
+
 				ImGui::Checkbox("Orbit automatically?", &active_camera.orbit_automatically);
-				if(active_camera.orbit_automatically)
+				if (active_camera.orbit_automatically)
 					ImGui::DragFloat("Rotations/s", &active_camera.orbit_camera_rotations_per_second, 0.001f, -1.0f, 1.0f);
 				else
 					internal.render_dirty |= ImGui::DragFloat("Rotated T", &active_camera.orbit_camera_t, 0.001f);
-				
-				active_camera.orbit_camera_t = wrap_number(active_camera.orbit_camera_t, 0.0f, 1.0f); 
+
+				active_camera.orbit_camera_t = wrap_number(active_camera.orbit_camera_t, 0.0f, 1.0f);
 			}
 
 			static float blur_radius_proxy;
@@ -813,9 +813,9 @@ namespace Raytracer
 
 			internal.render_dirty |= ImGui::DragFloat("Focal distance", &active_camera.focal_distance, 0.001f, 0.001f, 1e34f);
 
-			if(!internal.focus_on_clicked)
+			if (!internal.focus_on_clicked)
 			{
-				if(ImGui::Button("Focus on cursor"))
+				if (ImGui::Button("Focus on cursor"))
 				{
 					internal.focus_on_clicked = true;
 				}
@@ -826,18 +826,18 @@ namespace Raytracer
 			}
 
 			ImGui::Unindent();
-			ImGui::Dummy({20, 20});
+			ImGui::Dummy({ 20, 20 });
 			ImGui::SeparatorText("Accumulation & Frames");
 			ImGui::Indent();
 
 			ImGui::Checkbox("Accumulate frames?", &settings.accumulate_frames);
-			if(!settings.accumulate_frames)
+			if (!settings.accumulate_frames)
 				ImGui::BeginDisabled();
 			ImGui::Text("Accumulation Limit");
 			ImGui::Checkbox("##Limit accumulated frames checkbox", &settings.limit_accumulated_frames);
 			ImGui::SameLine();
 			ImGui::InputInt("##Frame limit", &settings.accumulated_frame_limit, 0, 0);
-			if(!settings.accumulate_frames)
+			if (!settings.accumulate_frames)
 				ImGui::EndDisabled();
 
 			ImGui::Text("Framerate Limit");
@@ -846,27 +846,27 @@ namespace Raytracer
 			ImGui::InputInt("##Framerate limit", &settings.fps_limit, 0, 0);
 
 			ImGui::Unindent();
-			ImGui::Dummy({20, 20});
+			ImGui::Dummy({ 20, 20 });
 			ImGui::SeparatorText("Camera Instances");
 			ImGui::Indent();
-			
+
 			if (ImGui::Button("Add Camera"))
 			{
 				// Copy over current camera as a new camera
 				internal.cameras.push_back(internal.get_active_camera_ref());
 			}
 
-			ImGui::Dummy({20, 20});
+			ImGui::Dummy({ 20, 20 });
 
 			int remove_idx = -1;
 
-			for(u32 i = 0; i < internal.cameras.size(); i++)
+			for (u32 i = 0; i < internal.cameras.size(); i++)
 			{
 				std::string text = (i == internal.active_camera_idx)
 					? std::format("[Camera {}]", i)
 					: std::format("Camera {}", i);
 
-				if(ImGui::Button(text.c_str()))
+				if (ImGui::Button(text.c_str()))
 				{
 					internal.active_camera_idx = i;
 					internal.render_dirty = true;
@@ -877,19 +877,19 @@ namespace Raytracer
 
 				bool last_camera = internal.cameras.size() == 1;
 
-				if(!last_camera)
+				if (!last_camera)
 				{
-					if(ImGui::Button(std::format("X ## {}", i).c_str()))
+					if (ImGui::Button(std::format("X ## {}", i).c_str()))
 					{
 						remove_idx = i;
 					}
 				}
 			}
 
-			if(remove_idx != -1)
+			if (remove_idx != -1)
 			{
 				internal.cameras.erase(internal.cameras.begin() + remove_idx);
-				if(internal.active_camera_idx >= internal.cameras.size())
+				if (internal.active_camera_idx >= internal.cameras.size())
 				{
 					internal.active_camera_idx--;
 				}
@@ -898,21 +898,21 @@ namespace Raytracer
 			ImGui::EndTabItem();
 		}
 
-		if(ImGui::BeginTabItem("Scene Settings"))
+		if (ImGui::BeginTabItem("Scene Settings"))
 		{
-			ImGui::Dummy({0, 20});
+			ImGui::Dummy({ 0, 20 });
 			ImGui::SeparatorText("EXR Settings");
 			ImGui::Indent();
 
-			if(ImGui::BeginCombo("EXRs", internal.current_exr.c_str()))
+			if (ImGui::BeginCombo("EXRs", internal.current_exr.c_str()))
 			{
 				u32 idx = 0;
-				for(auto exr : Assets::get_disk_files_by_extension("exr"))
+				for (auto exr : Assets::get_disk_files_by_extension("exr"))
 				{
 					if (ImGui::Selectable((exr.file_name + ".exr").c_str(), exr.file_name == internal.current_exr))
 					{
 						internal.current_exr = exr.file_name;
-						
+
 						// Load actual exr
 						switch_skybox(idx);
 					}
@@ -926,16 +926,16 @@ namespace Raytracer
 			ImGui::EndTabItem();
 
 			internal.render_dirty |= ImGui::DragFloat("EXR Angle", &scene_data.exr_angle, 0.1f);
-			
+
 			scene_data.exr_angle = wrap_number(scene_data.exr_angle, 0.0f, 360.0f);
 
 			static std::string selected_mesh_name = Assets::get_disk_files_by_extension("gltf").begin()->file_name;
 			static u32 selected_mesh_idx = 0;
-			
-			if(ImGui::BeginCombo("Mesh Instances", selected_mesh_name.c_str()))
+
+			if (ImGui::BeginCombo("Mesh Instances", selected_mesh_name.c_str()))
 			{
 				u32 idx = 0;
-				for(auto& mesh : Assets::get_disk_files_by_extension("gltf"))
+				for (auto& mesh : Assets::get_disk_files_by_extension("gltf"))
 				{
 					if (ImGui::Selectable(mesh.file_name.c_str(), mesh.file_name == selected_mesh_name))
 					{
@@ -948,31 +948,31 @@ namespace Raytracer
 				ImGui::EndCombo();
 			}
 
-			if(ImGui::Button("Add Instance"))
+			if (ImGui::Button("Add Instance"))
 			{
 				internal.selected_instance_idx = World::add_instance_of_mesh(selected_mesh_idx);
 				internal.world_dirty = true;
 			}
 
-			ImGui::Dummy({0, 20});
+			ImGui::Dummy({ 0, 20 });
 			ImGui::Unindent();
 			ImGui::SeparatorText("Selected Instance");
 			ImGui::Indent();
 
 			ui_selected_instance();
 
-			ImGui::Dummy({0, 20});
+			ImGui::Dummy({ 0, 20 });
 			ImGui::Unindent();
 			ImGui::SeparatorText("Materials");
 			ImGui::Indent();
 
-			if(ImGui::Button("Add new"))
+			if (ImGui::Button("Add new"))
 			{
 				World::add_material();
 			}
 
 			u32 number_idx = 0;
-			for(u32 idx = 0; idx < World::get_material_count(); idx++)
+			for (u32 idx = 0; idx < World::get_material_count(); idx++)
 			{
 				auto current_material = World::get_material_ref(idx);
 
@@ -994,7 +994,7 @@ namespace Raytracer
 			}
 		}
 
-		if(ImGui::BeginTabItem("Performance"))
+		if (ImGui::BeginTabItem("Performance"))
 		{
 			perf::draw_section_implot_graph("render passes");
 			ImGui::EndTabItem();
@@ -1007,7 +1007,7 @@ namespace Raytracer
 
 		auto view = glm::lookAtRH(active_camera.position, active_camera.position + forward, glm::vec3(0.0f, 1.0f, 0.0f));
 
-		if(internal.selected_instance_idx != -1)
+		if (internal.selected_instance_idx != -1)
 		{
 			i32 transform_idx = internal.selected_instance_idx;
 
@@ -1024,14 +1024,14 @@ namespace Raytracer
 			}
 		}
 
-		if(settings.show_onscreen_log)
+		if (settings.show_onscreen_log)
 		{
 			auto latest_msg = Log::get_latest_msg();
 			auto message_color = (latest_msg.second == Log::MessageType::Error) ? IM_COL32(255, 0, 0, 255) : IM_COL32(255, 255, 255, 255);
 
 			auto text_size = ImGui::CalcTextSize(latest_msg.first.data());
 
-			ImGui::GetForegroundDrawList()->AddText(ImVec2(internal.render_width_px / 2 - text_size.x / 2, 10), message_color, latest_msg.first.data() ,latest_msg.first.data() + latest_msg.first.length());
+			ImGui::GetForegroundDrawList()->AddText(ImVec2(internal.render_width_px / 2 - text_size.x / 2, 10), message_color, latest_msg.first.data(), latest_msg.first.data() + latest_msg.first.length());
 		}
 	}
 
