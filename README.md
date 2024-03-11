@@ -19,6 +19,7 @@ Latest Render
 - Pathtracing
 - SAH BVH
 - EXR/HDRI Support
+- Wavefront Pathtracing (Currently WIP)
 
 ### Using (And thanks to)
 - [GLFW](https://www.glfw.org/)
