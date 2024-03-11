@@ -1,6 +1,5 @@
 # Phantasma Pathtracer
 
-My repository for my Phantasma Pathtracer built along with the Advanced Graphics Masterclass at BUas, given by Jacco Bikker.
 <p align="center">
 <img src="https://raw.githubusercontent.com/WhatevvsDev/Phantasma/master/AdvGfx/render.jpg">
 </p>
