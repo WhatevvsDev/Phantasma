@@ -16,7 +16,6 @@ Latest Render
 ### Current features
 - GPU Acceleration via OpenCL
 - Live shader recompilation
-- Pathtracing
 - SAH BVH
 - EXR/HDRI Support
 - Wavefront Pathtracing (Currently WIP)
